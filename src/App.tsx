@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
-import Lancamentos from './components/Lancamentos';
+import Lancamentos from './components/lancamentos';
 import Praticidades from './components/Praticidades';
 import PratasCarousel from './components/Pratas';
 import About from './components/About';
