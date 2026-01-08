@@ -46,9 +46,10 @@ const Header: React.FC = () => {
 
       {/* HEADER */}
       <div
-        className={`transition-all duration-300 ${
-          scrolled ? 'bg-[#f3f0e0]/95 shadow-sm backdrop-blur-md' : 'bg-[#f3f0e0]'
-        }`}
+        className={`transition-all duration-300 ${scrolled
+            ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md border-b border-[#2b554e]/10"
+            : "bg-[#FCFAF6] border-b border-[#2b554e]/10"
+          }`}
       >
         {/* Linha principal */}
         <div className="container mx-auto px-4 md:px-6 h-20 flex items-center">
@@ -68,9 +69,9 @@ const Header: React.FC = () => {
           <div className="flex-1 flex justify-center md:justify-start md:flex-none md:w-[260px]">
             <Link href="#home" className="inline-flex items-center">
               <img
-                src="/logo_fundo_claro.png"
+                src="/logo_fundo_claro2.png"
                 alt="Logo da loja"
-                className="h-16 w-auto object-contain"
+                className="h-[90px] w-auto object-contain"
               />
             </Link>
           </div>
@@ -149,9 +150,8 @@ const Header: React.FC = () => {
 
       {/* DRAWER MOBILE */}
       <div
-        className={`md:hidden fixed inset-0 bg-[#2b554e]/95 z-40 transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`md:hidden fixed inset-0 bg-[#2b554e]/95 z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
       >
         <div className="pt-24 px-6">
           {/* Busca mobile */}

@@ -2,7 +2,7 @@ import React from 'react';
 
 const Hero: React.FC = () => {
   return (
-    <section id="home" className="bg-[#f3f0e0] pt-[160px] md:pt-[170px]">
+    <section id="home" className="bg-[#FCFAF6] pt-[170px] md:pt-[180px]">
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="overflow-hidden rounded-2xl">

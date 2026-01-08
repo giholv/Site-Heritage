@@ -1,14 +1,14 @@
 import React, { useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
-import Solutions from './components/MarmitaCarousel';
-import Explore from './components/Explore';
-import CaseStudies from './components/CaseStudies';
+import Lancamentos from './components/Lancamentos';
+import Praticidades from './components/Praticidades';
+import PratasCarousel from './components/Pratas';
 import About from './components/About';
-import Team from './components/Team';
-import Testimonials from './components/Testimonials';
+import Faq from './components/FAQ';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
+import Semijoias from './components/Semijoias';
 
 function App() {
   useEffect(() => {
@@ -35,12 +35,12 @@ function App() {
       <Header />
       <main>
         <Hero />
-        <Solutions />
-        <Explore />
-        <CaseStudies />
+        <Lancamentos />
+        <PratasCarousel />
+        <Semijoias />
+        <Praticidades />
         <About />
-        <Team /> 
-        <Testimonials />
+        <Faq />
         <Contact />
       </main>
       <Footer />

@@ -1,141 +1,140 @@
-  import React from 'react';
-  import { Award, Users, Globe, Leaf } from 'lucide-react';
+import React from "react";
+import { Gem, ShieldCheck, Sparkles, HeartHandshake } from "lucide-react";
 
-  interface ValueCardProps {
-    icon: React.ReactNode;
-    title: string;
-    description: string;
-  }
+interface ValueCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}
 
-  const ValueCard: React.FC<ValueCardProps> = ({ icon, title, description }) => {
-    return (
-      <div className="flex flex-col items-center text-center p-6">
-        <div className="rounded-full bg-primary bg-opacity-10 w-16 h-16 flex items-center justify-center mb-4">
-          {icon}
-        </div>
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">{title}</h3>
-        <p className="text-gray-600">{description}</p>
+const ValueCard: React.FC<ValueCardProps> = ({ icon, title, description }) => {
+  return (
+    <div className="bg-white/85 rounded-2xl border border-[#2b554e]/10 shadow-sm p-6 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+      <div className="rounded-2xl bg-[#2b554e]/10 w-14 h-14 flex items-center justify-center mb-4 mx-auto">
+        {icon}
       </div>
-    );
-  };
+      <h3 className="text-lg font-semibold text-[#2b554e] mb-2">{title}</h3>
+      <p className="text-sm text-[#2b554e]/70 leading-relaxed">{description}</p>
+    </div>
+  );
+};
 
-  const About: React.FC = () => {
-    const values = [
-      {
-        icon: <Leaf className="h-7 w-7 text-primary" />,
-        title: "Praticidade Inteligente",
-        description: "Tornamos a alimentação do universitário simples, rápida e sempre acessível — sem perder qualidade."
-      },
-      {
-        icon: <Award className="h-7 w-7 text-primary" />,
-        title: "Nutrição de Verdade",
-        description: "Cada refeição é pensada para dar energia, foco e bem-estar no ritmo puxado da faculdade."
-      },
-      {
-        icon: <Users className="h-7 w-7 text-primary" />,
-        title: "Sustentabilidade Real",
-        description: "Usamos processos e embalagens que reduzem impacto, porque cuidar do corpo também é cuidar do mundo."
-      },
-      {
-        icon: <Globe className="h-7 w-7 text-primary" />,
-        title: "Excelência no Sabor",
-        description: "Fit não precisa ser sem graça. Entregamos refeições equilibradas, gostosas e consistentes todos os dias."
-      }
-    ];
+const About: React.FC = () => {
+  const values = [
+    {
+      icon: <Sparkles className="h-7 w-7 text-[#2b554e]" />,
+      title: "Design que combina com você",
+      description:
+        "Peças pensadas para o dia a dia: do look básico ao marcante, sem exagero.",
+    },
+    {
+      icon: <Gem className="h-7 w-7 text-[#2b554e]" />,
+      title: "Acabamento premium",
+      description:
+        "Brilho bonito, detalhes bem feitos e cuidado real em cada peça e embalagem.",
+    },
+    {
+      icon: <ShieldCheck className="h-7 w-7 text-[#2b554e]" />,
+      title: "Qualidade e segurança",
+      description:
+        "Transparência nos materiais e padrão de qualidade para você comprar tranquila.",
+    },
+    {
+      icon: <HeartHandshake className="h-7 w-7 text-[#2b554e]" />,
+      title: "Experiência sem complicação",
+      description:
+        "Compra simples, atendimento humano e troca fácil quando precisar.",
+    },
+  ];
 
-    return (
-    <section id="about" className="py-20 bg-gray-50">
-    <div className="container mx-auto px-4 md:px-6">
+  return (
+    <section id="about" className="py-20 bg-[#FCFAF6] scroll-mt-[140px]">
+      <div className="container mx-auto px-4 md:px-6">
+        {/* GRID PRINCIPAL */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* COLUNA DE TEXTO */}
+          <div>
+            <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e] mb-4">
+              Sobre nós
+            </h2>
+            <div className="h-[2px] w-24 bg-[#b08d57] mb-6 rounded-full"></div>
 
-      {/* GRID PRINCIPAL */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <p className="text-base md:text-lg text-[#2b554e]/80 mb-5">
+              A Héritage nasce da ideia de que joias acompanham fases. Mudam com você,
+              refletem quem você é hoje e quem está se tornando.
+            </p>
 
-        {/* COLUNA DE TEXTO */}
-        <div>
-          <h2 className="text-3xl md:text-4xl font-bold text-primary-dark mb-4">
-            Sobre nós
-          </h2>
-          <div className="h-1 w-20 bg-accent mb-6"></div>
+            <p className="text-base md:text-lg text-[#2b554e]/80 mb-5">
+              Criamos semijoias e pratas com design atemporal, acabamento cuidadoso e
+              brilho que se encaixa no dia a dia — do básico ao marcante, sem exagero.
+            </p>
 
-          <p className="text-lg text-primary-dark mb-6">
-            A Unifit nasceu para simplificar a alimentação dos universitários. 
-            A rotina é corrida, cheia de prazos, provas e atividades — e encontrar comida saudável,
-            rápida e acessível raramente é fácil.
-          </p>
+            <p className="text-base md:text-lg text-[#2b554e]/80 mb-8">
+              Mais do que acessórios, entregamos escolha, identidade e liberdade para
+              se expressar do seu jeito.
+            </p>
 
-          <p className="text-lg text-primary mb-6">
-            Por isso criamos uma solução prática, nutritiva e pensada exatamente para quem passa 
-            horas estudando: refeições balanceadas, gostosas e prontas para acompanhar o ritmo intenso 
-            da vida acadêmica.
-          </p>
+            {/* “mini stats” (opcional) */}
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: "Acabamento premium", value: "Detalhe" },
+                { label: "Peças versáteis", value: "Todo dia" },
+                { label: "Linha Prata 925", value: "Atemporal" },
+                { label: "NOUVEAU", value: "Nova fase" },
+              ].map((stat, index) => (
+                <div
+                  key={index}
+                  className="bg-white/85 border border-[#2b554e]/10 p-4 rounded-xl shadow-sm"
+                >
+                  <p className="text-[#b08d57] font-semibold text-lg">{stat.value}</p>
+                  <p className="text-[#2b554e]/70 text-sm">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
-          <p className="text-lg text-primary-dark mb-8">
-            Acreditamos que uma boa alimentação é combustível para corpo e mente. 
-            A Unifit não entrega apenas comida — entrega cuidado, saúde e praticidade no dia a dia do universitário.
-          </p>
+          {/* COLUNA DA IMAGEM */}
+          <div className="relative">
+            <div className="relative z-10 rounded-3xl overflow-hidden shadow-md border border-[#2b554e]/10 bg-white/70">
+              <img
+                src="/Dona.jpg"
+                alt="Dona Héritage"
+                className="w-full h-auto object-contain p-10"
+              />
+            </div>
 
-          {/* ESTATÍSTICAS */}
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            {[
-              { label: "Refeições servidas", value: "15k+" },
-              { label: "Campus atendidos", value: "8+" },
-              { label: "Avaliação média", value: "4.9 ★" },
-              { label: "Pratos no menu", value: "40+" },
-            ].map((stat, index) => (
-              <div key={index} className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-primary font-bold text-2xl">{stat.value}</p>
-                <p className="text-gray-600">{stat.label}</p>
-              </div>
+            {/* blobs decorativos */}
+            <div className="absolute top-1/2 right-0 translate-x-1/4 -translate-y-1/2 w-32 h-32 md:w-48 md:h-48 bg-[#b08d57] rounded-full opacity-20 blur-2xl" />
+            <div className="absolute bottom-1/3 left-0 -translate-x-1/4 w-32 h-32 md:w-48 md:h-48 bg-[#2b554e] rounded-full opacity-20 blur-2xl" />
+          </div>
+        </div>
+
+        {/* VALORES */}
+        <div className="mt-16">
+          <div className="text-center max-w-3xl mx-auto mb-10">
+            <h3 className="text-2xl md:text-3xl font-semibold text-[#2b554e] mb-3">
+              Nossos valores
+            </h3>
+            <div className="h-[2px] w-20 bg-[#b08d57] mx-auto mb-4 rounded-full"></div>
+            <p className="text-[#2b554e]/75">
+              O que guia cada peça, do design ao envio.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {values.map((value, index) => (
+              <ValueCard
+                key={index}
+                icon={value.icon}
+                title={value.title}
+                description={value.description}
+              />
             ))}
           </div>
         </div>
-
-        {/* COLUNA DA IMAGEM */}
-        <div className="relative">
-          <div className="relative z-10 rounded-lg overflow-hidden shadow-xl">
-            <img
-              src="/Logo3.png"
-              alt="logo Unifit"
-              className="w-full h-auto"
-            />
-          </div>
-
-          <div className="absolute top-1/2 right-0 translate-x-1/4 -translate-y-1/2 
-                          w-32 h-32 md:w-48 md:h-48 bg-accent rounded-full 
-                          opacity-30 blur-2xl">
-          </div>
-
-          <div className="absolute bottom-1/3 left-0 -translate-x-1/4
-                          w-32 h-32 md:w-48 md:h-48 bg-primary rounded-full 
-                          opacity-30 blur-2xl">
-          </div>
-        </div>
       </div>
+    </section>
+  );
+};
 
-  {/* VALORES */}
-<div className="mt-20 py-16 bg-gray-50 rounded-2xl">
-  <div className="text-center max-w-3xl mx-auto mb-12">
-    <h2 className="text-3xl font-bold text-primary-dark mb-4">Nossos Valores</h2>
-    <div className="h-1 w-16 bg-accent mx-auto mb-6"></div>
-    <p className="text-lg text-primary-dark">
-      Os princípios que guiam nossa missão.
-    </p>
-  </div>
-
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-    {values.map((value, index) => (
-      <ValueCard
-        key={index}
-        icon={value.icon}
-        title={value.title}
-        description={value.description}
-      />
-    ))}
-  </div>
-</div>
-    </div>
-  </section>
-    );
-  }
-
-  export default About;
+export default About;
