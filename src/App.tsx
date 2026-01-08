@@ -12,7 +12,7 @@ import Footer from './components/Footer';
 
 function App() {
   useEffect(() => {
-    document.title = 'Unifit - Nutrição Inteligente para Universitários';
+    document.title = 'Héritage - SemiJoias';
 
     const handleHashChange = () => {
       const { hash } = window.location;
