@@ -1,51 +1,31 @@
-import React, { useEffect } from 'react';
-import Header from './components/Header';
-import Hero from './components/Hero';
-import Lancamentos from './components/lancamentos';
-import Praticidades from './components/Praticidades';
-import PratasCarousel from './components/Pratas';
-import About from './components/About';
-import Faq from './components/FAQ';
-import Contact from './components/Contact';
-import Footer from './components/Footer';
-import Semijoias from './components/Semijoias';
+import { useEffect } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
+import HomePage from "./pages/HomePage";
+import ProductPage from "./pages/ProductPage";
 
-function App() {
+function ScrollToHash() {
+  const { hash, pathname } = useLocation();
+
   useEffect(() => {
-    document.title = 'Héritage - SemiJoias';
+    if (!hash) return;
 
-    const handleHashChange = () => {
-      const { hash } = window.location;
-      if (hash) {
-        const element = document.querySelector(hash);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
-        }
-      }
-    };
+    requestAnimationFrame(() => {
+      const el = document.querySelector(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    });
+  }, [hash, pathname]);
 
-    window.addEventListener('hashchange', handleHashChange);
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, []);
-
-  return (
-    <div className="antialiased">
-      <Header />
-      <main>
-        <Hero />
-        <Lancamentos />
-        <PratasCarousel />
-        <Semijoias />
-        <Praticidades />
-        <About />
-        <Faq />
-        <Contact />
-      </main>
-      <Footer />
-    </div>
-  );
+  return null;
 }
 
-export default App;
+export default function App() {
+  return (
+    <>
+      <ScrollToHash />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/produto/:slug" element={<ProductPage />} />
+      </Routes>
+    </>
+  );
+}

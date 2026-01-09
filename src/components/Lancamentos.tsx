@@ -1,27 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
-
-type Peca = {
-  nome: string;
-  descricao?: string;
-  preco?: string;
-  imagem: string;
-  tag?: string;
-};
+import { useNavigate } from "react-router-dom";
+import { products, type Product } from "../data/Products";
 
 const ColecaoCarousel: React.FC = () => {
-  const pecas: Peca[] = useMemo(
-    () => [
-      { nome: "Brinco Aurora", descricao: "Banho premium • acabamento espelhado", preco: "R$ 89,90", imagem: "/peca1.jpg", tag: "Novidade" },
-      { nome: "Colar Lumi", descricao: "Minimalista • brilho sutil", preco: "R$ 129,90", imagem: "/peca2.jpg" },
-      { nome: "Anel Éveil", descricao: "Ajustável • destaque do look", preco: "R$ 79,90", imagem: "/peca3.jpg", tag: "Destaque" },
-      { nome: "Pulseira Nouveau", descricao: "Clássica • fácil de combinar", preco: "R$ 99,90", imagem: "/peca4.jpg" },
-    ],
-    []
-  );
+  const navigate = useNavigate();
 
+  const pecas: Product[] = useMemo(() => products, []);
   const total = pecas.length;
+
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -36,10 +24,12 @@ const ColecaoCarousel: React.FC = () => {
   const next = () => setActiveIndex((prev) => (prev + 1) % total);
   const prev = () => setActiveIndex((prev) => (prev - 1 + total) % total);
 
-  const onAddToCart = (peca: Peca) => {
+  const onAddToCart = (peca: Product) => {
     console.log("Adicionar no carrinho:", peca);
-    // aqui você liga no seu carrinho (context/zustand/redux)
   };
+
+  const formatBRL = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
     <section id="lancamentos" className="py-16 bg-[#FCFAF6] scroll-mt-[140px]">
@@ -80,11 +70,21 @@ const ColecaoCarousel: React.FC = () => {
                 translateY = 8;
               }
 
+              const handleCardClick = () => {
+                // se não é o ativo: só foca
+                if (offset !== 0) {
+                  setActiveIndex(index);
+                  return;
+                }
+                // se é o ativo: abre página do produto
+                navigate(`/produto/${peca.slug}`);
+              };
+
               return (
                 <motion.div
-                  key={`${peca.nome}-${index}`}
+                  key={`${peca.slug}-${index}`}
                   className="w-56 md:w-60 lg:w-72 cursor-pointer select-none snap-center"
-                  onClick={() => setActiveIndex(index)}
+                  onClick={handleCardClick}
                   initial={false}
                   animate={{ scale, opacity, y: translateY }}
                   transition={{ duration: 0.75, ease: "easeInOut" }}
@@ -121,11 +121,9 @@ const ColecaoCarousel: React.FC = () => {
                         )}
 
                         <div className="mt-4 flex items-center justify-between gap-3">
-                          {peca.preco && (
-                            <div className="text-sm font-semibold text-[#b08d57]">
-                              {peca.preco}
-                            </div>
-                          )}
+                          <div className="text-sm font-semibold text-[#b08d57]">
+                            {formatBRL(peca.preco)}
+                          </div>
 
                           <button
                             type="button"
@@ -139,6 +137,18 @@ const ColecaoCarousel: React.FC = () => {
                             Adicionar
                           </button>
                         </div>
+
+                        {/* opcional: botão explícito pra detalhes */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/produto/${peca.slug}`);
+                          }}
+                          className="mt-3 w-full rounded-md border border-[#2b554e]/20 px-4 py-2 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
+                        >
+                          Ver detalhes
+                        </button>
                       </div>
                     )}
                   </div>
