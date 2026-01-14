@@ -295,7 +295,7 @@ const Header: React.FC = () => {
         items={state.items}
         subtotal={subtotal}
         freeShippingThreshold={699}
-        onContinueShopping={() => navigate("/")}
+        onContinueShopping={() => setCartOpen(false)}
         onCheckout={() => {
           setCartOpen(false);
           navigate("/checkout");

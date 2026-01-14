@@ -5,6 +5,7 @@ import ProductPage from "./pages/ProductPage";
 import Header from "./Header";
 import CadastroUsuariosPage from "./pages/cadastro_users";
 import LoginPage from "./pages/LoginPage";
+import Checkout from "./pages/Checkout";
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -31,6 +32,7 @@ export default function App() {
            <Route path="/cadastro" element={<CadastroUsuariosPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/carrinho" element={<div className="p-6">Carrinho</div>} />
+        <Route path="/checkout" element={<Checkout />} />
       </Routes>
     </>
   );
