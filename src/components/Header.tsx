@@ -110,9 +110,10 @@ const Header: React.FC = () => {
             <div className="flex-1 flex justify-center md:justify-start md:flex-none md:w-[260px]">
               <Link href="#home" className="inline-flex items-center">
                 <img
-                  src="/logo_fundo_claro2.png"
+                  src="/logo_fundo_claro3.svg"
                   alt="Logo da loja"
-                  className="h-[90px] w-auto object-contain"
+                  className="h-[150px] w-auto object-contain"
+                  style={{ marginTop: "50px" }}
                 />
               </Link>
             </div>
@@ -174,7 +175,7 @@ const Header: React.FC = () => {
           </div>
 
           {/* MENU desktop */}
-          <nav className="hidden md:block border-t border-[#2b554e]/10">
+          <nav className="hidden md:block">
             <div className="container mx-auto px-4 md:px-6 h-12 flex items-center justify-center gap-10">
               {menuItems.map((item) => (
                 <Link
@@ -281,7 +282,7 @@ const Header: React.FC = () => {
                 </div>
 
                 <p className="mt-6 text-xs text-white/60">
-                  Heritage Maison • Elegância sem esforço.
+                  Caléa  • Elegância sem esforço.
                 </p>
               </div>
             </div>

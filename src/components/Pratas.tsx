@@ -45,7 +45,7 @@ const PratasCarousel: React.FC = () => {
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e]">
-            Linha <span className="text-[#b08d57]">PRATA 925</span>
+            Linha <span className="text-[#b08d57]">PRATA</span>
           </h2>
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mt-4 mb-4 rounded-full" />
           <p className="text-[#2b554e]/80 text-base md:text-lg">

@@ -39,7 +39,7 @@ const Contact: React.FC = () => {
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e] mb-3">
-            Fale com a <span className="text-[#b08d57]">Héritage</span>
+            Fale com a <span className="text-[#b08d57]">Caléa</span>
           </h2>
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mb-4 rounded-full" />
           <p className="text-base md:text-lg text-[#2b554e]/75">

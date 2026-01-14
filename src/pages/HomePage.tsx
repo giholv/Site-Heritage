@@ -12,7 +12,7 @@ import Semijoias from "../components/Semijoias";
 
 export default function HomePage() {
   useEffect(() => {
-    document.title = "Héritage - SemiJoias";
+    document.title = "Caléa - SemiJoias";
   }, []);
 
   return (

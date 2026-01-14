@@ -12,7 +12,7 @@ const Footer: React.FC = () => {
             <div className="flex items-center gap-3 mb-4">
               <img
                 src="/logo_fundo_escuro.png"
-                alt="Héritage"
+                alt="Caléa Logo"
                 className="h-[44px] w-auto object-contain"
               />
             </div>
@@ -124,7 +124,7 @@ const Footer: React.FC = () => {
         <div className="mt-10 pt-6 border-t border-[#FCFAF6]/15">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-[#FCFAF6]/65">
-              © {new Date().getFullYear()} Héritage. Todos os direitos reservados.
+              © {new Date().getFullYear()} Caléa. Todos os direitos reservados.
             </p>
 
             <div className="flex items-center gap-6 text-xs">

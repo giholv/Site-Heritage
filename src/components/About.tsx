@@ -60,7 +60,7 @@ const About: React.FC = () => {
             <div className="h-[2px] w-24 bg-[#b08d57] mb-6 rounded-full"></div>
 
             <p className="text-base md:text-lg text-[#2b554e]/80 mb-5">
-              A Héritage nasce da ideia de que joias acompanham fases. Mudam com você,
+              A Caléa nasce da ideia de que joias acompanham fases. Mudam com você,
               refletem quem você é hoje e quem está se tornando.
             </p>
 
@@ -98,7 +98,7 @@ const About: React.FC = () => {
             <div className="relative z-10 rounded-3xl overflow-hidden shadow-md border border-[#2b554e]/10 bg-white/70">
               <img
                 src="/Dona.jpg"
-                alt="Dona Héritage"
+                alt="Dona Caléa"
                 className="w-full h-auto object-contain p-10"
               />
             </div>

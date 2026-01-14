@@ -65,7 +65,7 @@ export default function ProductPage() {
 
   useEffect(() => {
     if (!product) return;
-    document.title = `${product.nome} - Héritage`;
+    document.title = `${product.nome} - Caléa`;
     setMainImg(product.imagens?.[0] ?? product.imagem);
   }, [product]);
 
@@ -165,7 +165,7 @@ export default function ProductPage() {
             </div>
           </div>
 
-          {/* DIREITA - Compra (no estilo Héritage) */}
+          {/* DIREITA - Compra (no estilo ) */}
           <div className="lg:sticky lg:top-28 h-fit">
             <div className="bg-white/90 rounded-3xl shadow-md border border-[#2b554e]/10 p-6">
               <h1 className="text-2xl md:text-3xl font-semibold text-[#2b554e]">
