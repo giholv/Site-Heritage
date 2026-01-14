@@ -19,7 +19,7 @@ function Step({
   Icon: React.ElementType;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 min-w-[90px]">
+    <div className="flex shrink-0 flex-col items-center gap-2">
       <span
         className={[
           "inline-flex h-10 w-10 items-center justify-center rounded-full border",
@@ -29,12 +29,18 @@ function Step({
         <Icon className="h-5 w-5" />
       </span>
 
-      <span className={active ? "text-sm font-semibold" : "text-sm text-gray-400"}>
+      <span
+        className={[
+          "whitespace-nowrap text-xs sm:text-sm",
+          active ? "font-semibold text-black" : "text-gray-400",
+        ].join(" ")}
+      >
         {label}
       </span>
     </div>
   );
 }
+
 
 
 type ShippingOption = {
@@ -146,7 +152,8 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-[#f6f3ee]">
-      <div className="mx-auto max-w-6xl px-4 py-10">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 sm:py-10">
+
         {/* topo */}
         <div className="mb-10 text-center">
           <img
@@ -154,17 +161,22 @@ export default function Checkout() {
             alt="Logo da loja"
             className="mx-auto h-[150px] w-auto object-contain"
           />
-          <div className="mx-auto flex max-w-3xl items-center justify-between">
-            <Step label="Sacola" active Icon={ShoppingBag} />
-            <div className="h-px flex-1 bg-gray-300 mx-4" />
-            <Step label="Identificação" Icon={User} />
-            <div className="h-px flex-1 bg-gray-300 mx-4" />
-            <Step label="Pagamento" Icon={CreditCard} />
-            <div className="h-px flex-1 bg-gray-300 mx-4" />
-            <Step label="Confirmação" Icon={CheckCircle} />
-          </div>
+          <div className="mx-auto max-w-3xl">
+            <div className="flex items-center gap-6 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] sm:justify-between sm:overflow-visible">
+              <Step label="Sacola" active Icon={ShoppingBag} />
 
+              <div className="hidden sm:block h-px flex-1 bg-gray-300" />
+              <Step label="Identificação" Icon={User} />
+
+              <div className="hidden sm:block h-px flex-1 bg-gray-300" />
+              <Step label="Pagamento" Icon={CreditCard} />
+
+              <div className="hidden sm:block h-px flex-1 bg-gray-300" />
+              <Step label="Confirmação" Icon={CheckCircle} />
+            </div>
+          </div>
         </div>
+
 
 
         {/* layout */}
@@ -172,25 +184,28 @@ export default function Checkout() {
           {/* ESQUERDA */}
           <div className="lg:col-span-2 space-y-6">
             {/* Sacola */}
-            <div className="rounded-xl bg-white p-6 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
+           <div className="rounded-xl bg-white p-4 sm:p-6 shadow-sm">
+               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Sacola</h2>
                 <span className="text-sm text-gray-500">{count} item(ns)</span>
               </div>
 
               <div className="divide-y">
                 {items.map((it) => (
-                  <div key={it.id} className="py-5 flex items-center gap-4">
+                  <div
+                    key={it.id}
+                    className="py-5 grid grid-cols-[64px_1fr] sm:flex sm:items-center gap-4">
                     <div className="h-16 w-16 rounded-md bg-gray-100 overflow-hidden">
                       {it.image ? (
                         <img src={it.image} alt={it.name} className="h-full w-full object-cover" />
                       ) : null}
                     </div>
 
-                    <div className="flex-1">
-                      <div className="font-semibold">{it.name}</div>
-                      <div className="text-sm text-gray-500">{it.variant ?? ""}</div>
+                    <div className="min-w-0 sm:flex-1">
+                      <div className="font-semibold truncate">{it.name}</div>
+                      <div className="text-sm text-gray-500 truncate">{it.variant ?? ""}</div>
                     </div>
+
 
                     <div className="flex items-center gap-2">
                       <button
