@@ -71,7 +71,7 @@ export default async (req: Request) => {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        "User-Agent": "SuaLoja (integracao@sualoja.com)",
+        "User-Agent": "calea (integracao@sualoja.com)",
         accept: "application/json",
         "content-type": "application/json",
       },

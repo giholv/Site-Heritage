@@ -90,7 +90,7 @@ export default function Checkout() {
     try {
       const payload = {
         to_postcode: cleanCep,
-        insurance_value: subtotal,
+        insurance_value: 0,
         products: items.map((it: any) => ({
           quantity: it.qty ?? 1,
           weight: it.weight ?? 0.03,
