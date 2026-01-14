@@ -1,27 +1,41 @@
 // src/pages/Checkout.tsx
 import React, { useMemo } from "react";
+import { ShoppingBag, User, CreditCard, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
+
 
 function moneyBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function Step({ label, active }: { label: string; active?: boolean }) {
+function Step({
+  label,
+  active,
+  Icon,
+}: {
+  label: string;
+  active?: boolean;
+  Icon: React.ElementType;
+}) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-col items-center gap-2 min-w-[90px]">
       <span
         className={[
-          "inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm",
-          active ? "border-black" : "border-gray-300 text-gray-400",
+          "inline-flex h-10 w-10 items-center justify-center rounded-full border",
+          active ? "border-black text-black" : "border-gray-300 text-gray-400",
         ].join(" ")}
       >
-        ✓
+        <Icon className="h-5 w-5" />
       </span>
-      <span className={active ? "font-semibold" : "text-gray-400"}>{label}</span>
+
+      <span className={active ? "text-sm font-semibold" : "text-sm text-gray-400"}>
+        {label}
+      </span>
     </div>
   );
 }
+
 
 type ShippingOption = {
   id: string;
@@ -76,8 +90,8 @@ export default function Checkout() {
         products: items.map((it) => ({
           quantity: it.qty ?? 1,
           weight: (it as any).weight ?? 0.03, // kg (joia é leve)
-          height: (it as any).height ?? 2,    // cm
-          width: (it as any).width ?? 11,     // cm
+          height: (it as any).height ?? 8,    // cm
+          width: (it as any).width ?? 12,     // cm
           length: (it as any).length ?? 16,   // cm
         })),
       };
@@ -90,9 +104,35 @@ export default function Checkout() {
       });
 
       if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || "Falha ao calcular frete");
+        let msg = "Falha ao calcular frete";
+        try {
+          const err = await res.json();
+
+          // caso SuperFrete/Correios
+          const errors = err?.errors || err?.error?.errors;
+          const cepInvalid =
+            errors?.["correios.destination_postcode"]?.[0] ||
+            errors?.to_postcode?.[0] ||
+            err?.message;
+
+          if (cepInvalid && String(cepInvalid).toLowerCase().includes("inválido")) {
+            msg = "CEP inválido";
+          } else if (errors) {
+            // pega a primeira msg de erro que existir
+            const firstKey = Object.keys(errors)[0];
+            msg = errors[firstKey]?.[0] || "Falha ao calcular frete";
+          } else if (err?.message) {
+            msg = err.message;
+          }
+        } catch {
+          // se não for JSON, tenta texto
+          const t = await res.text().catch(() => "");
+          if (t) msg = t;
+        }
+
+        throw new Error(msg);
       }
+
 
       const data = await res.json();
       setShippingOptions(data.options ?? []);
@@ -109,17 +149,21 @@ export default function Checkout() {
       <div className="mx-auto max-w-6xl px-4 py-10">
         {/* topo */}
         <div className="mb-10 text-center">
-          <div className="text-4xl tracking-[0.5em] font-light mb-8">SUA LOJA</div>
-
+          <img
+            src="/logo_fundo_claro3.svg"
+            alt="Logo da loja"
+            className="mx-auto h-[150px] w-auto object-contain"
+          />
           <div className="mx-auto flex max-w-3xl items-center justify-between">
-            <Step label="Sacola" active />
+            <Step label="Sacola" active Icon={ShoppingBag} />
             <div className="h-px flex-1 bg-gray-300 mx-4" />
-            <Step label="Identificação" />
+            <Step label="Identificação" Icon={User} />
             <div className="h-px flex-1 bg-gray-300 mx-4" />
-            <Step label="Pagamento" />
+            <Step label="Pagamento" Icon={CreditCard} />
             <div className="h-px flex-1 bg-gray-300 mx-4" />
-            <Step label="Confirmação" />
+            <Step label="Confirmação" Icon={CheckCircle} />
           </div>
+
         </div>
 
 
@@ -271,7 +315,10 @@ export default function Checkout() {
                         />
                         <div>
                           <div className="font-semibold">{op.name}</div>
-                          <div className="text-xs text-gray-500">{op.deadline}</div>
+                          <div className="text-xs text-gray-500">
+                            {op.deadline ? `Entrega em até ${op.deadline} dias úteis` : ""}
+                          </div>
+
                         </div>
                       </div>
                       <div className="font-semibold">{moneyBRL(op.price)}</div>
