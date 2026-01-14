@@ -1,9 +1,8 @@
 // src/pages/Checkout.tsx
-import React, { useMemo } from "react";
-import { ShoppingBag, User, CreditCard, CheckCircle } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { ShoppingBag, User, CreditCard, CheckCircle, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-
 
 function moneyBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -22,13 +21,12 @@ function Step({
     <div className="flex shrink-0 flex-col items-center gap-2">
       <span
         className={[
-          "inline-flex h-10 w-10 items-center justify-center rounded-full border",
+          "inline-flex h-10 w-10 items-center justify-center rounded-full border shrink-0",
           active ? "border-black text-black" : "border-gray-300 text-gray-400",
         ].join(" ")}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-5 w-5 block" />
       </span>
-
       <span
         className={[
           "whitespace-nowrap text-xs sm:text-sm",
@@ -41,13 +39,11 @@ function Step({
   );
 }
 
-
-
 type ShippingOption = {
   id: string;
   name: string;
   price: number;
-  deadline: string;
+  deadline: string; // dias úteis
 };
 
 export default function Checkout() {
@@ -57,18 +53,20 @@ export default function Checkout() {
   const items = state.items ?? [];
 
   // presente
-  const [giftWrap, setGiftWrap] = React.useState(false);
+  const [giftWrap, setGiftWrap] = useState(false);
   const giftWrapPrice = 32;
 
+  // cupom (placeholder visual)
+  const [coupon, setCoupon] = useState("");
+
   // frete
-  const [cep, setCep] = React.useState("");
-  const [shippingLoading, setShippingLoading] = React.useState(false);
-  const [shippingError, setShippingError] = React.useState<string | null>(null);
-  const [shippingOptions, setShippingOptions] = React.useState<ShippingOption[]>([]);
-  const [selectedShipping, setSelectedShipping] = React.useState<ShippingOption | null>(null);
+  const [cep, setCep] = useState("");
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
+  const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
 
   const shippingPrice = selectedShipping?.price ?? 0;
-
   const total = subtotal + (giftWrap ? giftWrapPrice : 0) + shippingPrice;
 
   const count = useMemo(
@@ -91,18 +89,16 @@ export default function Checkout() {
     try {
       const payload = {
         to_postcode: cleanCep,
-        // opcional: valor declarado (seguro)
         insurance_value: subtotal,
         products: items.map((it) => ({
           quantity: it.qty ?? 1,
-          weight: (it as any).weight ?? 0.03, // kg (joia é leve)
-          height: (it as any).height ?? 8,    // cm
-          width: (it as any).width ?? 12,     // cm
-          length: (it as any).length ?? 16,   // cm
+          weight: (it as any).weight ?? 0.03, // kg
+          height: (it as any).height ?? 8, // cm
+          width: (it as any).width ?? 12, // cm
+          length: (it as any).length ?? 16, // cm
         })),
       };
 
-      // CHAMA A FUNCTION NO PATH CERTO
       const res = await fetch("/.netlify/functions/shipping-quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -113,8 +109,6 @@ export default function Checkout() {
         let msg = "Falha ao calcular frete";
         try {
           const err = await res.json();
-
-          // caso SuperFrete/Correios
           const errors = err?.errors || err?.error?.errors;
           const cepInvalid =
             errors?.["correios.destination_postcode"]?.[0] ||
@@ -124,25 +118,22 @@ export default function Checkout() {
           if (cepInvalid && String(cepInvalid).toLowerCase().includes("inválido")) {
             msg = "CEP inválido";
           } else if (errors) {
-            // pega a primeira msg de erro que existir
             const firstKey = Object.keys(errors)[0];
-            msg = errors[firstKey]?.[0] || "Falha ao calcular frete";
+            msg = errors[firstKey]?.[0] || msg;
           } else if (err?.message) {
             msg = err.message;
           }
         } catch {
-          // se não for JSON, tenta texto
           const t = await res.text().catch(() => "");
           if (t) msg = t;
         }
-
         throw new Error(msg);
       }
 
-
       const data = await res.json();
-      setShippingOptions(data.options ?? []);
-      if (!data.options?.length) setShippingError("Nenhuma opção de frete encontrada.");
+      const opts: ShippingOption[] = data.options ?? [];
+      setShippingOptions(opts);
+      if (!opts.length) setShippingError("Nenhuma opção de frete encontrada.");
     } catch (e: any) {
       setShippingError(e?.message ?? "Erro ao calcular frete");
     } finally {
@@ -153,39 +144,35 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-[#f6f3ee]">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 sm:py-10">
-
         {/* topo */}
-        <div className="mb-10 text-center">
+        <div className="mb-8 sm:mb-10 text-center">
           <img
             src="/logo_fundo_claro3.svg"
             alt="Logo da loja"
-            className="mx-auto h-[150px] w-auto object-contain"
+            className="mx-auto h-[110px] sm:h-[150px] w-auto object-contain"
           />
-          <div className="mx-auto max-w-3xl">
-            <div className="flex items-center gap-6 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] sm:justify-between sm:overflow-visible">
-              <Step label="Sacola" active Icon={ShoppingBag} />
 
+          {/* stepper: mobile scroll + desktop alinhado */}
+          <div className="mx-auto mt-4 max-w-3xl">
+            <div className="flex items-center gap-6 overflow-x-auto px-2 pb-2 [-webkit-overflow-scrolling:touch] sm:px-0 sm:justify-between sm:overflow-visible">
+              <Step label="Sacola" active Icon={ShoppingBag} />
               <div className="hidden sm:block h-px flex-1 bg-gray-300" />
               <Step label="Identificação" Icon={User} />
-
               <div className="hidden sm:block h-px flex-1 bg-gray-300" />
               <Step label="Pagamento" Icon={CreditCard} />
-
               <div className="hidden sm:block h-px flex-1 bg-gray-300" />
               <Step label="Confirmação" Icon={CheckCircle} />
             </div>
           </div>
         </div>
 
-
-
         {/* layout */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* ESQUERDA */}
+          {/* esquerda */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Sacola */}
-           <div className="rounded-xl bg-white p-4 sm:p-6 shadow-sm">
-               <div className="mb-4 flex items-center justify-between">
+            {/* sacola */}
+            <div className="rounded-2xl bg-white p-4 sm:p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Sacola</h2>
                 <span className="text-sm text-gray-500">{count} item(ns)</span>
               </div>
@@ -194,72 +181,97 @@ export default function Checkout() {
                 {items.map((it) => (
                   <div
                     key={it.id}
-                    className="py-5 grid grid-cols-[64px_1fr] sm:flex sm:items-center gap-4">
-                    <div className="h-16 w-16 rounded-md bg-gray-100 overflow-hidden">
+                    className="py-5 grid grid-cols-[64px_1fr] gap-4 sm:flex sm:items-center"
+                  >
+                    {/* imagem */}
+                    <div className="h-16 w-16 rounded-md bg-gray-100 overflow-hidden shrink-0">
                       {it.image ? (
-                        <img src={it.image} alt={it.name} className="h-full w-full object-cover" />
+                        <img
+                          src={it.image}
+                          alt={it.name}
+                          className="h-full w-full object-cover"
+                        />
                       ) : null}
                     </div>
 
+                    {/* nome */}
                     <div className="min-w-0 sm:flex-1">
                       <div className="font-semibold truncate">{it.name}</div>
-                      <div className="text-sm text-gray-500 truncate">{it.variant ?? ""}</div>
+                      <div className="text-sm text-gray-500 truncate">
+                        {it.variant ?? ""}
+                      </div>
                     </div>
 
+                    {/* ações: mobile embaixo / desktop à direita */}
+                    <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:justify-end sm:gap-4">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          className="h-9 w-9 rounded-md border border-gray-300 bg-white hover:bg-gray-50"
+                          onClick={() => setQty(it.id, Math.max(1, (it.qty ?? 1) - 1))}
+                          type="button"
+                          aria-label="Diminuir quantidade"
+                        >
+                          -
+                        </button>
+                        <div className="w-10 text-center">{it.qty ?? 1}</div>
+                        <button
+                          className="h-9 w-9 rounded-md border border-gray-300 bg-white hover:bg-gray-50"
+                          onClick={() => setQty(it.id, (it.qty ?? 1) + 1)}
+                          type="button"
+                          aria-label="Aumentar quantidade"
+                        >
+                          +
+                        </button>
+                      </div>
 
-                    <div className="flex items-center gap-2">
+                      <div className="shrink-0 font-semibold">
+                        {moneyBRL((it.price ?? 0) * (it.qty ?? 1))}
+                      </div>
+
                       <button
-                        className="h-9 w-9 rounded border"
-                        onClick={() => setQty(it.id, Math.max(1, (it.qty ?? 1) - 1))}
+                        className="shrink-0 text-gray-400 hover:text-black"
+                        onClick={() => remove(it.id)}
+                        type="button"
+                        aria-label="Remover item"
                       >
-                        -
-                      </button>
-                      <div className="w-10 text-center">{it.qty ?? 1}</div>
-                      <button
-                        className="h-9 w-9 rounded border"
-                        onClick={() => setQty(it.id, (it.qty ?? 1) + 1)}
-                      >
-                        +
+                        <Trash2 className="h-5 w-5" />
                       </button>
                     </div>
-
-                    <div className="w-28 text-right font-semibold">
-                      {moneyBRL((it.price ?? 0) * (it.qty ?? 1))}
-                    </div>
-
-                    <button className="ml-2 text-gray-400 hover:text-black" onClick={() => remove(it.id)}>
-                      ✕
-                    </button>
                   </div>
                 ))}
 
                 {items.length === 0 && (
-                  <div className="py-10 text-center text-gray-500">Seu carrinho está vazio.</div>
+                  <div className="py-10 text-center text-gray-500">
+                    Seu carrinho está vazio.
+                  </div>
                 )}
               </div>
 
-              {/* Presente */}
-              <div className="mt-6 rounded-xl border border-gray-200 bg-white p-4">
-                <div className="overflow-hidden rounded-lg">
+              {/* presente */}
+              <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-4">
+                <div className="overflow-hidden rounded-xl bg-[#f6f3ee]">
                   <img
                     src="/banner_presente.svg"
                     alt="Embalagem para presente"
-                    className="h-28 w-full object-cover"
+                    className="h-28 w-full object-contain object-center sm:h-32"
                     loading="lazy"
                   />
                 </div>
 
-                <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-lg border p-3">
-                  <div className="flex items-center gap-3">
+                <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-gray-200 p-3">
+                  <div className="flex items-center gap-3 leading-none">
                     <input
                       type="checkbox"
                       checked={giftWrap}
                       onChange={(e) => setGiftWrap(e.target.checked)}
-                      className="h-5 w-5"
+                      className="h-5 w-5 shrink-0 align-middle"
+                      style={{ accentColor: "#2b554e" }}
                     />
                     <div>
                       <div className="font-semibold">Adicionar embalagem para presente</div>
-                      <div className="text-sm text-gray-500">Inclui embalagem premium + finalização</div>
+                      <div className="text-sm text-gray-500">
+                        Inclui embalagem premium + finalização
+                      </div>
                     </div>
                   </div>
                   <div className="font-semibold">{moneyBRL(giftWrapPrice)}</div>
@@ -268,24 +280,34 @@ export default function Checkout() {
             </div>
           </div>
 
-          {/* DIREITA (TUDO AQUI DENTRO) */}
-          <div className="space-y-6">
-            <div className="rounded-xl bg-white p-6 shadow-sm">
-              {/* Cupom */}
-              <div className="flex gap-3">
-                <input placeholder="Cupom de Desconto" className="h-11 flex-1 rounded-md border px-3" />
-                <button className="h-11 rounded-md border px-4 font-semibold">Adicionar</button>
+          {/* direita */}
+          <div className="space-y-6 lg:sticky lg:top-24 h-fit">
+            <div className="rounded-2xl bg-white p-4 sm:p-6 shadow-sm">
+              {/* cupom */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  value={coupon}
+                  onChange={(e) => setCoupon(e.target.value)}
+                  placeholder="Cupom de Desconto"
+                  className="h-11 w-full sm:flex-1 rounded-md border border-gray-300 px-3"
+                />
+                <button
+                  className="h-11 w-full sm:w-auto rounded-md border border-gray-300 px-4 font-semibold hover:bg-gray-50"
+                  type="button"
+                >
+                  Adicionar
+                </button>
               </div>
 
               <div className="my-6 h-px bg-gray-200" />
 
-              {/* Subtotal */}
+              {/* subtotal */}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-semibold">{moneyBRL(subtotal)}</span>
               </div>
 
-              {/* Embalagem */}
+              {/* embalagem */}
               {giftWrap && (
                 <div className="mt-3 flex items-center justify-between text-sm">
                   <span className="text-gray-600">Embalagem para presente</span>
@@ -293,47 +315,53 @@ export default function Checkout() {
                 </div>
               )}
 
-              {/* FRETE (AGORA NO CARD DA DIREITA, ACIMA DO TOTAL) */}
+              {/* frete */}
               <div className="my-6 h-px bg-gray-200" />
               <div className="text-sm font-semibold mb-2">Entrega</div>
 
-              <div className="flex gap-3 items-center">
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                 <input
                   value={cep}
                   onChange={(e) => setCep(e.target.value)}
                   placeholder="Digite seu CEP"
-                  className="h-11 flex-1 rounded-md border px-3"
+                  className="h-11 w-full sm:flex-1 rounded-md border border-gray-300 px-3"
                   inputMode="numeric"
                 />
                 <button
                   onClick={handleCalcShipping}
-                  className="h-11 rounded-md border px-4 font-semibold"
+                  className="h-11 w-full sm:w-auto rounded-md border border-gray-300 px-4 font-semibold hover:bg-gray-50 disabled:opacity-50"
                   disabled={shippingLoading || items.length === 0}
                   type="button"
                 >
-                  {shippingLoading ? "..." : "Calcular"}
+                  {shippingLoading ? "Calculando..." : "Calcular"}
                 </button>
               </div>
 
-              {shippingError && <div className="mt-2 text-sm text-red-600">{shippingError}</div>}
+              {shippingError && (
+                <div className="mt-2 text-sm text-red-600">{shippingError}</div>
+              )}
 
               {shippingOptions.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {shippingOptions.map((op) => (
-                    <label key={op.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer">
+                    <label
+                      key={op.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-3 cursor-pointer"
+                    >
                       <div className="flex items-center gap-3">
                         <input
                           type="radio"
                           name="shipping"
                           checked={selectedShipping?.id === op.id}
                           onChange={() => setSelectedShipping(op)}
+                          className="h-4 w-4 shrink-0 align-middle"
+                          style={{ accentColor: "#2b554e" }}
                         />
                         <div>
                           <div className="font-semibold">{op.name}</div>
                           <div className="text-xs text-gray-500">
                             {op.deadline ? `Entrega em até ${op.deadline} dias úteis` : ""}
                           </div>
-
                         </div>
                       </div>
                       <div className="font-semibold">{moneyBRL(op.price)}</div>
@@ -344,12 +372,14 @@ export default function Checkout() {
 
               {selectedShipping && (
                 <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Frete ({selectedShipping.name})</span>
+                  <span className="text-gray-600">
+                    Frete ({selectedShipping.name})
+                  </span>
                   <span className="font-semibold">{moneyBRL(shippingPrice)}</span>
                 </div>
               )}
 
-              {/* Total */}
+              {/* total */}
               <div className="my-6 h-px bg-gray-200" />
               <div className="flex items-center justify-between">
                 <span className="text-xl font-semibold">Total</span>
@@ -357,7 +387,7 @@ export default function Checkout() {
               </div>
 
               <button
-                className="mt-6 w-full rounded-md bg-[#c9b38a] py-4 text-white font-semibold disabled:opacity-50"
+                className="mt-6 w-full rounded-md bg-[#c9b38a] py-4 text-white font-semibold disabled:opacity-50 hover:brightness-95"
                 onClick={() => navigate("/checkout/identificacao")}
                 type="button"
                 disabled={items.length === 0 || !selectedShipping}
@@ -365,10 +395,13 @@ export default function Checkout() {
               >
                 FINALIZAR COMPRA
               </button>
+
+              <p className="mt-3 text-xs text-gray-500">
+                Pagamento seguro • Dados protegidos • Suporte via WhatsApp
+              </p>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
