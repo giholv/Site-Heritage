@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { ShoppingBag, User, CreditCard, CheckCircle, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
+import { products } from "../data/Products";
 
 function moneyBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -90,12 +91,12 @@ export default function Checkout() {
       const payload = {
         to_postcode: cleanCep,
         insurance_value: subtotal,
-        products: items.map((it) => ({
+        products: items.map((it: any) => ({
           quantity: it.qty ?? 1,
-          weight: (it as any).weight ?? 0.03, // kg
-          height: (it as any).height ?? 8, // cm
-          width: (it as any).width ?? 12, // cm
-          length: (it as any).length ?? 16, // cm
+          weight: it.weight ?? 0.03,
+          height: it.height ?? 8,
+          width: it.width ?? 12,
+          length: it.length ?? 16,
         })),
       };
 
@@ -104,6 +105,8 @@ export default function Checkout() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         let msg = "Falha ao calcular frete";
@@ -130,7 +133,6 @@ export default function Checkout() {
         throw new Error(msg);
       }
 
-      const data = await res.json();
       const opts: ShippingOption[] = data.options ?? [];
       setShippingOptions(opts);
       if (!opts.length) setShippingError("Nenhuma opção de frete encontrada.");
@@ -360,7 +362,8 @@ export default function Checkout() {
                         <div>
                           <div className="font-semibold">{op.name}</div>
                           <div className="text-xs text-gray-500">
-                            {op.deadline ? `Entrega em até ${op.deadline} dias úteis` : ""}
+                            {op.deadline ? op.deadline : ""}
+
                           </div>
                         </div>
                       </div>
