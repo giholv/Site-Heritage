@@ -24,7 +24,7 @@ export default async (req: Request) => {
     const superfretePayload = {
       from: { postal_code: FROM_CEP },
       to: { postal_code: to_postcode },
-      services: "1,2,17", // PAC, Sedex, Mini Envios
+      services: "1,2,17,3,31", // PAC, Sedex, Mini Envios
       options: {
         own_hand: false,
         receipt: false,
