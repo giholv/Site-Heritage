@@ -40,8 +40,8 @@ export default async (req: Request) => {
       })),
     };
 
-    const url = "https://sandbox.superfrete.com/api/v0/calculator"; // sandbox
-    // produção seria: https://api.superfrete.com/api/v0/calculator  :contentReference[oaicite:1]{index=1}
+    const url = "https://api.superfrete.com/api/v0/calculator"; // sandbox
+    // produção seria: https://api.superfrete.com/api/v0/calculator
 
     const resp = await fetch(url, {
       method: "POST",
