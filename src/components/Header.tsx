@@ -1,225 +1,307 @@
-import React, { useEffect, useState } from 'react';
-import { Menu, X, Search, ShoppingBag, User } from 'lucide-react';
-import { Link } from './ui/Link';
+import React, { useEffect, useState } from "react";
+import { Menu, X, Search, ShoppingBag, User } from "lucide-react";
+import { Link } from "./ui/Link";
+import { useNavigate, useLocation } from "react-router-dom";
+import CartDrawer from "./CartDrawer";
+import { useCart } from "../context/CartContext";
 
 const Header: React.FC = () => {
+  const navigate = useNavigate();
+   const location = useLocation(); 
+  const { state, subtotal, count, remove, setQty } = useCart();
+
   const [isOpen, setIsOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // fecha menu mobile com ESC
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen]);
+
+  // trava scroll quando drawer/menu estiver aberto
+  useEffect(() => {
+    const shouldLock = isOpen || cartOpen;
+    const prev = document.body.style.overflow;
+    if (shouldLock) document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen, cartOpen]);
+
   const menuItems = [
-    { label: 'Início', href: '#home' },
-    { label: 'Lançamentos', href: '#lancamentos' },
-    { label: 'Pratas', href: '#pratas' },
-    { label: 'Semijoias', href: '#semijoias' },
-    { label: 'Sobre Nós', href: '#about' },
-    { label: 'Contato', href: '#contact' },
+    { label: "Início", href: "#home" },
+    { label: "Lançamentos", href: "#lancamentos" },
+    { label: "Pratas", href: "#pratas" },
+    { label: "Semijoias", href: "#semijoias" },
+    { label: "Sobre Nós", href: "#about" },
+    { label: "Contato", href: "#contact" },
   ];
 
   const onSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Pesquisar:', q);
+    // se quiser uma rota:
+    // navigate(`/busca?q=${encodeURIComponent(q)}`);
+    console.log("Pesquisar:", q);
   };
 
-  const onCart = () => console.log('Abrir carrinho');
-  const onLogin = () => console.log('Ir para login');
+  const onLogin = () => navigate("/login");
 
-  const iconBase = scrolled ? 'text-[#2b554e]' : 'text-[#2b554e]';
-  const iconHover = 'hover:text-[#b08d57]';
+  const openCart = () => {
+    setIsOpen(false);
+    setCartOpen(true);
+  };
+
+  const iconBase = "text-[#2b554e]";
+  const iconHover = "hover:text-[#b08d57]";
+
+  const badge = (n: number) =>
+    n > 0 ? (
+      <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] leading-none bg-[#b08d57] text-white rounded-full">
+        {n > 99 ? "99+" : n}
+      </span>
+    ) : null;
 
   return (
-    <header className="fixed w-full z-50">
-      {/* TOP BAR (sua identidade) */}
-      <div className="bg-[#2b554e] text-[#f3f0e0]">
-        <div className="container mx-auto px-4 md:px-6 h-10 flex items-center justify-center text-sm">
-          <span className="opacity-95">
-            Frete grátis a partir de <strong>R$699</strong> • 5% OFF no PIX • Troca fácil
-          </span>
-        </div>
-      </div>
-
-      {/* HEADER */}
-      <div
-        className={`transition-all duration-300 ${scrolled
-            ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md border-b border-[#2b554e]/10"
-            : "bg-[#FCFAF6] border-b border-[#2b554e]/10"
-          }`}
-      >
-        {/* Linha principal */}
-        <div className="container mx-auto px-4 md:px-6 h-20 flex items-center">
-          {/* Mobile: menu */}
-          <div className="md:hidden flex items-center">
-            <button
-              type="button"
-              onClick={() => setIsOpen(!isOpen)}
-              aria-label="Toggle menu"
-              className="text-[#2b554e]"
-            >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-          </div>
-
-          {/* Logo (esquerda no mobile, centro no desktop) */}
-          <div className="flex-1 flex justify-center md:justify-start md:flex-none md:w-[260px]">
-            <Link href="#home" className="inline-flex items-center">
-              <img
-                src="/logo_fundo_claro2.png"
-                alt="Logo da loja"
-                className="h-[90px] w-auto object-contain"
-              />
-            </Link>
-          </div>
-
-          {/* Busca (desktop) */}
-          <div className="hidden md:flex flex-1 justify-center">
-            <form onSubmit={onSearchSubmit} className="w-full max-w-[520px]">
-              <div className="relative">
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar por nome ou código"
-                  className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/20 bg-white/60 text-[#2b554e] placeholder:text-[#2b554e]/45 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/35"
-                />
-                <button
-                  type="submit"
-                  aria-label="Pesquisar"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[#2b554e]/70 hover:text-[#b08d57] transition-colors"
-                >
-                  <Search className="h-5 w-5" />
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Ícones (direita) */}
-          <div className="flex items-center justify-end gap-3 md:w-[260px]">
-            {/* Mobile: ícone de busca */}
-            <button
-              type="button"
-              aria-label="Pesquisar"
-              onClick={() => console.log('Abrir busca mobile')}
-              className={`md:hidden transition-colors ${iconBase} ${iconHover}`}
-            >
-              <Search className="h-6 w-6" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onLogin}
-              aria-label="Login"
-              className={`transition-colors ${iconBase} ${iconHover}`}
-            >
-              <User className="h-5 w-5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onCart}
-              aria-label="Carrinho"
-              className={`transition-colors ${iconBase} ${iconHover} relative`}
-            >
-              <ShoppingBag className="h-5 w-5" />
-              <span className="absolute -top-2 -right-2 text-[10px] leading-none bg-[#b08d57] text-white rounded-full px-1.5 py-1">
-                0
-              </span>
-            </button>
+    <>
+      <header className="fixed w-full z-50">
+        {/* TOP BAR */}
+        <div className="bg-[#2b554e] text-[#f3f0e0]">
+          <div className="container mx-auto px-4 md:px-6 h-10 flex items-center justify-center text-sm">
+            <span className="opacity-95">
+              Frete grátis a partir de <strong>R$699</strong> • 5% OFF no PIX • Troca fácil
+            </span>
           </div>
         </div>
 
-        {/* MENU (desktop) */}
-        <nav className="hidden md:block border-t border-[#2b554e]/10">
-          <div className="container mx-auto px-4 md:px-6 h-12 flex items-center justify-center gap-10">
-            {menuItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm font-medium tracking-wide text-[#2b554e] hover:text-[#b08d57] transition-colors"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
-      </div>
-
-      {/* DRAWER MOBILE */}
-      <div
-        className={`md:hidden fixed inset-0 bg-[#2b554e]/95 z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
-      >
-        <div className="pt-24 px-6">
-          {/* Busca mobile */}
-          <form onSubmit={onSearchSubmit} className="mb-8">
-            <div className="relative">
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar por nome ou código"
-                className="w-full h-12 pl-4 pr-12 rounded-md border border-white/25 bg-transparent text-[#f3f0e0] placeholder:text-[#f3f0e0]/60 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/50"
-              />
+        {/* HEADER */}
+        <div
+          className={`transition-all duration-300 ${scrolled
+              ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md border-b border-[#2b554e]/10"
+              : "bg-[#FCFAF6] border-b border-[#2b554e]/10"
+            }`}
+        >
+          <div className="container mx-auto px-4 md:px-6 h-20 flex items-center gap-3">
+            {/* Mobile: menu */}
+            <div className="md:hidden flex items-center">
               <button
-                type="submit"
+                type="button"
+                onClick={() => setIsOpen((v) => !v)}
+                aria-label="Abrir menu"
+                className="text-[#2b554e]"
+              >
+                {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+            </div>
+
+            {/* Logo */}
+            <div className="flex-1 flex justify-center md:justify-start md:flex-none md:w-[260px]">
+              <Link href="#home" className="inline-flex items-center">
+                <img
+                  src="/logo_fundo_claro2.png"
+                  alt="Logo da loja"
+                  className="h-[90px] w-auto object-contain"
+                />
+              </Link>
+            </div>
+
+            {/* Busca desktop */}
+            <div className="hidden md:flex flex-1 justify-center">
+              <form onSubmit={onSearchSubmit} className="w-full max-w-[560px]">
+                <div className="relative">
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Buscar por nome ou código"
+                    className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/20 bg-white/60 text-[#2b554e] placeholder:text-[#2b554e]/45 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
+                  />
+                  <button
+                    type="submit"
+                    aria-label="Pesquisar"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[#2b554e]/70 hover:text-[#b08d57] transition-colors"
+                  >
+                    <Search className="h-5 w-5" />
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Ícones */}
+            <div className="flex items-center justify-end gap-3 md:w-[260px]">
+              {/* Mobile: busca */}
+              <button
+                type="button"
                 aria-label="Pesquisar"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#f3f0e0]/90 hover:text-white"
+                onClick={() => console.log("Abrir busca mobile")}
+                className={`md:hidden transition-colors ${iconBase} ${iconHover}`}
               >
                 <Search className="h-6 w-6" />
               </button>
-            </div>
-          </form>
 
-          <div className="flex flex-col gap-6">
-            {menuItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-[#f3f0e0] text-xl font-medium hover:text-[#e7d3a8]"
-                onClick={() => setIsOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-
-            <div className="mt-6 flex items-center gap-4">
+              {/* Login */}
               <button
                 type="button"
                 onClick={onLogin}
                 aria-label="Login"
-                className="text-[#f3f0e0] hover:text-[#e7d3a8]"
+                className={`transition-colors ${iconBase} ${iconHover}`}
               >
-                <User className="h-7 w-7" />
+                <User className="h-5 w-5" />
               </button>
 
+              {/* Carrinho */}
               <button
                 type="button"
-                onClick={onCart}
+                onClick={openCart}
                 aria-label="Carrinho"
-                className="text-[#f3f0e0] hover:text-[#e7d3a8] relative"
+                className={`transition-colors ${iconBase} ${iconHover} relative`}
               >
-                <ShoppingBag className="h-7 w-7" />
-                <span className="absolute -top-2 -right-2 text-[10px] leading-none bg-[#b08d57] text-white rounded-full px-1.5 py-1">
-                  0
-                </span>
+                <ShoppingBag className="h-5 w-5" />
+                {badge(count)}
               </button>
+            </div>
+          </div>
 
+          {/* MENU desktop */}
+          <nav className="hidden md:block border-t border-[#2b554e]/10">
+            <div className="container mx-auto px-4 md:px-6 h-12 flex items-center justify-center gap-10">
+              {menuItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-sm font-medium tracking-wide text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+        </div>
+
+        {/* MOBILE DRAWER MENU (com overlay clicável) */}
+        <div
+          className={`md:hidden fixed inset-0 z-40 ${isOpen ? "pointer-events-auto" : "pointer-events-none"
+            }`}
+        >
+          {/* overlay */}
+          <button
+            type="button"
+            aria-label="Fechar menu"
+            onClick={() => setIsOpen(false)}
+            className={`absolute inset-0 bg-black/30 transition-opacity ${isOpen ? "opacity-100" : "opacity-0"
+              }`}
+          />
+
+          {/* painel */}
+          <div
+            className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${isOpen ? "translate-x-0" : "translate-x-full"
+              }`}
+          >
+            <div className="pt-6 px-6 flex items-center justify-between">
+              <span className="text-sm tracking-[0.18em] opacity-90">MENU</span>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Fechar"
-                className="ml-auto text-[#f3f0e0]/80 hover:text-white"
+                className="text-[#f3f0e0]/80 hover:text-white"
               >
-                <X className="h-7 w-7" />
+                <X className="h-6 w-6" />
               </button>
+            </div>
+
+            <div className="pt-8 px-6">
+              {/* Busca mobile */}
+              <form onSubmit={onSearchSubmit} className="mb-8">
+                <div className="relative">
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Buscar por nome ou código"
+                    className="w-full h-12 pl-4 pr-12 rounded-md border border-white/25 bg-transparent text-[#f3f0e0] placeholder:text-[#f3f0e0]/60 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/50"
+                  />
+                  <button
+                    type="submit"
+                    aria-label="Pesquisar"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#f3f0e0]/90 hover:text-white"
+                  >
+                    <Search className="h-6 w-6" />
+                  </button>
+                </div>
+              </form>
+
+              {/* Links */}
+              <div className="flex flex-col gap-6">
+                {menuItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="text-[#f3f0e0] text-xl font-medium hover:text-[#e7d3a8]"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+
+                {/* Ações */}
+                <div className="mt-2 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      onLogin();
+                    }}
+                    className="h-12 rounded-xl bg-white text-[#2b554e] font-medium"
+                  >
+                    Entrar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openCart}
+                    className="h-12 rounded-xl border border-white/30 text-white font-medium relative"
+                  >
+                    Sacola
+                    {count > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] leading-none bg-[#b08d57] text-white rounded-full">
+                        {count > 99 ? "99+" : count}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                <p className="mt-6 text-xs text-white/60">
+                  Heritage Maison • Elegância sem esforço.
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* CART DRAWER */}
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        items={state.items}
+        subtotal={subtotal}
+        freeShippingThreshold={699}
+        onContinueShopping={() => navigate("/")}
+        onCheckout={undefined}
+        onRemove={remove}
+        onSetQty={setQty}
+      />
+    </>
   );
 };
 

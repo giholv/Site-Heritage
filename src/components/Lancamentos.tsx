@@ -3,9 +3,11 @@ import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { products, type Product } from "../data/Products";
+import { useCart } from "../context/CartContext";
 
 const ColecaoCarousel: React.FC = () => {
   const navigate = useNavigate();
+  const { add } = useCart();
 
   const pecas: Product[] = useMemo(() => products, []);
   const total = pecas.length;
@@ -14,7 +16,7 @@ const ColecaoCarousel: React.FC = () => {
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (paused) return;
+    if (paused || total === 0) return;
     const timer = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % total);
     }, 7800);
@@ -24,12 +26,22 @@ const ColecaoCarousel: React.FC = () => {
   const next = () => setActiveIndex((prev) => (prev + 1) % total);
   const prev = () => setActiveIndex((prev) => (prev - 1 + total) % total);
 
-  const onAddToCart = (peca: Product) => {
-    console.log("Adicionar no carrinho:", peca);
-  };
-
   const formatBRL = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const onAddToCart = (e: React.MouseEvent, peca: Product) => {
+    e.stopPropagation(); // não dispara o click do card
+
+    // Ajusta esses campos conforme seu Product type:
+    add({
+      id: peca.slug,                 // ou peca.id se tiver
+      name: peca.nome,
+      price: peca.preco,
+      image: peca.imagem,
+      variant: peca.tag ?? undefined, // ou "Dourado" / tamanho, etc
+      qty: 1,
+    });
+  };
 
   return (
     <section id="lancamentos" className="py-16 bg-[#FCFAF6] scroll-mt-[140px]">
@@ -71,12 +83,10 @@ const ColecaoCarousel: React.FC = () => {
               }
 
               const handleCardClick = () => {
-                // se não é o ativo: só foca
                 if (offset !== 0) {
                   setActiveIndex(index);
                   return;
                 }
-                // se é o ativo: abre página do produto
                 navigate(`/produto/${peca.slug}`);
               };
 
@@ -127,18 +137,15 @@ const ColecaoCarousel: React.FC = () => {
 
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAddToCart(peca);
-                            }}
-                            className="ml-auto inline-flex items-center gap-2 rounded-md bg-[#2b554e] text-[#FCFAF6] px-4 py-2 text-sm font-semibold hover:bg-[#23463f] transition-colors"
+                            onClick={(e) => onAddToCart(e, peca)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-4 py-2 text-sm font-semibold hover:opacity-95 transition"
+                            aria-label="Adicionar à sacola"
                           >
                             <ShoppingBag className="h-4 w-4" />
                             Adicionar
                           </button>
                         </div>
 
-                        {/* opcional: botão explícito pra detalhes */}
                         <button
                           type="button"
                           onClick={(e) => {

@@ -2,6 +2,9 @@ import { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import ProductPage from "./pages/ProductPage";
+import Header from "./Header";
+import CadastroUsuariosPage from "./pages/cadastro_users";
+import LoginPage from "./pages/LoginPage";
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -25,6 +28,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/produto/:slug" element={<ProductPage />} />
+           <Route path="/cadastro" element={<CadastroUsuariosPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/carrinho" element={<div className="p-6">Carrinho</div>} />
       </Routes>
     </>
   );
