@@ -7,7 +7,7 @@ import { useCart } from "../context/CartContext";
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
-   const location = useLocation(); 
+  const location = useLocation();
   const { state, subtotal, count, remove, setQty } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -31,15 +31,12 @@ const Header: React.FC = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen]);
 
-  // trava scroll quando drawer/menu estiver aberto
   useEffect(() => {
-    const shouldLock = isOpen || cartOpen;
+    if (!isOpen) return;
     const prev = document.body.style.overflow;
-    if (shouldLock) document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [isOpen, cartOpen]);
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [isOpen]);
 
   const menuItems = [
     { label: "Início", href: "#home" },
@@ -89,8 +86,8 @@ const Header: React.FC = () => {
         {/* HEADER */}
         <div
           className={`transition-all duration-300 ${scrolled
-              ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md border-b border-[#2b554e]/10"
-              : "bg-[#FCFAF6] border-b border-[#2b554e]/10"
+            ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md border-b border-[#2b554e]/10"
+            : "bg-[#FCFAF6] border-b border-[#2b554e]/10"
             }`}
         >
           <div className="container mx-auto px-4 md:px-6 h-20 flex items-center gap-3">
@@ -171,6 +168,7 @@ const Header: React.FC = () => {
                 <ShoppingBag className="h-5 w-5" />
                 {badge(count)}
               </button>
+
             </div>
           </div>
 
@@ -298,7 +296,10 @@ const Header: React.FC = () => {
         subtotal={subtotal}
         freeShippingThreshold={699}
         onContinueShopping={() => navigate("/")}
-        onCheckout={undefined}
+        onCheckout={() => {
+          setCartOpen(false);
+          navigate("/checkout");
+        }}
         onRemove={remove}
         onSetQty={setQty}
       />

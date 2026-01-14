@@ -6,7 +6,7 @@ import type { CartItem } from "../context/CartContext";
 type Props = {
   open: boolean;
   onClose: () => void;
-  items?: CartItem[]; // <- AGORA opcional (não quebra se vier undefined)
+  items?: CartItem[];
   subtotal: number;
   freeShippingThreshold?: number; // 699
   onContinueShopping: () => void;
@@ -34,6 +34,22 @@ export default function CartDrawer({
   const safeItems = Array.isArray(items) ? items : [];
   const hasItems = safeItems.length > 0;
 
+  // blindagem (evita NaN/undefined)
+  const safeSubtotal = Number.isFinite(subtotal) ? subtotal : 0;
+
+  const missingForFreeShipping = Math.max(0, freeShippingThreshold - safeSubtotal);
+  const progress =
+    freeShippingThreshold > 0
+      ? Math.min(100, (safeSubtotal / freeShippingThreshold) * 100)
+      : 0;
+
+  // HOOKS SEMPRE ANTES DE QUALQUER RETURN
+  const titleMsg = useMemo(() => {
+    if (safeSubtotal <= 0) return null;
+    if (missingForFreeShipping <= 0) return "Frete grátis desbloqueado ✨";
+    return `Falta ${moneyBRL(missingForFreeShipping)} para frete grátis.`;
+  }, [safeSubtotal, missingForFreeShipping]);
+
   // ESC fecha + trava scroll
   useEffect(() => {
     if (!open) return;
@@ -52,17 +68,8 @@ export default function CartDrawer({
     };
   }, [open, onClose]);
 
+  // AGORA sim pode retornar
   if (!open) return null;
-
-  const missingForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
-  const progress =
-    freeShippingThreshold > 0 ? Math.min(100, (subtotal / freeShippingThreshold) * 100) : 0;
-
-  const titleMsg = useMemo(() => {
-    if (subtotal <= 0) return null;
-    if (missingForFreeShipping <= 0) return "Frete grátis desbloqueado ✨";
-    return `Falta ${moneyBRL(missingForFreeShipping)} para frete grátis.`;
-  }, [subtotal, missingForFreeShipping]);
 
   return (
     <div className="fixed inset-0 z-[80]">
@@ -75,9 +82,9 @@ export default function CartDrawer({
       />
 
       {/* painel */}
-      <aside className="absolute right-0 top-0 h-full w-[92%] max-w-[480px] bg-[#FCFAF6] shadow-2xl">
+      <aside className="absolute right-0 top-0 h-full w-[92%] max-w-[480px] bg-[#FCFAF6] shadow-2xl flex flex-col">
         {/* topo */}
-        <div className="px-6 pt-4">
+        <div className="shrink-0 border-t border-[#2b554e]/10 px-6 py-4 bg-[#FCFAF6]">
           <div className="flex items-center justify-end">
             <button
               type="button"
@@ -104,15 +111,13 @@ export default function CartDrawer({
         </div>
 
         {/* corpo */}
-        <div className="h-[calc(100%-218px)] overflow-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           {!hasItems ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
               <p className="text-sm tracking-[0.25em] font-medium text-[#2b554e]">
                 SUA SACOLA ESTÁ VAZIA.
               </p>
-              <p className="mt-3 text-[#2b554e]/70 text-sm">
-                Descubra peças que combinam com você.
-              </p>
+              <p className="mt-3 text-[#2b554e]/70 text-sm">Descubra peças que combinam com você.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -183,7 +188,7 @@ export default function CartDrawer({
           {hasItems && (
             <div className="flex items-center justify-between text-sm mb-4">
               <span className="text-[#2b554e]/70">Subtotal</span>
-              <span className="font-medium text-[#2b554e]">{moneyBRL(subtotal)}</span>
+              <span className="font-medium text-[#2b554e]">{moneyBRL(safeSubtotal)}</span>
             </div>
           )}
 
@@ -193,15 +198,15 @@ export default function CartDrawer({
               onContinueShopping();
               onClose();
             }}
-            className="w-full h-12 rounded-xl bg-[#f4a08e] text-[#2b554e] font-semibold tracking-[0.18em] text-xs hover:opacity-90 transition"
+            className="w-full h-12 rounded-xl bg-[#f3f0e0] text-[#2b554e] font-semibold tracking-[0.18em] text-xs hover:opacity-90 transition"
           >
             CONTINUAR COMPRANDO
           </button>
 
-          {hasItems && onCheckout && (
+          {hasItems && (
             <button
               type="button"
-              onClick={onCheckout}
+              onClick={() => onCheckout?.()}
               className="mt-3 w-full h-12 rounded-xl bg-[#2b554e] text-[#FCFAF6] font-semibold tracking-[0.18em] text-xs hover:opacity-95 transition"
             >
               FINALIZAR COMPRA
