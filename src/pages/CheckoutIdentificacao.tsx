@@ -1,37 +1,11 @@
+// src/pages/CheckoutIdentificacao.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ShoppingBag, User, CreditCard, CheckCircle, ArrowLeft } from "lucide-react";
 import { useCart } from "../context/CartContext";
 
-function Step({
-  label,
-  active,
-  Icon,
-}: {
-  label: string;
-  active?: boolean;
-  Icon: React.ElementType;
-}) {
-  return (
-    <div className="flex shrink-0 flex-col items-center gap-2">
-      <span
-        className={[
-          "inline-flex h-10 w-10 items-center justify-center rounded-full border shrink-0",
-          active ? "border-black text-black" : "border-gray-300 text-gray-400",
-        ].join(" ")}
-      >
-        <Icon className="h-5 w-5 block" />
-      </span>
-      <span
-        className={[
-          "whitespace-nowrap text-xs sm:text-sm",
-          active ? "font-semibold text-black" : "text-gray-400",
-        ].join(" ")}
-      >
-        {label}
-      </span>
-    </div>
-  );
+function moneyBRL(v: number) {
+  return (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function onlyDigits(v: string) {
@@ -44,10 +18,9 @@ function isEmail(v: string) {
 }
 
 function isValidCPF(cpf: string) {
-  // validação simples (tira repetidos e checa dígitos)
   const c = onlyDigits(cpf);
   if (c.length !== 11) return false;
-  if (/^(\d)\1+$/.test(c)) return false;
+  if (/^(\d)\1{10}$/.test(c)) return false;
 
   const calc = (base: string, factor: number) => {
     let total = 0;
@@ -61,14 +34,61 @@ function isValidCPF(cpf: string) {
   return d1 === Number(c[9]) && d2 === Number(c[10]);
 }
 
+function Step({
+  label,
+  active,
+  Icon,
+  onClick,
+}: {
+  label: string;
+  active?: boolean;
+  Icon: React.ElementType;
+  onClick?: () => void;
+}) {
+  const clickable = Boolean(onClick);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!clickable}
+      className={[
+        "flex shrink-0 flex-col items-center gap-2",
+        clickable ? "cursor-pointer" : "cursor-default",
+      ].join(" ")}
+      aria-current={active ? "step" : undefined}
+      title={clickable ? `Ir para ${label}` : label}
+    >
+      <span
+        className={[
+          "inline-flex h-10 w-10 items-center justify-center rounded-full border shrink-0",
+          active
+            ? "border-black text-black"
+            : clickable
+              ? "border-gray-300 text-gray-400 hover:border-black hover:text-black"
+              : "border-gray-300 text-gray-400",
+        ].join(" ")}
+      >
+        <Icon className="h-5 w-5 block" />
+      </span>
+
+      <span
+        className={[
+          "whitespace-nowrap text-xs sm:text-sm",
+          active ? "font-semibold text-black" : "text-gray-400",
+        ].join(" ")}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
 type Form = {
   name: string;
   email: string;
   phone: string;
-
-  docType: "CPF" | "CNPJ";
-  document: string;
-
+  document: string; // CPF
   cep: string;
   street: string;
   number: string;
@@ -78,15 +98,16 @@ type Form = {
   state: string;
 };
 
-const STORAGE_KEY = "checkout_identificacao_v1";
+const STORAGE_KEY = "checkout_identificacao_v2";
 
 export default function CheckoutIdentificacao() {
   const navigate = useNavigate();
   const { state } = useCart();
 
   const items = state.items ?? [];
+
+  // se carrinho vazio, volta pra sacola
   useEffect(() => {
-    // se carrinho vazio, volta
     if (!items.length) navigate("/checkout");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
@@ -96,13 +117,14 @@ export default function CheckoutIdentificacao() {
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch {}
+      } catch {
+        // ignora
+      }
     }
     return {
       name: "",
       email: "",
       phone: "",
-      docType: "CPF",
       document: "",
       cep: "",
       street: "",
@@ -124,9 +146,8 @@ export default function CheckoutIdentificacao() {
   const requiredOk = useMemo(() => {
     const cepOk = onlyDigits(form.cep).length === 8;
     const emailOk = isEmail(form.email);
-    const phoneOk = onlyDigits(form.phone).length >= 10; // DDD + número
-    const docOk =
-      form.docType === "CPF" ? isValidCPF(form.document) : onlyDigits(form.document).length >= 14;
+    const phoneOk = onlyDigits(form.phone).length >= 10;
+    const docOk = isValidCPF(form.document);
 
     const addrOk =
       form.street.trim() &&
@@ -135,14 +156,7 @@ export default function CheckoutIdentificacao() {
       form.city.trim() &&
       form.state.trim().length === 2;
 
-    return Boolean(
-      form.name.trim() &&
-        emailOk &&
-        phoneOk &&
-        docOk &&
-        cepOk &&
-        addrOk
-    );
+    return Boolean(form.name.trim() && emailOk && phoneOk && docOk && cepOk && addrOk);
   }, [form]);
 
   function setField<K extends keyof Form>(key: K, value: Form[K]) {
@@ -161,11 +175,7 @@ export default function CheckoutIdentificacao() {
     if (!isEmail(form.email)) e.email = "E-mail inválido.";
     if (onlyDigits(form.phone).length < 10) e.phone = "Telefone inválido (com DDD).";
 
-    if (form.docType === "CPF") {
-      if (!isValidCPF(form.document)) e.document = "CPF inválido.";
-    } else {
-      if (onlyDigits(form.document).length < 14) e.document = "CNPJ inválido.";
-    }
+    if (!isValidCPF(form.document)) e.document = "CPF inválido. Verifique os números digitados.";
 
     if (onlyDigits(form.cep).length !== 8) e.cep = "CEP inválido.";
     if (!form.street.trim()) e.street = "Rua/Av. obrigatório.";
@@ -184,31 +194,61 @@ export default function CheckoutIdentificacao() {
 
     setSaving(true);
     try {
-      // Se você tiver um CheckoutContext, salve aqui também.
-      // Por enquanto, já está no localStorage.
       navigate("/checkout/pagamento");
     } finally {
       setSaving(false);
     }
   }
 
+
+const getItemName = (it: any) => it?.name ?? it?.title ?? "Item";
+const getItemImage = (it: any) => it?.image ?? it?.img ?? it?.thumbnail ?? "";
+const getItemQty = (it: any) => Number(it?.qty ?? it?.quantity ?? 1);
+const getItemPrice = (it: any) => Number(it?.price ?? 0);
+
+// pega do state, se existir (sem brigar com o TS)
+const subtotalFromState = (state as any)?.subtotal;
+const totalFromState = (state as any)?.total;
+
+const subtotal =
+  typeof subtotalFromState === "number"
+    ? subtotalFromState
+    : items.reduce((acc: number, it: any) => acc + getItemPrice(it) * getItemQty(it), 0);
+
+const total =
+  typeof totalFromState === "number"
+    ? totalFromState
+    : subtotal;
+
   return (
     <div className="min-h-screen bg-[#f6f3ee]">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 sm:py-10">
         {/* topo */}
-        <div className="mb-8 sm:mb-10 text-center">
-          <img
-            src="/logo_fundo_claro3.svg"
-            alt="Logo da loja"
-            className="mx-auto h-[110px] sm:h-[150px] w-auto object-contain"
-          />
+        <div className="mb-8 sm:mb-10">
+          <div className="flex items-center justify-center gap-4">
+            <img
+              src="/logo_fundo_claro3.svg"
+              alt="Logo da loja"
+              className="h-[110px] sm:h-[150px] w-auto object-contain"
+            />
+
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="text-xs text-gray-500 hover:text-black underline"
+              title="Voltar para a loja"
+            >
+              Voltar para a loja
+            </button>
+          </div>
 
           <div className="mx-auto mt-4 max-w-3xl">
             <div className="flex items-center gap-6 overflow-x-auto px-2 pb-2 [-webkit-overflow-scrolling:touch] sm:px-0 sm:justify-between sm:overflow-visible">
-              <Step label="Sacola" Icon={ShoppingBag} />
+              <Step label="Sacola" Icon={ShoppingBag} onClick={() => navigate("/checkout")} />
               <div className="hidden sm:block h-px flex-1 bg-gray-300" />
               <Step label="Identificação" active Icon={User} />
               <div className="hidden sm:block h-px flex-1 bg-gray-300" />
+              {/* Deixei Pagamento NÃO clicável pra não pular etapa */}
               <Step label="Pagamento" Icon={CreditCard} />
               <div className="hidden sm:block h-px flex-1 bg-gray-300" />
               <Step label="Confirmação" Icon={CheckCircle} />
@@ -269,26 +309,26 @@ export default function CheckoutIdentificacao() {
                   {errors.phone && <div className="mt-1 text-sm text-red-600">{errors.phone}</div>}
                 </div>
 
-                <div>
-                  <label className="text-sm font-semibold">Documento</label>
-                  <div className="mt-2 flex gap-2">
-                    <select
-                      value={form.docType}
-                      onChange={(e) => setField("docType", e.target.value as any)}
-                      className="h-11 rounded-md border border-gray-300 px-3 bg-white"
-                    >
-                      <option value="CPF">CPF</option>
-                      <option value="CNPJ">CNPJ</option>
-                    </select>
-                    <input
-                      value={form.document}
-                      onChange={(e) => setField("document", e.target.value)}
-                      className="h-11 flex-1 rounded-md border border-gray-300 px-3"
-                      placeholder={form.docType === "CPF" ? "000.000.000-00" : "00.000.000/0000-00"}
-                      inputMode="numeric"
-                    />
-                  </div>
-                  {errors.document && <div className="mt-1 text-sm text-red-600">{errors.document}</div>}
+                <div className="sm:col-span-2">
+                  <label className="text-sm font-semibold">CPF</label>
+                  <input
+                    value={form.document}
+                    onChange={(e) => setField("document", e.target.value)}
+                    onBlur={() => {
+                      if (form.document && !isValidCPF(form.document)) {
+                        setErrors((p) => ({
+                          ...p,
+                          document: "CPF inválido. Verifique os números digitados.",
+                        }));
+                      }
+                    }}
+                    className="mt-2 h-11 w-full rounded-md border border-gray-300 px-3"
+                    placeholder="000.000.000-00"
+                    inputMode="numeric"
+                  />
+                  {errors.document && (
+                    <div className="mt-1 text-sm text-red-600">{errors.document}</div>
+                  )}
                 </div>
               </div>
 
@@ -318,7 +358,9 @@ export default function CheckoutIdentificacao() {
                     className="mt-2 h-11 w-full rounded-md border border-gray-300 px-3"
                     placeholder="Rua Exemplo"
                   />
-                  {errors.street && <div className="mt-1 text-sm text-red-600">{errors.street}</div>}
+                  {errors.street && (
+                    <div className="mt-1 text-sm text-red-600">{errors.street}</div>
+                  )}
                 </div>
 
                 <div>
@@ -330,7 +372,9 @@ export default function CheckoutIdentificacao() {
                     placeholder="123"
                     inputMode="numeric"
                   />
-                  {errors.number && <div className="mt-1 text-sm text-red-600">{errors.number}</div>}
+                  {errors.number && (
+                    <div className="mt-1 text-sm text-red-600">{errors.number}</div>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">
@@ -405,10 +449,59 @@ export default function CheckoutIdentificacao() {
           {/* resumo */}
           <div className="space-y-6 lg:sticky lg:top-24 h-fit">
             <div className="rounded-2xl bg-white p-4 sm:p-6 shadow-sm">
-              <div className="text-sm font-semibold mb-2">Resumo</div>
-              <div className="text-sm text-gray-600">
-                Itens no carrinho: <span className="font-semibold text-black">{items.length}</span>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-sm font-semibold">Resumo do pedido</div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/checkout")}
+                  className="text-xs text-gray-500 hover:text-black underline"
+                >
+                  Voltar para sacola
+                </button>
               </div>
+
+              <div className="space-y-4">
+                {items.map((it: any) => {
+                  const name = getItemName(it);
+                  const img = getItemImage(it);
+                  const qty = getItemQty(it);
+                  const price = getItemPrice(it);
+
+                  return (
+                    <div key={it.id ?? name} className="flex items-center gap-3">
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={name}
+                          className="h-14 w-14 rounded-md object-cover border border-gray-200"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-md border border-gray-200 bg-gray-50" />
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{name}</p>
+                        <p className="text-xs text-gray-500">Qtd: {qty} • Em até 7 dias úteis</p>
+                      </div>
+
+                      <p className="text-sm font-semibold">{moneyBRL(price * qty)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="my-5 h-px bg-gray-200" />
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-semibold">{moneyBRL(subtotal)}</span>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between text-base">
+                <span className="font-semibold">Total</span>
+                <span className="font-semibold">{moneyBRL(total)}</span>
+              </div>
+
               <p className="mt-3 text-xs text-gray-500">
                 Seus dados ficam salvos só para finalizar a compra.
               </p>
