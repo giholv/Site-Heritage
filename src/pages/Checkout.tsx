@@ -71,25 +71,28 @@ export default function Checkout() {
     try {
       const payload = {
         to_postcode: cleanCep,
-        items: items.map((it) => ({
-          id: it.id,
-          name: it.name,
-          qty: it.qty ?? 1,
-          price: it.price ?? 0,
-          weight: (it as any).weight ?? 0.2, // kg
-          height: (it as any).height ?? 2,   // cm
-          width: (it as any).width ?? 11,    // cm
-          length: (it as any).length ?? 16,  // cm
+        // opcional: valor declarado (seguro)
+        insurance_value: subtotal,
+        products: items.map((it) => ({
+          quantity: it.qty ?? 1,
+          weight: (it as any).weight ?? 0.03, // kg (joia é leve)
+          height: (it as any).height ?? 2,    // cm
+          width: (it as any).width ?? 11,     // cm
+          length: (it as any).length ?? 16,   // cm
         })),
       };
 
-      const res = await fetch("/api/shipping/quote", {
+      // CHAMA A FUNCTION NO PATH CERTO
+      const res = await fetch("/.netlify/functions/shipping-quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Falha ao calcular frete");
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err || "Falha ao calcular frete");
+      }
 
       const data = await res.json();
       setShippingOptions(data.options ?? []);
@@ -119,7 +122,7 @@ export default function Checkout() {
           </div>
         </div>
 
-        {/* layout */}
+
         {/* layout */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* ESQUERDA */}
