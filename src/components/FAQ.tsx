@@ -11,19 +11,16 @@ const FAQ: React.FC = () => {
     () => [
       {
         q: "Qual a diferença entre semijoia e bijuteria?",
-        a: "Semijoias têm base metálica com banho (ex: ouro) e acabamento superior. Em geral duram mais e têm melhor resistência do que bijuterias comuns, desde que bem cuidadas.",
+        a: "Semijoias são feitas com base metálica e recebem banho de metais nobres, como ouro ou prata, além de acabamento superior. Duram mais, têm melhor resistência e qualidade quando bem cuidadas. Bijuterias não passam por esse processo e, por isso, têm menor durabilidade.",
       },
+
       {
-        q: "O que significa Prata 925?",
-        a: "Prata 925 é composta por 92,5% de prata pura + 7,5% de liga metálica para dar resistência. É o padrão mais usado em joias de prata.",
-      },
-      {
-        q: "Prata 925 escurece?",
-        a: "Sim, é normal. A prata pode oxidar com o tempo ao contato com ar, suor, perfumes e produtos químicos. A limpeza correta devolve o brilho.",
+        q: "Nossas peças em Prata escurece?",
+        a: "Sim, é normal. A prata sofre oxidação, uma reação química natural ao entrar em contato com o ar, suor, perfumes e outros produtos químicos. Esse processo escurece a peça, mas não é defeito. Com a limpeza correta, o brilho original é recuperado.",
       },
       {
         q: "Como cuidar das semijoias com banho de ouro?",
-        a: "Evite água, perfume, creme e produtos de limpeza. Retire antes do banho, mar/piscina e academia. Guarde separadas, em saquinho ou caixinha, longe de umidade.",
+        a: "Evite contato com perfumes, cremes e, principalmente, com produtos de limpeza. Guarde as peças separadas nos saquinhos que enviamos ou em caixinhas, sempre longe da umidade. A limpeza semanal é crucial para remover resíduos de suor e produtos, ajudando a preservar o brilho e aumentar a durabilidade do banho. Utilize flanela macia ou pano antiembaçante. Se necessário, lave com água morna e sabão neutro, enxágue e seque bem. Evite produtos abrasivos.",
       },
       {
         q: "Posso molhar as peças?",
@@ -31,11 +28,11 @@ const FAQ: React.FC = () => {
       },
       {
         q: "As peças dão alergia?",
-        a: "Depende da sensibilidade de cada pessoa. Se você tem alergia a metais (ex: níquel), priorize peças com especificação do banho e evite contato prolongado com suor/umidade. Se quiser, pergunte qual material e banho de cada peça.",
+        a: "Nossas peças são free níquel e hipoalergênicas, desenvolvidas para oferecer mais conforto, segurança e a melhor experiência no uso diário.",
       },
       {
-        q: "Como limpar prata 925 em casa?",
-        a: "Use flanela macia própria para prata. Se precisar, água morna + sabão neutro, enxágue e seque muito bem. Evite produtos abrasivos.",
+        q: "Como cuidar das semijoias com banho de prata?",
+        a: "Use flanela macia própria para prata. Se necessário, lave com água morna e sabão neutro, enxágue e seque muito bem. Evite produtos abrasivos. Principalmente, não use pasta de dente nem o famoso “truque do papel-alumínio”, que podem riscar e danificar a prata. Mozi, nem pensar.",
       },
       {
         q: "Como funciona troca e devolução?",
@@ -56,7 +53,7 @@ const FAQ: React.FC = () => {
           </h2>
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mb-4 rounded-full" />
           <p className="text-[#2b554e]/75 text-base md:text-lg">
-            Banho, Prata 925, cuidados e trocas — sem mistério.
+            Banho, cuidados e trocas — sem mistério.
           </p>
         </div>
 

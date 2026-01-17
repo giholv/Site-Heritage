@@ -11,20 +11,20 @@ const Footer: React.FC = () => {
           <div>
             <div className="flex items-center gap-3 mb-4">
               <img
-                src="/logo_fundo_escuro.png"
+                src="/logo_fundo_escuro.svg"
                 alt="Caléa Logo"
-                className="h-[44px] w-auto object-contain"
+                className="h-[85px] w-auto object-contain"
               />
             </div>
 
             <p className="text-[#FCFAF6]/75 text-sm leading-relaxed">
-              Semijoias e pratas com estética clean, brilho elegante e acabamento
+              Semijoias com estética clean, brilho elegante e acabamento
               premium — feitas pra acompanhar sua fase.
             </p>
 
             <div className="mt-5 flex items-center gap-4">
               <a
-                href="https://www.instagram.com/heritagemaison.co?igsh=MWVnd3ExdWg5MmRx&utm_source=qr"
+                href="https://www.instagram.com/calea.blanc/?utm_source=ig_web_button_share_sheet"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram"
@@ -95,7 +95,7 @@ const Footer: React.FC = () => {
                   href="mailto:contato@heritage.com.br"
                   className="hover:text-[#b08d57] transition-colors"
                 >
-                  contato@heritage.com.br
+                  contato@calea.com.br
                 </a>
               </div>
 

@@ -188,7 +188,7 @@ const Contact: React.FC = () => {
                       href="mailto:contato@heritage.com"
                       className="text-[#FCFAF6]/85 hover:text-white"
                     >
-                      contato@heritage.com
+                      contato@calea.com
                     </a>
                   </div>
                 </div>
@@ -211,12 +211,12 @@ const Contact: React.FC = () => {
                   <div>
                     <p className="font-semibold">Instagram</p>
                     <a
-                      href="https://instagram.com/"
+                      href="https://www.instagram.com/calea.blanc/?utm_source=ig_web_button_share_sheet"
                       target="_blank"
                       rel="noreferrer"
                       className="text-[#FCFAF6]/85 hover:text-white"
                     >
-                      @heritage
+                      @calea.blanc
                     </a>
                   </div>
                 </div>
