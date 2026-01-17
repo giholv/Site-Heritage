@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { products } from "../data/Products"; // ajuste se seu arquivo for ../data/products
+import { products } from "../data/Products";
+import { useCart } from "../context/CartContext";
 
 function formatBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function onlyDigits(s: string) {
-  return s.replace(/\D/g, "");
+  return String(s ?? "").replace(/\D/g, "");
 }
 
 function Accordion({
@@ -45,6 +46,12 @@ function Accordion({
 
 export default function ProductPage() {
   const { slug } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { add } = useCart();
+
+  const qs = new URLSearchParams(location.search);
+  const from = qs.get("from") || ""; // ex: "lancamentos" | "pratas" | "semijoias"
 
   const product = useMemo(() => products.find((p) => p.slug === slug), [slug]);
 
@@ -53,7 +60,7 @@ export default function ProductPage() {
     return product.imagens?.length ? product.imagens : [product.imagem];
   }, [product]);
 
-  const [mainImg, setMainImg] = useState(imagens[0] ?? "");
+  const [mainImg, setMainImg] = useState("");
   const [qty, setQty] = useState(1);
 
   const [cep, setCep] = useState("");
@@ -67,6 +74,8 @@ export default function ProductPage() {
     if (!product) return;
     document.title = `${product.nome} - Caléa`;
     setMainImg(product.imagens?.[0] ?? product.imagem);
+    setQty(1);
+    setFreteResult(null);
   }, [product]);
 
   if (!product) {
@@ -81,20 +90,50 @@ export default function ProductPage() {
     );
   }
 
+  const backHref = from ? `/#${from}` : "/";
+
+  const breadcrumbLabel =
+    from === "lancamentos"
+      ? "Lançamentos"
+      : from === "semijoias"
+      ? "Semijoias"
+      : from === "pratas"
+      ? "Pratas"
+      : "Coleção";
+
   const handleFrete = () => {
     const cepLimpo = onlyDigits(cep);
     if (cepLimpo.length !== 8) {
       setFreteResult(null);
-      alert("CEP inválido. Digite 8 números.");
+      // sem alert (fica clean)
+      setFreteResult({
+        servico: "CEP inválido",
+        prazo: "Digite 8 números",
+        valor: "—",
+      });
       return;
     }
 
     // MOCK (troca por API real depois)
     setFreteResult({
       servico: "PAC",
-      prazo: "4-8 dias úteis",
+      prazo: "4–8 dias úteis",
       valor: "R$ 19,90",
     });
+  };
+
+  const handleAddToCart = () => {
+    add({
+      id: product.slug,
+      name: product.nome,
+      price: product.preco,
+      image: product.imagem,
+      variant: product.tag ?? undefined,
+      qty,
+    });
+
+    // opcional: abre a sacola
+    // navigate("/checkout"); // ou abre o drawer, dependendo do seu fluxo
   };
 
   return (
@@ -105,7 +144,7 @@ export default function ProductPage() {
         {/* topo / voltar */}
         <div className="flex items-center justify-between mb-6">
           <Link
-            to="/#lancamentos"
+            to={backHref}
             className="text-sm text-[#2b554e]/70 hover:text-[#2b554e] underline underline-offset-4"
           >
             Voltar
@@ -116,8 +155,8 @@ export default function ProductPage() {
               Início
             </Link>
             <span>/</span>
-            <a href="/#lancamentos" className="hover:text-[#2b554e]">
-              Lançamentos
+            <a href={backHref} className="hover:text-[#2b554e]">
+              {breadcrumbLabel}
             </a>
             <span>/</span>
             <span className="text-[#2b554e]/80">{product.nome}</span>
@@ -137,12 +176,11 @@ export default function ProductPage() {
 
                 <div className="w-full h-[560px] bg-white overflow-hidden">
                   <img
-                    src={mainImg}
+                    src={mainImg || product.imagem}
                     alt={product.nome}
                     className="w-full h-full object-cover"
                   />
                 </div>
-
               </div>
             </div>
 
@@ -153,10 +191,11 @@ export default function ProductPage() {
                   key={img}
                   type="button"
                   onClick={() => setMainImg(img)}
-                  className={`h-20 w-20 rounded-2xl overflow-hidden border shadow-sm bg-white ${mainImg === img
-                    ? "border-[#b08d57]"
-                    : "border-[#2b554e]/10"
-                    }`}
+                  className={`h-20 w-20 rounded-2xl overflow-hidden border shadow-sm bg-white ${
+                    (mainImg || product.imagem) === img
+                      ? "border-[#b08d57]"
+                      : "border-[#2b554e]/10"
+                  }`}
                   aria-label="Trocar imagem"
                 >
                   <img src={img} alt="" className="w-full h-full object-cover" />
@@ -165,7 +204,7 @@ export default function ProductPage() {
             </div>
           </div>
 
-          {/* DIREITA - Compra (no estilo ) */}
+          {/* DIREITA - Compra */}
           <div className="lg:sticky lg:top-28 h-fit">
             <div className="bg-white/90 rounded-3xl shadow-md border border-[#2b554e]/10 p-6">
               <h1 className="text-2xl md:text-3xl font-semibold text-[#2b554e]">
@@ -180,9 +219,7 @@ export default function ProductPage() {
                 <div className="text-2xl font-semibold text-[#b08d57]">
                   {formatBRL(product.preco)}
                 </div>
-                <div className="text-xs text-[#2b554e]/60">
-                  10x sem juros
-                </div>
+                <div className="text-xs text-[#2b554e]/60">10x sem juros</div>
               </div>
 
               {/* quantidade + botão */}
@@ -192,6 +229,7 @@ export default function ProductPage() {
                     type="button"
                     className="w-11 h-11 text-lg text-[#2b554e] hover:bg-[#2b554e]/5"
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
+                    aria-label="Diminuir"
                   >
                     −
                   </button>
@@ -202,6 +240,7 @@ export default function ProductPage() {
                     type="button"
                     className="w-11 h-11 text-lg text-[#2b554e] hover:bg-[#2b554e]/5"
                     onClick={() => setQty((q) => q + 1)}
+                    aria-label="Aumentar"
                   >
                     +
                   </button>
@@ -210,10 +249,7 @@ export default function ProductPage() {
                 <button
                   type="button"
                   className="flex-1 h-11 rounded-2xl bg-[#2b554e] text-[#FCFAF6] text-sm font-semibold hover:bg-[#23463f] transition-colors"
-                  onClick={() => {
-                    console.log("Adicionar ao carrinho:", product.slug, "qty:", qty);
-                    alert(`Adicionado: ${product.nome} (x${qty})`);
-                  }}
+                  onClick={handleAddToCart}
                 >
                   Adicionar ao carrinho
                 </button>
@@ -231,6 +267,7 @@ export default function ProductPage() {
                     onChange={(e) => setCep(e.target.value)}
                     placeholder="Digite o CEP"
                     className="flex-1 border border-[#2b554e]/15 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#b08d57] bg-white"
+                    inputMode="numeric"
                   />
                   <button
                     type="button"
@@ -246,12 +283,8 @@ export default function ProductPage() {
                     <div className="font-semibold text-[#2b554e]">
                       {freteResult.servico}
                     </div>
-                    <div className="text-[#2b554e]/70">
-                      Prazo: {freteResult.prazo}
-                    </div>
-                    <div className="text-[#2b554e]/70">
-                      Valor: {freteResult.valor}
-                    </div>
+                    <div className="text-[#2b554e]/70">Prazo: {freteResult.prazo}</div>
+                    <div className="text-[#2b554e]/70">Valor: {freteResult.valor}</div>
                   </div>
                 )}
               </div>
@@ -264,8 +297,8 @@ export default function ProductPage() {
 
                 <Accordion title="Composição">
                   <ul className="list-disc pl-5 space-y-1">
-                    <li>Banho premium</li>
-                    <li>Acabamento espelhado</li>
+                    <li>Banho premium / Prata 925 (conforme peça)</li>
+                    <li>Acabamento cuidadoso</li>
                     <li>Embalagem presenteável</li>
                   </ul>
                 </Accordion>
@@ -278,6 +311,15 @@ export default function ProductPage() {
                   </ul>
                 </Accordion>
               </div>
+
+              {/* botão secundário opcional */}
+              <button
+                type="button"
+                onClick={() => navigate("/checkout")}
+                className="mt-5 w-full rounded-2xl border border-[#2b554e]/15 px-4 py-3 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
+              >
+                Ir para a sacola
+              </button>
             </div>
           </div>
         </div>

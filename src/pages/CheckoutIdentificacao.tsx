@@ -201,24 +201,24 @@ export default function CheckoutIdentificacao() {
   }
 
 
-const getItemName = (it: any) => it?.name ?? it?.title ?? "Item";
-const getItemImage = (it: any) => it?.image ?? it?.img ?? it?.thumbnail ?? "";
-const getItemQty = (it: any) => Number(it?.qty ?? it?.quantity ?? 1);
-const getItemPrice = (it: any) => Number(it?.price ?? 0);
+  const getItemName = (it: any) => it?.name ?? it?.title ?? "Item";
+  const getItemImage = (it: any) => it?.image ?? it?.img ?? it?.thumbnail ?? "";
+  const getItemQty = (it: any) => Number(it?.qty ?? it?.quantity ?? 1);
+  const getItemPrice = (it: any) => Number(it?.price ?? 0);
 
-// pega do state, se existir (sem brigar com o TS)
-const subtotalFromState = (state as any)?.subtotal;
-const totalFromState = (state as any)?.total;
+  // pega do state, se existir (sem brigar com o TS)
+  const subtotalFromState = (state as any)?.subtotal;
+  const totalFromState = (state as any)?.total;
 
-const subtotal =
-  typeof subtotalFromState === "number"
-    ? subtotalFromState
-    : items.reduce((acc: number, it: any) => acc + getItemPrice(it) * getItemQty(it), 0);
+  const subtotal =
+    typeof subtotalFromState === "number"
+      ? subtotalFromState
+      : items.reduce((acc: number, it: any) => acc + getItemPrice(it) * getItemQty(it), 0);
 
-const total =
-  typeof totalFromState === "number"
-    ? totalFromState
-    : subtotal;
+  const total =
+    typeof totalFromState === "number"
+      ? totalFromState
+      : subtotal;
 
   return (
     <div className="min-h-screen bg-[#f6f3ee]">
@@ -231,15 +231,6 @@ const total =
               alt="Logo da loja"
               className="h-[110px] sm:h-[150px] w-auto object-contain"
             />
-
-            <button
-              type="button"
-              onClick={() => navigate("/")}
-              className="text-xs text-gray-500 hover:text-black underline"
-              title="Voltar para a loja"
-            >
-              Voltar para a loja
-            </button>
           </div>
 
           <div className="mx-auto mt-4 max-w-3xl">
@@ -427,10 +418,11 @@ const total =
               <div className="mt-6 flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate("/checkout")}
-                  className="h-12 w-full sm:w-auto rounded-md border border-gray-300 px-5 font-semibold hover:bg-gray-50"
+                  onClick={() => navigate("/")}
+                  className="text-xs text-gray-500 hover:text-black underline"
+                  title="Voltar para a loja"
                 >
-                  Voltar para sacola
+                  Voltar para a loja
                 </button>
 
                 <button

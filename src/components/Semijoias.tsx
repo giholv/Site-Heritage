@@ -1,22 +1,54 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "../context/CartContext";
 
 type Peca = {
+  slug: string;
   nome: string;
   descricao?: string;
-  preco?: string;
+  preco: number; // number (igual lançamento)
   imagem: string;
   tag?: string;
 };
 
 const SemijoiasCarousel: React.FC = () => {
+  const navigate = useNavigate();
+  const { add } = useCart();
+
   const pecas: Peca[] = useMemo(
     () => [
-      { nome: "Colar Dourado", descricao: "Banho de ouro • brilho elegante", preco: "R$ 149,90", imagem: "/semi1.jpg", tag: "Novo" },
-      { nome: "Brinco Gota", descricao: "Leve • perfeito pro dia a dia", preco: "R$ 79,90", imagem: "/semi2.jpg" },
-      { nome: "Anel Ajustável", descricao: "Acabamento premium • confortável", preco: "R$ 89,90", imagem: "/semi3.jpg", tag: "Destaque" },
-      { nome: "Pulseira Delicada", descricao: "Minimalista • combina com tudo", preco: "R$ 99,90", imagem: "/semi4.jpg" },
+      {
+        slug: "colar-dourado",
+        nome: "Colar Dourado",
+        descricao: "Banho de ouro • brilho elegante",
+        preco: 149.9,
+        imagem: "/ouro1.png",
+        tag: "Novo",
+      },
+      {
+        slug: "brinco-gota",
+        nome: "Brinco Gota",
+        descricao: "Leve • perfeito pro dia a dia",
+        preco: 79.9,
+        imagem: "/ouro2.png",
+      },
+      {
+        slug: "anel-ajustavel",
+        nome: "Anel Ajustável",
+        descricao: "Acabamento premium • confortável",
+        preco: 89.9,
+        imagem: "/ouro2.png",
+        tag: "Destaque",
+      },
+      {
+        slug: "pulseira-delicada",
+        nome: "Pulseira Delicada",
+        descricao: "Minimalista • combina com tudo",
+        preco: 99.9,
+        imagem: "/ouro4.png",
+      },
     ],
     []
   );
@@ -26,7 +58,7 @@ const SemijoiasCarousel: React.FC = () => {
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (paused) return;
+    if (paused || total === 0) return;
     const timer = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % total);
     }, 7800);
@@ -36,8 +68,20 @@ const SemijoiasCarousel: React.FC = () => {
   const next = () => setActiveIndex((prev) => (prev + 1) % total);
   const prev = () => setActiveIndex((prev) => (prev - 1 + total) % total);
 
-  const onAddToCart = (peca: Peca) => {
-    console.log("Adicionar no carrinho:", peca);
+  const formatBRL = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const onAddToCart = (e: React.MouseEvent, peca: Peca) => {
+    e.stopPropagation();
+
+    add({
+      id: peca.slug,
+      name: peca.nome,
+      price: peca.preco,
+      image: peca.imagem,
+      variant: peca.tag ?? "Semijoia",
+      qty: 1,
+    });
   };
 
   return (
@@ -79,11 +123,20 @@ const SemijoiasCarousel: React.FC = () => {
                 translateY = 8;
               }
 
+              const handleCardClick = () => {
+                // igual lançamento
+                if (offset !== 0) {
+                  setActiveIndex(index);
+                  return;
+                }
+                navigate(`/produto/${peca.slug}?from=semijoias`);
+              };
+
               return (
                 <motion.div
-                  key={`${peca.nome}-${index}`}
+                  key={`${peca.slug}-${index}`}
                   className="w-56 md:w-60 lg:w-72 cursor-pointer select-none snap-center"
-                  onClick={() => setActiveIndex(index)}
+                  onClick={handleCardClick}
                   initial={false}
                   animate={{ scale, opacity, y: translateY }}
                   transition={{ duration: 0.75, ease: "easeInOut" }}
@@ -120,24 +173,31 @@ const SemijoiasCarousel: React.FC = () => {
                         )}
 
                         <div className="mt-4 flex items-center justify-between gap-3">
-                          {peca.preco && (
-                            <div className="text-sm font-semibold text-[#b08d57]">
-                              {peca.preco}
-                            </div>
-                          )}
+                          <div className="text-sm font-semibold text-[#b08d57]">
+                            {formatBRL(peca.preco)}
+                          </div>
 
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAddToCart(peca);
-                            }}
-                            className="ml-auto inline-flex items-center gap-2 rounded-md bg-[#2b554e] text-[#FCFAF6] px-4 py-2 text-sm font-semibold hover:bg-[#23463f] transition-colors"
+                            onClick={(e) => onAddToCart(e, peca)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-4 py-2 text-sm font-semibold hover:opacity-95 transition"
+                            aria-label="Adicionar à sacola"
                           >
                             <ShoppingBag className="h-4 w-4" />
                             Adicionar
                           </button>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/produto/${peca.slug}`);
+                          }}
+                          className="mt-3 w-full rounded-md border border-[#2b554e]/20 px-4 py-2 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
+                        >
+                          Ver detalhes
+                        </button>
                       </div>
                     )}
                   </div>

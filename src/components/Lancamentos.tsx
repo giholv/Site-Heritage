@@ -87,7 +87,7 @@ const ColecaoCarousel: React.FC = () => {
                   setActiveIndex(index);
                   return;
                 }
-                navigate(`/produto/${peca.slug}`);
+                navigate(`/produto/${peca.slug}?from=lancamentos`);
               };
 
               return (

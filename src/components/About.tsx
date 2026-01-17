@@ -1,140 +1,84 @@
 import React from "react";
-import { Gem, ShieldCheck, Sparkles, HeartHandshake } from "lucide-react";
+import { Sparkles, Gem, ShieldCheck, HeartHandshake } from "lucide-react";
 
-interface ValueCardProps {
-  icon: React.ReactNode;
+type Item = {
+  Icon: React.ElementType;
   title: string;
-  description: string;
-}
-
-const ValueCard: React.FC<ValueCardProps> = ({ icon, title, description }) => {
-  return (
-    <div className="bg-white/85 rounded-2xl border border-[#2b554e]/10 shadow-sm p-6 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-      <div className="rounded-2xl bg-[#2b554e]/10 w-14 h-14 flex items-center justify-center mb-4 mx-auto">
-        {icon}
-      </div>
-      <h3 className="text-lg font-semibold text-[#2b554e] mb-2">{title}</h3>
-      <p className="text-sm text-[#2b554e]/70 leading-relaxed">{description}</p>
-    </div>
-  );
+  desc: string;
 };
 
-const About: React.FC = () => {
-  const values = [
+export default function About() {
+  const items: Item[] = [
     {
-      icon: <Sparkles className="h-7 w-7 text-[#2b554e]" />,
-      title: "Design que combina com você",
-      description:
-        "Peças pensadas para o dia a dia: do look básico ao marcante, sem exagero.",
+      Icon: Sparkles,
+      title: "Design para usar de verdade",
+      desc: "Versátil no dia a dia e elegante no especial.",
     },
     {
-      icon: <Gem className="h-7 w-7 text-[#2b554e]" />,
+      Icon: Gem,
       title: "Acabamento premium",
-      description:
-        "Brilho bonito, detalhes bem feitos e cuidado real em cada peça e embalagem.",
+      desc: "Detalhes bem feitos e brilho bonito.",
     },
     {
-      icon: <ShieldCheck className="h-7 w-7 text-[#2b554e]" />,
-      title: "Qualidade e segurança",
-      description:
-        "Transparência nos materiais e padrão de qualidade para você comprar tranquila.",
+      Icon: ShieldCheck,
+      title: "Qualidade sem surpresas",
+      desc: "Transparência nos materiais e padrão consistente.",
     },
     {
-      icon: <HeartHandshake className="h-7 w-7 text-[#2b554e]" />,
-      title: "Experiência sem complicação",
-      description:
-        "Compra simples, atendimento humano e troca fácil quando precisar.",
+      Icon: HeartHandshake,
+      title: "Atendimento que resolve",
+      desc: "Suporte rápido e troca simples quando precisar.",
     },
   ];
 
   return (
     <section id="about" className="py-20 bg-[#FCFAF6] scroll-mt-[140px]">
       <div className="container mx-auto px-4 md:px-6">
-        {/* GRID PRINCIPAL */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* COLUNA DE TEXTO */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+          {/* TEXTO */}
           <div>
-            <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e] mb-4">
+            <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e]">
               Sobre nós
             </h2>
-            <div className="h-[2px] w-24 bg-[#b08d57] mb-6 rounded-full"></div>
+            <div className="h-[2px] w-24 bg-[#b08d57] mt-3 mb-6 rounded-full" />
 
-            <p className="text-base md:text-lg text-[#2b554e]/80 mb-5">
+            <p className="text-base md:text-lg text-[#2b554e]/80 mb-5 leading-relaxed">
               A Caléa nasce da ideia de que joias acompanham fases. Mudam com você,
               refletem quem você é hoje e quem está se tornando.
             </p>
 
-            <p className="text-base md:text-lg text-[#2b554e]/80 mb-5">
-              Criamos semijoias e pratas com design atemporal, acabamento cuidadoso e
-              brilho que se encaixa no dia a dia — do básico ao marcante, sem exagero.
+            <p className="text-base md:text-lg text-[#2b554e]/80 mb-5 leading-relaxed">
+              Criamos semijoias com design atemporal e acabamento cuidadoso tanto para brilhar no dia a dia quanto para arrasar em momentos especiais.
             </p>
 
-            <p className="text-base md:text-lg text-[#2b554e]/80 mb-8">
-              Mais do que acessórios, entregamos escolha, identidade e liberdade para
-              se expressar do seu jeito.
+            <p className="text-base md:text-lg text-[#2b554e]/80 leading-relaxed">
+              Mais do que acessórios, entregamos uma experiência simples e segura do clique ao unboxing.
             </p>
+          </div>
 
-            {/* “mini stats” (opcional) */}
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: "Acabamento premium", value: "Detalhe" },
-                { label: "Peças versáteis", value: "Todo dia" },
-                { label: "Linha Prata 925", value: "Atemporal" },
-                { label: "NOUVEAU", value: "Nova fase" },
-              ].map((stat, index) => (
-                <div
-                  key={index}
-                  className="bg-white/85 border border-[#2b554e]/10 p-4 rounded-xl shadow-sm"
-                >
-                  <p className="text-[#b08d57] font-semibold text-lg">{stat.value}</p>
-                  <p className="text-[#2b554e]/70 text-sm">{stat.label}</p>
+          {/* LISTA CLEAN */}
+          <div className="rounded-2xl border border-[#2b554e]/10 bg-white/70 p-6">
+            <div className="space-y-5">
+              {items.map(({ Icon, title, desc }, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#2b554e]/8">
+                    <Icon className="h-5 w-5 text-[#2b554e]" />
+                  </span>
+
+                  <div className="min-w-0">
+                    <p className="text-sm md:text-base font-semibold text-[#2b554e] leading-tight">
+                      {title}
+                    </p>
+                    <p className="text-sm text-[#2b554e]/70 mt-1 leading-relaxed">
+                      {desc}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* COLUNA DA IMAGEM */}
-          <div className="relative">
-            <div className="relative z-10 rounded-3xl overflow-hidden shadow-md border border-[#2b554e]/10 bg-white/70">
-              <img
-                src="/Dona.jpg"
-                alt="Dona Caléa"
-                className="w-full h-auto object-contain p-10"
-              />
-            </div>
-
-            {/* blobs decorativos */}
-            <div className="absolute top-1/2 right-0 translate-x-1/4 -translate-y-1/2 w-32 h-32 md:w-48 md:h-48 bg-[#b08d57] rounded-full opacity-20 blur-2xl" />
-            <div className="absolute bottom-1/3 left-0 -translate-x-1/4 w-32 h-32 md:w-48 md:h-48 bg-[#2b554e] rounded-full opacity-20 blur-2xl" />
-          </div>
-        </div>
-
-        {/* VALORES */}
-        <div className="mt-16">
-          <div className="text-center max-w-3xl mx-auto mb-10">
-            <h3 className="text-2xl md:text-3xl font-semibold text-[#2b554e] mb-3">
-              Nossos valores
-            </h3>
-            <div className="h-[2px] w-20 bg-[#b08d57] mx-auto mb-4 rounded-full"></div>
-            <p className="text-[#2b554e]/75">
-              O que guia cada peça, do design ao envio.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {values.map((value, index) => (
-              <ValueCard
-                key={index}
-                icon={value.icon}
-                title={value.title}
-                description={value.description}
-              />
-            ))}
           </div>
         </div>
       </div>
     </section>
   );
-};
-
-export default About;
+}
