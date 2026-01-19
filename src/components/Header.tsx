@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Menu, X, Search, ShoppingBag, User } from "lucide-react";
 import { Link } from "./ui/Link";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import CartDrawer from "./CartDrawer";
 import { useCart } from "../context/CartContext";
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { state, subtotal, count, remove, setQty } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -74,7 +73,7 @@ const Header: React.FC = () => {
       <header className="fixed w-full z-50">
         {/* TOP BAR */}
         <div className="bg-[#2b554e] text-[#f3f0e0]">
-          <div className="container mx-auto px-3 md:px-6 h-9 md:h-10 flex items-center justify-center">
+          <div className="container mx-auto px-3 md:px-6 h-8 md:h-9 flex items-center justify-center">
             <span className="text-[11px] md:text-sm opacity-95 text-center leading-none">
               Frete grátis a partir de <strong>R$699</strong> • 5% OFF no PIX • Troca fácil
             </span>
@@ -85,15 +84,12 @@ const Header: React.FC = () => {
         <div
           className={[
             "transition-all duration-300 border-b border-[#2b554e]/10",
-            scrolled
-              ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md"
-              : "bg-[#FCFAF6]",
+            scrolled ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md" : "bg-[#FCFAF6]",
           ].join(" ")}
         >
           <div className="container mx-auto px-3 md:px-6">
-            {/* MOBILE: grid 3 colunas | DESKTOP: flex original */}
+            {/* MOBILE */}
             <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-14">
-              {/* menu */}
               <button
                 type="button"
                 onClick={() => setIsOpen((v) => !v)}
@@ -103,23 +99,21 @@ const Header: React.FC = () => {
                 {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
 
-              {/* logo central */}
               <div className="justify-self-center">
                 <Link href="#home" className="inline-flex items-center">
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                    className="h-8 w-auto object-contain"
+                    className="h-10 w-auto object-contain"
                   />
                 </Link>
               </div>
 
-              {/* ações */}
               <div className="justify-self-end flex items-center gap-1">
                 <button
                   type="button"
                   aria-label="Pesquisar"
-                  onClick={() => setIsOpen(true)} // abre drawer e já tem busca lá
+                  onClick={() => setIsOpen(true)}
                   className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
                 >
                   <Search className="h-5 w-5" />
@@ -147,29 +141,21 @@ const Header: React.FC = () => {
             </div>
 
             {/* DESKTOP */}
-            <div className="hidden md:flex h-20 items-center gap-3">
-              {/* Logo */}
-              <div className="flex-1 flex justify-center md:justify-start md:flex-none md:w-[260px]">
-                <Link href="#home" className="inline-flex items-center">
-                  {/* Mobile: pequena */}
-                  <img
-                    src="/logo_fundo_claro.svg"
-                    alt="Logo da loja"
-                    className="h-[100px] w-auto object-contain"
-                    style={{ marginTop: "50px" }}
-                  />
+            <div className="hidden md:flex h-20 items-center gap-6">
 
-                  {/* Desktop: grande */}
+              {/* Logo - UMA só */}
+             <div className="flex-none w-[260px] flex items-center pt-10">
+                <Link href="#home" className="inline-flex items-center">
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                    className="h-[150px] w-auto object-contain"
-                    style={{ marginTop: "50px" }}
+                    className="h-28 lg:h-32 w-auto object-contain"
+
                   />
                 </Link>
               </div>
 
-              {/* Busca desktop */}
+              {/* Busca */}
               <div className="flex-1 flex justify-center">
                 <form onSubmit={onSearchSubmit} className="w-full max-w-[560px]">
                   <div className="relative">
@@ -191,7 +177,7 @@ const Header: React.FC = () => {
               </div>
 
               {/* Ícones */}
-              <div className="flex items-center justify-end gap-2 md:w-[260px]">
+              <div className="flex-none w-[260px] flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={onLogin}
@@ -230,24 +216,27 @@ const Header: React.FC = () => {
           </nav>
         </div>
 
-        {/* MOBILE DRAWER MENU (com overlay clicável) */}
+        {/* MOBILE DRAWER MENU */}
         <div
-          className={`md:hidden fixed inset-0 z-40 ${isOpen ? "pointer-events-auto" : "pointer-events-none"
-            }`}
+          className={`md:hidden fixed inset-0 z-40 ${
+            isOpen ? "pointer-events-auto" : "pointer-events-none"
+          }`}
         >
           {/* overlay */}
           <button
             type="button"
             aria-label="Fechar menu"
             onClick={() => setIsOpen(false)}
-            className={`absolute inset-0 bg-black/30 transition-opacity ${isOpen ? "opacity-100" : "opacity-0"
-              }`}
+            className={`absolute inset-0 bg-black/30 transition-opacity ${
+              isOpen ? "opacity-100" : "opacity-0"
+            }`}
           />
 
           {/* painel */}
           <div
-            className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${isOpen ? "translate-x-0" : "translate-x-full"
-              }`}
+            className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${
+              isOpen ? "translate-x-0" : "translate-x-full"
+            }`}
           >
             <div className="pt-6 px-6 flex items-center justify-between">
               <span className="text-sm tracking-[0.18em] opacity-90">MENU</span>
@@ -321,9 +310,7 @@ const Header: React.FC = () => {
                   </button>
                 </div>
 
-                <p className="mt-6 text-xs text-white/60">
-                  Caléa • Elegância sem esforço.
-                </p>
+                <p className="mt-6 text-xs text-white/60">Caléa • Elegância sem esforço.</p>
               </div>
             </div>
           </div>
