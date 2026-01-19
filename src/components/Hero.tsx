@@ -21,7 +21,7 @@ const Hero: React.FC = () => {
   }, [banners.length]);
 
   return (
-    <section id="home" className="bg-[#FCFAF6] pt-[170px] md:pt-[180px]">
+    <section id="home" className="bg-[#FCFAF6] pt-[140px] sm:pt-[150px] md:pt-[180px]">
       <div className="container mx-auto px-4 md:px-6">
         {/* MOBILE: carousel */}
         <div className="md:hidden">

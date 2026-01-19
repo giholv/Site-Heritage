@@ -89,7 +89,8 @@ const Header: React.FC = () => {
         >
           <div className="container mx-auto px-3 md:px-6">
             {/* MOBILE */}
-            <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-16">
+            <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-16 py-4">
+
               <button
                 type="button"
                 onClick={() => setIsOpen((v) => !v)}
@@ -104,7 +105,7 @@ const Header: React.FC = () => {
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                    className="h-12 w-auto object-contain"
+                    className="h-14 w-auto object-contain"
                   />
                 </Link>
               </div>
@@ -144,7 +145,7 @@ const Header: React.FC = () => {
             <div className="hidden md:flex h-20 items-center gap-6">
 
               {/* Logo - UMA só */}
-             <div className="flex-none w-[260px] flex items-center pt-10">
+              <div className="flex-none w-[260px] flex items-center pt-10">
                 <Link href="#home" className="inline-flex items-center">
                   <img
                     src="/logo_fundo_claro.svg"
@@ -218,25 +219,22 @@ const Header: React.FC = () => {
 
         {/* MOBILE DRAWER MENU */}
         <div
-          className={`md:hidden fixed inset-0 z-40 ${
-            isOpen ? "pointer-events-auto" : "pointer-events-none"
-          }`}
+          className={`md:hidden fixed inset-0 z-40 ${isOpen ? "pointer-events-auto" : "pointer-events-none"
+            }`}
         >
           {/* overlay */}
           <button
             type="button"
             aria-label="Fechar menu"
             onClick={() => setIsOpen(false)}
-            className={`absolute inset-0 bg-black/30 transition-opacity ${
-              isOpen ? "opacity-100" : "opacity-0"
-            }`}
+            className={`absolute inset-0 bg-black/30 transition-opacity ${isOpen ? "opacity-100" : "opacity-0"
+              }`}
           />
 
           {/* painel */}
           <div
-            className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${
-              isOpen ? "translate-x-0" : "translate-x-full"
-            }`}
+            className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${isOpen ? "translate-x-0" : "translate-x-full"
+              }`}
           >
             <div className="pt-6 px-6 flex items-center justify-between">
               <span className="text-sm tracking-[0.18em] opacity-90">MENU</span>
