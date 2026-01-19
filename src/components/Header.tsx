@@ -31,11 +31,14 @@ const Header: React.FC = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen]);
 
+  // trava scroll quando menu mobile abre
   useEffect(() => {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [isOpen]);
 
   const menuItems = [
@@ -49,8 +52,6 @@ const Header: React.FC = () => {
 
   const onSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // se quiser uma rota:
-    // navigate(`/busca?q=${encodeURIComponent(q)}`);
     console.log("Pesquisar:", q);
   };
 
@@ -61,12 +62,9 @@ const Header: React.FC = () => {
     setCartOpen(true);
   };
 
-  const iconBase = "text-[#2b554e]";
-  const iconHover = "hover:text-[#b08d57]";
-
   const badge = (n: number) =>
     n > 0 ? (
-      <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] leading-none bg-[#b08d57] text-white rounded-full">
+      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] leading-none bg-[#b08d57] text-white rounded-full">
         {n > 99 ? "99+" : n}
       </span>
     ) : null;
@@ -76,8 +74,8 @@ const Header: React.FC = () => {
       <header className="fixed w-full z-50">
         {/* TOP BAR */}
         <div className="bg-[#2b554e] text-[#f3f0e0]">
-          <div className="container mx-auto px-4 md:px-6 h-10 flex items-center justify-center text-sm">
-            <span className="opacity-95">
+          <div className="container mx-auto px-3 md:px-6 h-9 md:h-10 flex items-center justify-center">
+            <span className="text-[11px] md:text-sm opacity-95 text-center leading-none">
               Frete grátis a partir de <strong>R$699</strong> • 5% OFF no PIX • Troca fácil
             </span>
           </div>
@@ -85,90 +83,134 @@ const Header: React.FC = () => {
 
         {/* HEADER */}
         <div
-          className={`transition-all duration-300 ${scrolled
-            ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md border-b border-[#2b554e]/10"
-            : "bg-[#FCFAF6] border-b border-[#2b554e]/10"
-            }`}
+          className={[
+            "transition-all duration-300 border-b border-[#2b554e]/10",
+            scrolled
+              ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md"
+              : "bg-[#FCFAF6]",
+          ].join(" ")}
         >
-          <div className="container mx-auto px-4 md:px-6 h-20 flex items-center gap-3">
-            {/* Mobile: menu */}
-            <div className="md:hidden flex items-center">
+          <div className="container mx-auto px-3 md:px-6">
+            {/* MOBILE: grid 3 colunas | DESKTOP: flex original */}
+            <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-14">
+              {/* menu */}
               <button
                 type="button"
                 onClick={() => setIsOpen((v) => !v)}
                 aria-label="Abrir menu"
-                className="text-[#2b554e]"
+                className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e]"
               >
                 {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
-            </div>
 
-            {/* Logo */}
-            <div className="flex-1 flex justify-center md:justify-start md:flex-none md:w-[260px]">
-              <Link href="#home" className="inline-flex items-center">
-                <img
-                  src="/logo_fundo_claro3.svg"
-                  alt="Logo da loja"
-                  className="h-[150px] w-auto object-contain"
-                  style={{ marginTop: "50px" }}
-                />
-              </Link>
-            </div>
-
-            {/* Busca desktop */}
-            <div className="hidden md:flex flex-1 justify-center">
-              <form onSubmit={onSearchSubmit} className="w-full max-w-[560px]">
-                <div className="relative">
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Buscar por nome ou código"
-                    className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/20 bg-white/60 text-[#2b554e] placeholder:text-[#2b554e]/45 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
+              {/* logo central */}
+              <div className="justify-self-center">
+                <Link href="#home" className="inline-flex items-center">
+                  <img
+                    src="/logo_fundo_claro.svg"
+                    alt="Logo da loja"
+                    className="h-8 w-auto object-contain"
                   />
-                  <button
-                    type="submit"
-                    aria-label="Pesquisar"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[#2b554e]/70 hover:text-[#b08d57] transition-colors"
-                  >
-                    <Search className="h-5 w-5" />
-                  </button>
-                </div>
-              </form>
+                </Link>
+              </div>
+
+              {/* ações */}
+              <div className="justify-self-end flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Pesquisar"
+                  onClick={() => setIsOpen(true)} // abre drawer e já tem busca lá
+                  className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                >
+                  <Search className="h-5 w-5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onLogin}
+                  aria-label="Login"
+                  className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                >
+                  <User className="h-5 w-5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openCart}
+                  aria-label="Carrinho"
+                  className="relative h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                >
+                  <ShoppingBag className="h-5 w-5" />
+                  {badge(count)}
+                </button>
+              </div>
             </div>
 
-            {/* Ícones */}
-            <div className="flex items-center justify-end gap-3 md:w-[260px]">
-              {/* Mobile: busca */}
-              <button
-                type="button"
-                aria-label="Pesquisar"
-                onClick={() => console.log("Abrir busca mobile")}
-                className={`md:hidden transition-colors ${iconBase} ${iconHover}`}
-              >
-                <Search className="h-6 w-6" />
-              </button>
+            {/* DESKTOP */}
+            <div className="hidden md:flex h-20 items-center gap-3">
+              {/* Logo */}
+              {/* Logo */}
+              <div className="flex-1 flex justify-center md:justify-start md:flex-none md:w-[260px]">
+                <Link href="#home" className="inline-flex items-center">
+                  {/* Mobile: pequena */}
+                  <img
+                    src="/logo_fundo_claro.svg"
+                    alt="Logo da loja"
+                    className="md:hidden h-8 w-auto object-contain"
+                  />
 
-              {/* Login */}
-              <button
-                type="button"
-                onClick={onLogin}
-                aria-label="Login"
-                className={`transition-colors ${iconBase} ${iconHover}`}
-              >
-                <User className="h-5 w-5" />
-              </button>
+                  {/* Desktop: grande */}
+                  <img
+                    src="/logo_fundo_claro.svg"
+                    alt="Logo da loja"
+                    className="h-[150px] w-auto object-contain"
+                    style={{ marginTop: "50px" }}
+                  />
+                </Link>
+              </div>
 
-              {/* Carrinho */}
-              <button
-                type="button"
-                onClick={openCart}
-                aria-label="Carrinho"
-                className={`transition-colors ${iconBase} ${iconHover} relative`}
-              >
-                <ShoppingBag className="h-5 w-5" />
-                {badge(count)}
-              </button>
+              {/* Busca desktop */}
+              <div className="flex-1 flex justify-center">
+                <form onSubmit={onSearchSubmit} className="w-full max-w-[560px]">
+                  <div className="relative">
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Buscar por nome ou código"
+                      className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/20 bg-white/60 text-[#2b554e] placeholder:text-[#2b554e]/45 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Pesquisar"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#2b554e]/70 hover:text-[#b08d57] transition-colors"
+                    >
+                      <Search className="h-5 w-5" />
+                    </button>
+                  </div>
+                </form>
+              </div>
 
+              {/* Ícones */}
+              <div className="flex items-center justify-end gap-2 md:w-[260px]">
+                <button
+                  type="button"
+                  onClick={onLogin}
+                  aria-label="Login"
+                  className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                >
+                  <User className="h-5 w-5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openCart}
+                  aria-label="Carrinho"
+                  className="relative h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                >
+                  <ShoppingBag className="h-5 w-5" />
+                  {badge(count)}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -213,7 +255,7 @@ const Header: React.FC = () => {
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Fechar"
-                className="text-[#f3f0e0]/80 hover:text-white"
+                className="h-11 w-11 inline-flex items-center justify-center text-[#f3f0e0]/80 hover:text-white"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -280,7 +322,7 @@ const Header: React.FC = () => {
                 </div>
 
                 <p className="mt-6 text-xs text-white/60">
-                  Caléa  • Elegância sem esforço.
+                  Caléa • Elegância sem esforço.
                 </p>
               </div>
             </div>
