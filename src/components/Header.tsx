@@ -149,14 +149,14 @@ const Header: React.FC = () => {
             {/* DESKTOP */}
             <div className="hidden md:flex h-20 items-center gap-3">
               {/* Logo */}
-              {/* Logo */}
               <div className="flex-1 flex justify-center md:justify-start md:flex-none md:w-[260px]">
                 <Link href="#home" className="inline-flex items-center">
                   {/* Mobile: pequena */}
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                    className="md:hidden h-8 w-auto object-contain"
+                    className="h-[100px] w-auto object-contain"
+                    style={{ marginTop: "50px" }}
                   />
 
                   {/* Desktop: grande */}
