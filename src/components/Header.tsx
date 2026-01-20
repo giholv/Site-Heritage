@@ -105,7 +105,7 @@ const Header: React.FC = () => {
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                    className="h-18 w-auto object-contain"
+                    className="h-11 w-auto object-contain"
                   />
                 </Link>
               </div>
