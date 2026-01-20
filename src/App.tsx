@@ -7,6 +7,8 @@ import CadastroUsuariosPage from "./pages/cadastro_users";
 import LoginPage from "./pages/LoginPage";
 import Checkout from "./pages/Checkout";
 import CheckoutIdentificacao from "./pages/CheckoutIdentificacao";
+import JewelryListing from "./pages/JewelryListing";
+
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -30,11 +32,13 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/produto/:slug" element={<ProductPage />} />
-           <Route path="/cadastro" element={<CadastroUsuariosPage />} />
+        <Route path="/cadastro" element={<CadastroUsuariosPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/carrinho" element={<div className="p-6">Carrinho</div>} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/checkout/identificacao" element={<CheckoutIdentificacao />} />
+        <Route path="/joias/:slug" element={<JewelryListing />} />
+
       </Routes>
     </>
   );
