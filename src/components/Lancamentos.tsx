@@ -54,7 +54,7 @@ export default function CategoriesStrip() {
   };
 
   return (
-    <section className="bg-[#FCFAF6] mt-10 md:mt-16 py-10 md:py-14">
+    <section className="bg-[#FCFAF6] mt-10 md:mt-14">
       <div className="container mx-auto px-4 md:px-6">
         {/* topo */}
         <div className="text-center mb-8 md:mb-10">
