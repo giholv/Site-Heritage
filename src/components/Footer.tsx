@@ -13,7 +13,7 @@ const Footer: React.FC = () => {
               <img
                 src="/logo_fundo_escuro.svg"
                 alt="Caléa Logo"
-                className="h-[85px] w-auto object-contain"
+                className="h-[95px] w-auto object-contain"
               />
             </div>
 
@@ -32,7 +32,6 @@ const Footer: React.FC = () => {
               >
                 <Instagram className="h-5 w-5" />
               </a>
-              {/* Se quiser adicionar TikTok depois, eu coloco */}
             </div>
           </div>
 
@@ -71,7 +70,6 @@ const Footer: React.FC = () => {
             <ul className="space-y-2 text-sm text-[#FCFAF6]/75">
               <li>• 5% OFF no PIX</li>
               <li>• Troca fácil</li>
-              <li>• Cuidados: banho / prata 925</li>
               <li>• Atendimento pelo WhatsApp</li>
             </ul>
 
@@ -112,7 +110,7 @@ const Footer: React.FC = () => {
               <div className="flex items-start gap-3 text-[#FCFAF6]/75">
                 <MapPin className="h-4 w-4 mt-0.5 text-[#b08d57]" />
                 <p>
-                  São Paulo • SP <br />
+                  Sorocaba • SP <br />
                   Envio para todo o Brasil
                 </p>
               </div>

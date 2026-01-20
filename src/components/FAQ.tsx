@@ -15,7 +15,7 @@ const FAQ: React.FC = () => {
       },
 
       {
-        q: "Nossas peças em Prata escurece?",
+        q: "É normal peças em prata escurecer?",
         a: "Sim, é normal. A prata sofre oxidação, uma reação química natural ao entrar em contato com o ar, suor, perfumes e outros produtos químicos. Esse processo escurece a peça, mas não é defeito. Com a limpeza correta, o brilho original é recuperado.",
       },
       {

@@ -188,7 +188,7 @@ const Contact: React.FC = () => {
                       href="mailto:contato@heritage.com"
                       className="text-[#FCFAF6]/85 hover:text-white"
                     >
-                      contato@calea.com
+                      contato@calea.com.br
                     </a>
                   </div>
                 </div>
@@ -226,7 +226,7 @@ const Contact: React.FC = () => {
                   <div>
                     <p className="font-semibold">Localização</p>
                     <p className="text-[#FCFAF6]/85">
-                      São Paulo – SP
+                      Sorocaba – SP
                       <br />
                       (atendimento online)
                     </p>
