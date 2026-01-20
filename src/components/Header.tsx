@@ -89,7 +89,7 @@ const Header: React.FC = () => {
         >
           <div className="container mx-auto px-3 md:px-6">
             {/* MOBILE */}
-            <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-16 py-2">
+            <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-14 py-2">
 
               <button
                 type="button"
