@@ -89,7 +89,7 @@ const Header: React.FC = () => {
         >
           <div className="container mx-auto px-3 md:px-6">
             {/* MOBILE */}
-            <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-16 py-3">
+            <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-16 py-2">
 
               <button
                 type="button"
@@ -105,7 +105,7 @@ const Header: React.FC = () => {
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                    className="h-16 w-auto object-contain"
+                    className="h-18 w-auto object-contain"
                   />
                 </Link>
               </div>

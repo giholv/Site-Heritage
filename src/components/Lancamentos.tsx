@@ -1,205 +1,151 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
+import React, { useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { products, type Product } from "../data/Products";
-import { useCart } from "../context/CartContext";
 
-const ColecaoCarousel: React.FC = () => {
+type Category = {
+  title: string;
+  slug: string;
+  image: string;
+  filters?: Record<string, string>;
+};
+
+function toQuery(filters?: Record<string, string>) {
+  if (!filters) return "";
+  const qs = new URLSearchParams(filters);
+  const str = qs.toString();
+  return str ? `?${str}` : "";
+}
+
+const FALLBACK = "/cats/fallback.jpg";
+
+export default function CategoriesStrip() {
   const navigate = useNavigate();
-  const { add } = useCart();
+  const trackRef = useRef<HTMLDivElement | null>(null);
 
-  const pecas: Product[] = useMemo(() => products, []);
-  const total = pecas.length;
+  const categories = useMemo<Category[]>(
+    () => [
+      { title: "Anéis", slug: "aneis", image: "/cats/Aneis.jpg" },
+      { title: "Brincos", slug: "brincos", image: "/cats/Brincos.jpg" },
+      { title: "Colares", slug: "colares", image: "/cats/Colares.jpg" },
+      { title: "Pulseiras", slug: "pulseiras", image: "/cats/Pulseiras.jpg" },
+      { title: "Pingentes", slug: "pingentes", image: "/cats/Pingentes.jpg" },
+      { title: "Relicários", slug: "relicarios", image: "/cats/Relicarios.jpg" },
+      {
+        title: "Lançamentos",
+        slug: "lancamentos",
+        image: "/cats/Lancamentos.jpg",
+        filters: { tag: "lancamento" },
+      },
+    ],
+    []
+  );
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [broken, setBroken] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (paused || total === 0) return;
-    const timer = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % total);
-    }, 7800);
-    return () => clearInterval(timer);
-  }, [paused, total]);
+  const onClick = (c: Category) => {
+    navigate(`/joias/${c.slug}${toQuery(c.filters)}`);
+  };
 
-  const next = () => setActiveIndex((prev) => (prev + 1) % total);
-  const prev = () => setActiveIndex((prev) => (prev - 1 + total) % total);
-
-  const formatBRL = (v: number) =>
-    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-  const onAddToCart = (e: React.MouseEvent, peca: Product) => {
-    e.stopPropagation(); // não dispara o click do card
-
-    // Ajusta esses campos conforme seu Product type:
-    add({
-      id: peca.slug,                 // ou peca.id se tiver
-      name: peca.nome,
-      price: peca.preco,
-      image: peca.imagem,
-      variant: peca.tag ?? undefined, // ou "Dourado" / tamanho, etc
-      qty: 1,
-    });
+  const scrollByCards = (dir: 1 | -1) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const amount = Math.round(el.clientWidth * 0.75) * dir;
+    el.scrollBy({ left: amount, behavior: "smooth" });
   };
 
   return (
-    <section id="lancamentos" className="py-16 bg-[#FCFAF6] scroll-mt-[140px]">
+    <section className="bg-[#FCFAF6] mt-10 md:mt-16 py-10 md:py-14">
       <div className="container mx-auto px-4 md:px-6">
-        <div className="text-center mb-10">
+        {/* topo */}
+        <div className="text-center mb-8 md:mb-10">
           <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e]">
-            Coleção <span className="text-[#b08d57]">NOUVEAU</span>
+            Encontre sua <span className="text-[#b08d57]">JOIA</span>
           </h2>
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mt-4 mb-4 rounded-full" />
           <p className="text-[#2b554e]/80 text-base md:text-lg">
-            Nova fase. Novo brilho. Escolha a que combina com você.
+            Joias para seu dia a dia — leve, elegante e atemporal.
           </p>
         </div>
 
-        <div
-          className="relative max-w-6xl mx-auto"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          <div className="flex items-center justify-center gap-4 md:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory md:snap-none pb-2">
-            {pecas.map((peca, index) => {
-              const offset = (index - activeIndex + total) % total;
+        {/* carrossel com setas flutuantes */}
+        <div className="relative">
+          {/* seta esquerda (desktop) */}
+          <button
+            type="button"
+            onClick={() => scrollByCards(-1)}
+            aria-label="Voltar"
+            className={[
+              "hidden md:flex items-center justify-center",
+              "absolute left-0 top-1/2 -translate-y-1/2 z-10",
+              "h-12 w-12 rounded-full bg-white border border-black/10 shadow-sm",
+              "text-[#2b554e] hover:bg-black/5 transition",
+              // distância da borda
+              "ml-2",
+            ].join(" ")}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
 
-              let scale = 0.72;
-              let opacity = 0.25;
-              let zIndex = 10;
-              let translateY = 18;
+          {/* seta direita (desktop) */}
+          <button
+            type="button"
+            onClick={() => scrollByCards(1)}
+            aria-label="Avançar"
+            className={[
+              "hidden md:flex items-center justify-center",
+              "absolute right-0 top-1/2 -translate-y-1/2 z-10",
+              "h-12 w-12 rounded-full bg-white border border-black/10 shadow-sm",
+              "text-[#2b554e] hover:bg-black/5 transition",
+              "mr-2",
+            ].join(" ")}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
 
-              if (offset === 0) {
-                scale = 1;
-                opacity = 1;
-                zIndex = 30;
-                translateY = 0;
-              } else if (offset === 1 || offset === total - 1) {
-                scale = 0.88;
-                opacity = 0.75;
-                zIndex = 20;
-                translateY = 8;
-              }
-
-              const handleCardClick = () => {
-                if (offset !== 0) {
-                  setActiveIndex(index);
-                  return;
-                }
-                navigate(`/produto/${peca.slug}?from=lancamentos`);
-              };
+          {/* trilho (padding lateral = distancia entre card e setas) */}
+          <div
+            ref={trackRef}
+            className={[
+              "px-16 md:px-20", // << AQUI aumenta o espaço entre cards e botões
+              "flex gap-6 overflow-x-auto pb-2",
+              "snap-x snap-mandatory",
+              "scroll-smooth",
+              "[scrollbar-width:none] [-ms-overflow-style:none]",
+              "[&::-webkit-scrollbar]:hidden",
+            ].join(" ")}
+          >
+            {categories.map((c) => {
+              const src = broken[c.slug] ? FALLBACK : c.image;
 
               return (
-                <motion.div
-                  key={`${peca.slug}-${index}`}
-                  className="w-56 md:w-60 lg:w-72 cursor-pointer select-none snap-center"
-                  onClick={handleCardClick}
-                  initial={false}
-                  animate={{ scale, opacity, y: translateY }}
-                  transition={{ duration: 0.75, ease: "easeInOut" }}
-                  style={{ zIndex }}
+                <button
+                  key={c.slug}
+                  type="button"
+                  onClick={() => onClick(c)}
+                  className="snap-start shrink-0 text-left group"
                 >
-                  <div className="bg-white/90 rounded-3xl shadow-md overflow-hidden border border-[#2b554e]/10">
-                    <div className="relative">
-                      <div className="aspect-[4/5] overflow-hidden">
-                        <img
-                          src={peca.imagem}
-                          alt={peca.nome}
-                          className="block w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </div>
-
-                      {peca.tag && (
-                        <span className="absolute top-3 left-3 text-xs font-semibold bg-[#2b554e] text-[#F8F3EA] px-3 py-1 rounded-full">
-                          {peca.tag}
-                        </span>
-                      )}
+                  <div className="w-[240px] sm:w-[260px] md:w-[280px]">
+                    <div className="relative overflow-hidden rounded-3xl bg-white border border-black/5 shadow-sm">
+                      <img
+                        src={src}
+                        alt={c.title}
+                        className="h-[260px] md:h-[300px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        loading="lazy"
+                        onError={() =>
+                          setBroken((prev) => ({ ...prev, [c.slug]: true }))
+                        }
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
                     </div>
 
-                    {offset === 0 && (
-                      <div className="p-5">
-                        <h3 className="text-lg font-semibold text-[#2b554e]">
-                          {peca.nome}
-                        </h3>
-
-                        {peca.descricao && (
-                          <p className="text-sm text-[#2b554e]/70 mt-1">
-                            {peca.descricao}
-                          </p>
-                        )}
-
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <div className="text-sm font-semibold text-[#b08d57]">
-                            {formatBRL(peca.preco)}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={(e) => onAddToCart(e, peca)}
-                            className="inline-flex items-center gap-2 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-4 py-2 text-sm font-semibold hover:opacity-95 transition"
-                            aria-label="Adicionar à sacola"
-                          >
-                            <ShoppingBag className="h-4 w-4" />
-                            Adicionar
-                          </button>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/produto/${peca.slug}`);
-                          }}
-                          className="mt-3 w-full rounded-md border border-[#2b554e]/20 px-4 py-2 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
-                        >
-                          Ver detalhes
-                        </button>
-                      </div>
-                    )}
+                    <div className="pt-4 text-lg text-black">{c.title}</div>
                   </div>
-                </motion.div>
+                </button>
               );
             })}
-          </div>
-
-          <button
-            type="button"
-            onClick={prev}
-            aria-label="Anterior"
-            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-6 bg-white/90 border border-[#2b554e]/15 rounded-full shadow-sm w-11 h-11 items-center justify-center text-[#2b554e] hover:text-[#b08d57] hover:border-[#b08d57]/40"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={next}
-            aria-label="Próximo"
-            className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 bg-white/90 border border-[#2b554e]/15 rounded-full shadow-sm w-11 h-11 items-center justify-center text-[#2b554e] hover:text-[#b08d57] hover:border-[#b08d57]/40"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-
-          <div className="flex justify-center mt-7 gap-2">
-            {pecas.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveIndex(i)}
-                aria-label={`Ir para item ${i + 1}`}
-                className={`h-2.5 rounded-full transition-all ${
-                  i === activeIndex
-                    ? "w-8 bg-[#b08d57]"
-                    : "w-2.5 bg-[#2b554e]/20 hover:bg-[#2b554e]/35"
-                }`}
-              />
-            ))}
           </div>
         </div>
       </div>
     </section>
   );
-};
-
-export default ColecaoCarousel;
+}
