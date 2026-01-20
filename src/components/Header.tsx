@@ -89,8 +89,13 @@ const Header: React.FC = () => {
         >
           <div className="container mx-auto px-3 md:px-6">
             {/* MOBILE */}
-            <div className="md:hidden grid grid-cols-[44px_1fr_120px] items-center h-14 py-2">
 
+            <div
+              className="container mx-auto px-3 md:px-6 h-8 md:h-9 flex items-center justify-center"
+              style={{ paddingTop: "env(safe-area-inset-top)" }}
+            >
+
+          
               <button
                 type="button"
                 onClick={() => setIsOpen((v) => !v)}
