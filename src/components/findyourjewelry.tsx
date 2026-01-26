@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+
 type Category = {
   title: string;
   slug: string;
@@ -29,13 +30,6 @@ export default function CategoriesStrip() {
       { title: "Colares", slug: "colares", image: "/cats/Colares.jpg" },
       { title: "Pulseiras", slug: "pulseiras", image: "/cats/Pulseiras.jpg" },
       { title: "Pingentes", slug: "pingentes", image: "/cats/Pingentes.jpg" },
-      { title: "Relicários", slug: "relicarios", image: "/cats/Relicarios.jpg" },
-      {
-        title: "Lançamentos",
-        slug: "lancamentos",
-        image: "/cats/Lancamentos.jpg",
-        filters: { tag: "lancamento" },
-      },
     ],
     []
   );

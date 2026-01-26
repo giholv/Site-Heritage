@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
-import { X, SlidersHorizontal, ChevronDown } from "lucide-react";
+// JewelryListing.tsx (mesmo arquivo) — só layout/UX
+import React, { useMemo, useState } from "react";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { X, SlidersHorizontal, ChevronDown, ShoppingBag } from "lucide-react";
 
 type Option = { label: string; value: string };
 
@@ -33,37 +34,41 @@ function titleize(s?: string) {
   if (!s) return "";
   return s.replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
-
 function getMulti(sp: URLSearchParams, key: string) {
   return sp.getAll(key);
 }
-
 function setMulti(sp: URLSearchParams, key: string, values: string[]) {
   sp.delete(key);
   values.forEach((v) => sp.append(key, v));
 }
-
 function parsePrice(v: string | null, fallback: number) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+}
+function moneyBRL(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 /** Mock só pra layout */
 const mockProducts = Array.from({ length: 24 }).map((_, i) => ({
   id: String(i + 1),
-  title: `Produto ${i + 1}`,
+  slug: `produto-${i + 1}`,
+  title: `Joia Caléa ${i + 1}`,
   price: 149.9 + i,
+  tag: i % 7 === 0 ? "Novo" : i % 5 === 0 ? "Mais vendido" : undefined,
 }));
 
 export default function JewelryListing() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // estado UI
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  // leitura da URL -> estado derivado
-  const selectedMaterial = useMemo(() => getMulti(searchParams, "material"), [searchParams]);
+  const selectedMaterial = useMemo(
+    () => getMulti(searchParams, "material"),
+    [searchParams]
+  );
   const selectedPedra = useMemo(() => getMulti(searchParams, "pedra"), [searchParams]);
   const selectedCor = useMemo(() => getMulti(searchParams, "cor"), [searchParams]);
 
@@ -73,32 +78,31 @@ export default function JewelryListing() {
   const sort = useMemo(() => searchParams.get("sort") ?? "relevance", [searchParams]);
 
   const appliedChips = useMemo(() => {
-    const chips: { key: string; label: string; value: string }[] = [];
+    const chips: { key: string; label: string; value: string; raw?: string }[] = [];
 
     selectedMaterial.forEach((v) => {
       const opt = FILTERS.material.find((o) => o.value === v);
-      chips.push({ key: "material", label: "Material", value: opt?.label ?? v });
+      chips.push({ key: "material", label: "Material", value: opt?.label ?? v, raw: v });
     });
 
     selectedPedra.forEach((v) => {
       const opt = FILTERS.pedra.find((o) => o.value === v);
-      chips.push({ key: "pedra", label: "Pedra", value: opt?.label ?? v });
+      chips.push({ key: "pedra", label: "Pedra", value: opt?.label ?? v, raw: v });
     });
 
     selectedCor.forEach((v) => {
       const opt = FILTERS.cor.find((o) => o.value === v);
-      chips.push({ key: "cor", label: "Cor", value: opt?.label ?? v });
+      chips.push({ key: "cor", label: "Cor", value: opt?.label ?? v, raw: v });
     });
 
     if (searchParams.get("min") || searchParams.get("max")) {
       chips.push({
         key: "preco",
         label: "Preço",
-        value: `R$ ${minPrice} – R$ ${maxPrice}`,
+        value: `${moneyBRL(minPrice)} – ${moneyBRL(maxPrice)}`,
       });
     }
 
-    // qualquer outra tag passada (ex: ?tag=lancamento)
     const tag = searchParams.get("tag");
     if (tag) chips.push({ key: "tag", label: "Tag", value: tag });
 
@@ -106,8 +110,7 @@ export default function JewelryListing() {
   }, [searchParams, selectedMaterial, selectedPedra, selectedCor, minPrice, maxPrice]);
 
   const products = useMemo(() => {
-    // Aqui você pluga seus produtos reais + filtra com base nos params.
-    // Por enquanto só retorna mock.
+    // depois você pluga Supabase e filtra de verdade
     return mockProducts;
   }, []);
 
@@ -130,17 +133,11 @@ export default function JewelryListing() {
 
   const clearAll = () => {
     const sp = new URLSearchParams(searchParams);
-
-    // mantém slug como rota, limpa filtros conhecidos
     ["material", "pedra", "cor", "min", "max", "sort"].forEach((k) => sp.delete(k));
-
-    // se você quiser manter tag=lancamento, NÃO delete tag
-    // sp.delete("tag");
-
     setSearchParams(sp, { replace: true });
   };
 
-  const removeChip = (chip: { key: string; value: string; label: string }) => {
+  const removeChip = (chip: { key: string; value: string; label: string; raw?: string }) => {
     const sp = new URLSearchParams(searchParams);
 
     if (chip.key === "preco") {
@@ -149,20 +146,8 @@ export default function JewelryListing() {
     } else if (chip.key === "tag") {
       sp.delete("tag");
     } else {
-      // material/pedra/cor (remover um valor)
       const all = sp.getAll(chip.key);
-      // achar pelo value "real" (aqui usamos label no chip, então remove por label não dá)
-      // solução: remover por qualquer item que bate no label OU valor (mais simples pro seu caso atual)
-      const next = all.filter((v) => {
-        const opt =
-          chip.key === "material"
-            ? FILTERS.material.find((o) => o.value === v)?.label
-            : chip.key === "pedra"
-            ? FILTERS.pedra.find((o) => o.value === v)?.label
-            : FILTERS.cor.find((o) => o.value === v)?.label;
-
-        return opt !== chip.value && v !== chip.value;
-      });
+      const next = all.filter((v) => v !== (chip.raw ?? chip.value));
       setMulti(sp, chip.key as any, next);
     }
 
@@ -171,13 +156,13 @@ export default function JewelryListing() {
 
   const FiltersPanel = ({ compact }: { compact?: boolean }) => (
     <div className={compact ? "" : "sticky top-[160px]"}>
-      <div className="bg-white border border-black/10 rounded-2xl p-4">
+      <div className="bg-white/80 backdrop-blur border border-black/10 rounded-3xl p-5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-semibold text-[#2b554e]">Filtros</div>
+          <div className="text-sm font-semibold text-[#2b554e] tracking-wide">FILTROS</div>
           <button
             type="button"
             onClick={clearAll}
-            className="text-xs text-black/60 hover:text-black"
+            className="text-xs text-black/50 hover:text-black"
           >
             Limpar
           </button>
@@ -187,88 +172,69 @@ export default function JewelryListing() {
         <div className="border-t border-black/10 pt-4">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-black">Preço</div>
-            <span className="text-xs text-black/60">R$ {minPrice} – {maxPrice}</span>
+            <span className="text-xs text-black/50">
+              {moneyBRL(minPrice)} – {moneyBRL(maxPrice)}
+            </span>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-black/60">Mín</label>
+              <label className="text-xs text-black/50">Mín</label>
               <input
                 type="number"
                 value={minPrice}
                 onChange={(e) => setPrice(Number(e.target.value || 0), maxPrice)}
-                className="mt-1 w-full h-10 rounded-xl border border-black/10 px-3 text-sm"
+                className="mt-1 w-full h-11 rounded-2xl border border-black/10 px-3 text-sm bg-[#FCFAF6]"
               />
             </div>
             <div>
-              <label className="text-xs text-black/60">Máx</label>
+              <label className="text-xs text-black/50">Máx</label>
               <input
                 type="number"
                 value={maxPrice}
                 onChange={(e) => setPrice(minPrice, Number(e.target.value || 9999))}
-                className="mt-1 w-full h-10 rounded-xl border border-black/10 px-3 text-sm"
+                className="mt-1 w-full h-11 rounded-2xl border border-black/10 px-3 text-sm bg-[#FCFAF6]"
               />
             </div>
           </div>
         </div>
 
-        {/* Material */}
-        <div className="border-t border-black/10 pt-4 mt-4">
-          <div className="text-sm font-medium text-black mb-2">Material</div>
-          <div className="space-y-2">
-            {FILTERS.material.map((o) => (
-              <label key={o.value} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selectedMaterial.includes(o.value)}
-                  onChange={() => toggleMulti("material", o.value)}
-                />
-                <span>{o.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+        {/* bloco genérico checkbox */}
+        {(
+          [
+            ["Material", "material", FILTERS.material, selectedMaterial] as const,
+            ["Pedra", "pedra", FILTERS.pedra, selectedPedra] as const,
+            ["Cor", "cor", FILTERS.cor, selectedCor] as const,
+          ] as const
+        ).map(([title, key, opts, selected]) => (
+          <div key={key} className="border-t border-black/10 pt-4 mt-4">
+            <div className="text-sm font-medium text-black mb-3">{title}</div>
 
-        {/* Pedra */}
-        <div className="border-t border-black/10 pt-4 mt-4">
-          <div className="text-sm font-medium text-black mb-2">Pedra</div>
-          <div className="space-y-2">
-            {FILTERS.pedra.map((o) => (
-              <label key={o.value} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selectedPedra.includes(o.value)}
-                  onChange={() => toggleMulti("pedra", o.value)}
-                />
-                <span>{o.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+            <div className="space-y-2">
+              {opts.map((o) => (
+                <label
+                  key={o.value}
+                  className="flex items-center justify-between gap-3 text-sm cursor-pointer"
+                >
+                  <span className="text-black/80">{o.label}</span>
 
-        {/* Cor */}
-        <div className="border-t border-black/10 pt-4 mt-4">
-          <div className="text-sm font-medium text-black mb-2">Cor</div>
-          <div className="space-y-2">
-            {FILTERS.cor.map((o) => (
-              <label key={o.value} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selectedCor.includes(o.value)}
-                  onChange={() => toggleMulti("cor", o.value)}
-                />
-                <span>{o.label}</span>
-              </label>
-            ))}
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(o.value)}
+                    onChange={() => toggleMulti(key as any, o.value)}
+                    className="h-4 w-4 accent-[#2b554e]"
+                  />
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
+        ))}
 
-        {/* CTA (mobile) */}
         {compact && (
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(false)}
-            className="mt-5 w-full h-11 rounded-xl bg-[#2b554e] text-white text-sm font-medium"
+            className="mt-6 w-full h-11 rounded-2xl bg-[#2b554e] text-white text-sm font-semibold"
           >
             Aplicar
           </button>
@@ -279,18 +245,28 @@ export default function JewelryListing() {
 
   return (
     <div className="bg-[#FCFAF6] pt-[140px] md:pt-[180px]">
-      <div className="container mx-auto px-4 md:px-6">
+      <div className="container mx-auto px-4 md:px-6 pb-16">
         {/* topo */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm text-black/50">Joias &gt; {titleize(slug)}</div>
-            <h1 className="mt-2 text-2xl font-semibold text-black">{titleize(slug)}</h1>
-            <div className="mt-1 text-sm text-black/60">Exibindo {total} produtos</div>
+            <div className="text-xs tracking-[0.18em] text-black/45 uppercase">
+              Joias • {titleize(slug)}
+            </div>
+
+            <h1 className="mt-2 text-3xl md:text-4xl font-semibold text-[#2b554e]">
+              {titleize(slug)}
+            </h1>
+
+            <div className="mt-3 h-[2px] w-20 bg-[#b08d57] rounded-full" />
+
+            <div className="mt-3 text-sm text-black/55">
+              {total} peças selecionadas
+            </div>
           </div>
 
           {/* ordenar (desktop) */}
           <div className="hidden md:flex items-center gap-2">
-            <span className="text-sm text-black/60">Ordenar:</span>
+            <span className="text-sm text-black/50">Ordenar:</span>
             <div className="relative">
               <select
                 value={sort}
@@ -299,7 +275,7 @@ export default function JewelryListing() {
                   sp.set("sort", e.target.value);
                   setSearchParams(sp, { replace: true });
                 }}
-                className="h-11 rounded-xl border border-black/10 bg-white px-3 pr-10 text-sm"
+                className="h-11 rounded-2xl border border-black/10 bg-white px-4 pr-10 text-sm"
               >
                 {SORTS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -314,24 +290,24 @@ export default function JewelryListing() {
 
         {/* chips */}
         {appliedChips.length > 0 && (
-          <div className="mt-5 flex flex-wrap items-center gap-2">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             {appliedChips.map((c, i) => (
               <button
                 key={`${c.key}-${i}`}
                 type="button"
                 onClick={() => removeChip(c)}
-                className="inline-flex items-center gap-2 rounded-full bg-white border border-black/10 px-3 py-2 text-sm hover:bg-black/5"
+                className="inline-flex items-center gap-2 rounded-full bg-white/80 backdrop-blur border border-black/10 px-4 py-2 text-sm hover:bg-black/5"
               >
-                <span className="text-black/70">{c.label}:</span>
-                <span className="font-medium">{c.value}</span>
-                <X className="h-4 w-4 text-black/40" />
+                <span className="text-black/55">{c.label}:</span>
+                <span className="font-medium text-[#2b554e]">{c.value}</span>
+                <X className="h-4 w-4 text-black/35" />
               </button>
             ))}
 
             <button
               type="button"
               onClick={clearAll}
-              className="ml-1 text-sm text-[#2b554e] hover:underline"
+              className="ml-1 text-sm text-[#b08d57] hover:underline"
             >
               Limpar tudo
             </button>
@@ -339,7 +315,7 @@ export default function JewelryListing() {
         )}
 
         {/* layout */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-[300px_1fr] gap-8">
           {/* sidebar filtros (desktop) */}
           <div className="hidden md:block">
             <FiltersPanel />
@@ -348,11 +324,11 @@ export default function JewelryListing() {
           {/* lista */}
           <div>
             {/* mobile: barra de ações */}
-            <div className="md:hidden flex items-center justify-between gap-3 mb-4">
+            <div className="md:hidden flex items-center justify-between gap-3 mb-5">
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen(true)}
-                className="h-11 px-4 rounded-xl bg-white border border-black/10 text-sm inline-flex items-center gap-2"
+                className="h-11 px-4 rounded-2xl bg-white/80 backdrop-blur border border-black/10 text-sm inline-flex items-center gap-2"
               >
                 <SlidersHorizontal className="h-4 w-4" />
                 Filtros
@@ -366,7 +342,7 @@ export default function JewelryListing() {
                     sp.set("sort", e.target.value);
                     setSearchParams(sp, { replace: true });
                   }}
-                  className="w-full h-11 rounded-xl border border-black/10 bg-white px-3 pr-10 text-sm"
+                  className="w-full h-11 rounded-2xl border border-black/10 bg-white/80 backdrop-blur px-4 pr-10 text-sm"
                 >
                   {SORTS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -378,16 +354,59 @@ export default function JewelryListing() {
               </div>
             </div>
 
-            {/* grid produtos */}
+            {/* grid produtos — cara de Caléa */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {products.map((p) => (
-                <div key={p.id} className="rounded-2xl bg-white border border-black/10 overflow-hidden">
-                  <div className="h-[220px] bg-black/5" />
-                  <div className="p-3">
-                    <div className="text-sm font-medium">{p.title}</div>
-                    <div className="text-sm text-black/70 mt-1">R$ {p.price.toFixed(2)}</div>
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => navigate(`/produto/${p.slug}?from=${encodeURIComponent(slug ?? "")}`)}
+                  className="text-left group rounded-3xl bg-white/80 backdrop-blur border border-black/10 overflow-hidden shadow-sm hover:shadow-md transition"
+                >
+                  <div className="relative">
+                    {/* placeholder da foto */}
+                    <div className="aspect-[4/5] bg-gradient-to-b from-black/5 to-black/0" />
+
+                    {/* tag */}
+                    {p.tag && (
+                      <span className="absolute top-3 left-3 text-xs font-semibold bg-[#2b554e] text-[#F8F3EA] px-3 py-1 rounded-full">
+                        {p.tag}
+                      </span>
+                    )}
+
+                    {/* brilho sutil */}
+                    <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition">
+                      <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-[#b08d57]/10 blur-2xl" />
+                    </div>
                   </div>
-                </div>
+
+                  <div className="p-4">
+                    <div className="text-sm font-semibold text-[#2b554e] line-clamp-1">
+                      {p.title}
+                    </div>
+
+                    <div className="mt-1 text-sm font-semibold text-[#b08d57]">
+                      {moneyBRL(p.price)}
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="inline-flex items-center gap-2 text-xs text-black/55">
+                        Elegante • atemporal
+                      </span>
+                    </div>
+
+                    <div className="mt-4 flex gap-2">
+                      <span className="flex-1 h-10 inline-flex items-center justify-center rounded-2xl bg-[#2b554e] text-white text-sm font-semibold group-hover:opacity-95 transition">
+                        <ShoppingBag className="h-4 w-4 mr-2" />
+                        Adicionar
+                      </span>
+
+                      <span className="h-10 px-4 inline-flex items-center justify-center rounded-2xl border border-[#2b554e]/15 text-[#2b554e] text-sm font-semibold group-hover:border-[#b08d57]/35 group-hover:text-[#b08d57] transition">
+                        Ver
+                      </span>
+                    </div>
+                  </div>
+                </button>
               ))}
             </div>
           </div>

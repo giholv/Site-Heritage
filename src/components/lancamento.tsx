@@ -1,102 +1,98 @@
-// src/components/PratasCarousel.tsx (ou onde você usa)
+// src/components/ProductCarousel.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 
-type Peca = {
+export type ProdutoCarouselItem = {
   slug: string;
   nome: string;
   descricao?: string;
   preco: number;
   imagem: string;
-  tag?: string;
+  tag?: string; // ex: "Novo", "Mais vendido", "925"
+  variant?: string; // o que vai pro carrinho (ex: "Prata 925", "Banho Ouro 18k")
 };
 
-const PratasCarousel: React.FC = () => {
+type Props = {
+  id?: string; // âncora: "destaques"
+  title: React.ReactNode; // pode passar JSX (ex: Linha <span>...)
+  subtitle?: string;
+  items: ProdutoCarouselItem[];
+  from?: string; // querystring: ?from=...
+  autoplayMs?: number; // default 7800
+  showDots?: boolean; // default true
+};
+
+function formatBRL(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+export default function ProductCarousel({
+  id,
+  title,
+  subtitle,
+  items,
+  from,
+  autoplayMs = 7800,
+  showDots = true,
+}: Props) {
   const navigate = useNavigate();
   const { add } = useCart();
 
-  const pecas: Peca[] = useMemo(
-    () => [
-      {
-        slug: "brinco-prata-925",
-        nome: "Brinco Prata 925",
-        descricao: "Prata 925 • brilho delicado",
-        preco: 79.9,
-        imagem: "/prata1.png",
-        tag: "925",
-      },
-      {
-        slug: "colar-prata-925",
-        nome: "Colar Prata 925",
-        descricao: "Minimalista • perfeito pro dia a dia",
-        preco: 139.9,
-        imagem: "/prata2.png",
-      },
-      {
-        slug: "anel-prata-925",
-        nome: "Anel Prata 925",
-        descricao: "Ajustável • acabamento polido",
-        preco: 89.9,
-        imagem: "/prata3.png",
-        tag: "Destaque",
-      },
-      {
-        slug: "pulseira-prata-925",
-        nome: "Pulseira Prata 925",
-        descricao: "Clássica • combina com tudo",
-        preco: 99.9,
-        imagem: "/prata4.png",
-      },
-    ],
-    []
-  );
-
+  const pecas = useMemo(() => items ?? [], [items]);
   const total = pecas.length;
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (paused || total === 0) return;
+    if (paused || total <= 1) return;
     const timer = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % total);
-    }, 7800);
+    }, autoplayMs);
     return () => clearInterval(timer);
-  }, [paused, total]);
+  }, [paused, total, autoplayMs]);
 
-  const next = () => setActiveIndex((prev) => (prev + 1) % total);
-  const prev = () => setActiveIndex((prev) => (prev - 1 + total) % total);
+  useEffect(() => {
+    // se a lista mudar e o índice ficar inválido
+    if (activeIndex > total - 1) setActiveIndex(0);
+  }, [total, activeIndex]);
 
-  const formatBRL = (v: number) =>
-    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const next = () => total && setActiveIndex((prev) => (prev + 1) % total);
+  const prev = () => total && setActiveIndex((prev) => (prev - 1 + total) % total);
 
-  const onAddToCart = (e: React.MouseEvent, peca: Peca) => {
+  const onAddToCart = (e: React.MouseEvent, peca: ProdutoCarouselItem) => {
     e.stopPropagation();
-
     add({
       id: peca.slug,
       name: peca.nome,
       price: peca.preco,
       image: peca.imagem,
-      variant: peca.tag ?? "Prata 925",
+      variant: peca.variant ?? peca.tag ?? "Produto",
       qty: 1,
     });
   };
 
+  const goToProduct = (slug: string) => {
+    const qs = from ? `?from=${encodeURIComponent(from)}` : "";
+    navigate(`/produto/${slug}${qs}`);
+  };
+
+  if (!total) return null;
+
   return (
-    <section id="pratas" className="py-16 bg-[#FCFAF6] scroll-mt-[140px]">
+    <section id={id} className="py-16 bg-[#FCFAF6] scroll-mt-[140px]">
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e]">
-            Linha <span className="text-[#b08d57]">PRATA</span>
+            {title}
           </h2>
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mt-4 mb-4 rounded-full" />
-          <p className="text-[#2b554e]/80 text-base md:text-lg">
-            Pratas para o dia a dia — leve, elegante e atemporal.
-          </p>
+          {subtitle && (
+            <p className="text-[#2b554e]/80 text-base md:text-lg">{subtitle}</p>
+          )}
         </div>
 
         <div
@@ -126,14 +122,11 @@ const PratasCarousel: React.FC = () => {
               }
 
               const handleCardClick = () => {
-                // mesmo comportamento do lançamento:
-                // se não for o ativo, só traz pro centro
                 if (offset !== 0) {
                   setActiveIndex(index);
                   return;
                 }
-                // se for o ativo, abre a página do produto
-               navigate(`/produto/${peca.slug}?from=pratas`);
+                goToProduct(peca.slug);
               };
 
               return (
@@ -196,7 +189,7 @@ const PratasCarousel: React.FC = () => {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/produto/${peca.slug}`);
+                            goToProduct(peca.slug);
                           }}
                           className="mt-3 w-full rounded-md border border-[#2b554e]/20 px-4 py-2 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
                         >
@@ -228,24 +221,24 @@ const PratasCarousel: React.FC = () => {
             <ChevronRight className="h-5 w-5" />
           </button>
 
-          <div className="flex justify-center mt-7 gap-2">
-            {pecas.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveIndex(i)}
-                aria-label={`Ir para item ${i + 1}`}
-                className={`h-2.5 rounded-full transition-all ${
-                  i === activeIndex
-                    ? "w-8 bg-[#b08d57]"
-                    : "w-2.5 bg-[#2b554e]/20 hover:bg-[#2b554e]/35"
-                }`}
-              />
-            ))}
-          </div>
+          {showDots && (
+            <div className="flex justify-center mt-7 gap-2">
+              {pecas.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveIndex(i)}
+                  aria-label={`Ir para item ${i + 1}`}
+                  className={`h-2.5 rounded-full transition-all ${
+                    i === activeIndex
+                      ? "w-8 bg-[#b08d57]"
+                      : "w-2.5 bg-[#2b554e]/20 hover:bg-[#2b554e]/35"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
   );
-};
-
-export default PratasCarousel;
+}

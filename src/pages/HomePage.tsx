@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import Header from "../components/Header";
 import Hero from "../components/Hero";
-import Lancamentos from "../components/Lancamentos";
-import PratasCarousel from "../components/Pratas";
+import EncontreSuaJoia from "../components/findyourjewelry";
+import PratasCarousel from "../components/lancamento";
 import About from "../components/About";
 import Faq from "../components/FAQ";
 import Contact from "../components/Contact";
@@ -19,7 +19,7 @@ export default function HomePage() {
       <Header />
       <main>
         <Hero />
-        <Lancamentos />
+        <EncontreSuaJoia />
         <PratasCarousel />
         <Semijoias />
         <About />

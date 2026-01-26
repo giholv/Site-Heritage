@@ -42,8 +42,8 @@ const Header: React.FC = () => {
 
   const menuItems = [
     { label: "Início", href: "#home" },
+    { label: "Encontre Sua Joia", href: "#EncontreSuaJoia" },
     { label: "Lançamentos", href: "#lancamentos" },
-    { label: "Pratas", href: "#pratas" },
     { label: "Semijoias", href: "#semijoias" },
     { label: "Sobre Nós", href: "#about" },
     { label: "Contato", href: "#contact" },
@@ -102,7 +102,7 @@ const Header: React.FC = () => {
               <div className="justify-self-center">
                 <Link href="#home" className="inline-flex items-center">
                   <img
-                    src="/logo_fundo_claro.svg"
+                    src="/logo_fundo_escuro_mobile.svg"
                     alt="Logo da loja"
                     className="h-14 w-auto object-contain"
                   />
@@ -150,7 +150,10 @@ const Header: React.FC = () => {
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                   className="h-24 lg:h-28 w-auto object-contain"
+                  className="h-[110px] lg:h-[130px] w-auto object-contain"
+
+
+
                     
 
                   />
