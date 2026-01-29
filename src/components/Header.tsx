@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import CartDrawer from "./CartDrawer";
 import { useCart } from "../context/CartContext";
 
+
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const { state, subtotal, count, remove, setQty } = useCart();
@@ -43,7 +44,8 @@ const Header: React.FC = () => {
   const menuItems = [
     { label: "Início", href: "#home" },
     { label: "Encontre Sua Joia", href: "#EncontreSuaJoia" },
-    { label: "Lançamentos", href: "#lancamentos" },
+{ label: "Lançamentos", href: "#lancamentos" },
+
     { label: "Semijoias", href: "#semijoias" },
     { label: "Sobre Nós", href: "#about" },
     { label: "Contato", href: "#contact" },
@@ -104,7 +106,7 @@ const Header: React.FC = () => {
                   <img
                     src="/logo_fundo_escuro_mobile.svg"
                     alt="Logo da loja"
-                    className="h-15 w-auto object-contain"
+                    className="h-14-auto object-contain"
                   />
                 </Link>
               </div>

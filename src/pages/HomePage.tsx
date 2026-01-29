@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import Header from "../components/Header";
 import Hero from "../components/Hero";
 import EncontreSuaJoia from "../components/findyourjewelry";
-import PratasCarousel from "../components/lancamento";
 import About from "../components/About";
 import Faq from "../components/FAQ";
 import Contact from "../components/Contact";
@@ -20,7 +19,6 @@ export default function HomePage() {
       <main>
         <Hero />
         <EncontreSuaJoia />
-        <PratasCarousel />
         <Semijoias />
         <About />
         <Faq />

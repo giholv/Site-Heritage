@@ -1,4 +1,4 @@
-// src/components/ProductCarousel.tsx
+// src/components/lancamento.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
