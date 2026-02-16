@@ -7,9 +7,8 @@ type Option = { label: string; value: string };
 
 const FILTERS = {
   material: [
-    { label: "Prata 925", value: "prata925" },
+    { label: "Prata", value: "prata" },
     { label: "Banho Ouro", value: "banho-ouro" },
-    { label: "Aço", value: "aco" },
   ] as Option[],
   pedra: [
     { label: "Zircônia", value: "zirconia" },
@@ -19,7 +18,6 @@ const FILTERS = {
   cor: [
     { label: "Dourado", value: "dourado" },
     { label: "Prata", value: "prata" },
-    { label: "Rosé", value: "rose" },
   ] as Option[],
 };
 

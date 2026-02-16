@@ -1,14 +1,19 @@
 import { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
+
 import HomePage from "./pages/HomePage";
 import ProductPage from "./pages/ProductPage";
-import Header from "./components/Header";
 import CadastroUsuariosPage from "./pages/cadastro_users";
 import LoginPage from "./pages/LoginPage";
 import Checkout from "./pages/Checkout";
 import CheckoutIdentificacao from "./pages/CheckoutIdentificacao";
 import JewelryListing from "./pages/JewelryListing";
 
+// ADMIN
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminProducts from "./pages/admin/AdminProducts";
+import { AdminGuard } from "./routes/AdminGuard";
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -39,6 +44,15 @@ export default function App() {
         <Route path="/checkout/identificacao" element={<CheckoutIdentificacao />} />
         <Route path="/joias/:slug" element={<JewelryListing />} />
 
+        {/* ADMIN */}
+        <Route path="/admin" element={<AdminGuard />}>
+          <Route element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="produtos" element={<AdminProducts />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<div className="p-6">404</div>} />
       </Routes>
     </>
   );

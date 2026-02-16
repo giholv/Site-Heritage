@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase"; // ajuste o caminho
 
 type FormState = {
   email: string;
@@ -46,28 +47,41 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include", // se você usar cookie httpOnly no backend
-        body: JSON.stringify({
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          remember: form.remember,
-        }),
+      const email = form.email.trim().toLowerCase();
+
+      // 1) Login no Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password: form.password,
       });
 
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setServerError(data?.message || "E-mail ou senha inválidos.");
+      if (authError || !authData.user) {
+        setServerError(authError?.message || "E-mail ou senha inválidos.");
         return;
       }
 
-      // Se o backend devolver token, você pode salvar:
-      // localStorage.setItem("token", data.token)
+      // 2) (Opcional) Persistência "remember me"
+      // O supabase-js já persiste sessão por padrão no localStorage.
+      // Se você quiser simular "não lembrar", dá pra forçar storage em memória (mais chato),
+      // então aqui só mantemos o comportamento padrão.
 
-      navigate("/minha-conta"); // ajuste pra sua rota pós-login
+      // 3) Busca role no profiles (admin vs customer)
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", authData.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        // se não encontrou perfil, encerra sessão por segurança
+        await supabase.auth.signOut();
+        setServerError("Seu perfil não foi encontrado. Contate o suporte.");
+        return;
+      }
+
+      // 4) Redireciona baseado no role
+      if (profile.role === "admin") navigate("/admin");
+      else navigate("/minha-conta");
     } catch {
       setServerError("Falha de rede/servidor. Tente novamente.");
     } finally {
@@ -80,7 +94,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-[#2b554e]">Entrar</h1>
-          <p className="text-[#2b554e]/70 mt-1">Acesse sua conta para acompanhar pedidos e favoritos.</p>
+          <p className="text-[#2b554e]/70 mt-1">
+            Acesse sua conta para acompanhar pedidos e favoritos.
+          </p>
         </div>
 
         <div className="rounded-2xl border border-[#2b554e]/10 bg-white p-6 shadow-sm">
@@ -171,7 +187,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-xs text-[#2b554e]/60">
-          Backend ideal: senha com hash (argon2/bcrypt) + sessão via cookie httpOnly ou JWT bem tratado.
+          Login via Supabase Auth + role em <code>profiles</code> (admin/customer).
         </p>
       </div>
     </div>
