@@ -3,9 +3,9 @@ import React, { useEffect, useMemo, useState } from "react";
 const Hero: React.FC = () => {
   const banners = useMemo(
     () => [
-      { src: "/Banner1.jpg", alt: "Banner semijoias 1" },
-      { src: "/Banner2.jpg", alt: "Banner semijoias 2" },
-      { src: "/Banner3.jpg", alt: "Banner semijoias 3" },
+      { src: "/Banner4.jpg", alt: "Banner semijoias 1" },
+      { src: "/Banner6.jpg", alt: "Banner semijoias 2" },
+      { src: "/Banner7.jpg", alt: "Banner semijoias 3" },
     ],
     []
   );
