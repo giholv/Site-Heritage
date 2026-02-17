@@ -9,8 +9,6 @@ export type SkuRow = {
   price_cents: number;
   active: boolean;
   barcode: string | null;
-  plating_millesimal: number | null;
-  plating_origin: string | null;
   created_at?: string;
 };
 
@@ -38,20 +36,6 @@ function toCents(input: string) {
   return Math.round(v * 100);
 }
 
-function requiresMillesimal(variantName: string) {
-  const v = (variantName || "").toLowerCase();
-  // regra simples e prática
-  return v.includes("ouro") || v.includes("prata");
-}
-
-function parseMillesimal(raw: string) {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return null;
-  const i = Math.trunc(n);
-  if (i <= 0) return null;
-  return i;
-}
-
 export default function SkusTab({
   productId,
   productName,
@@ -59,7 +43,7 @@ export default function SkusTab({
   onSelectSku,
 }: {
   productId: string;
-  productName: string;
+  productName: string; // pra gerar SKU automático
   selectedSkuId: string | null;
   onSelectSku: (id: string) => void;
 }) {
@@ -74,11 +58,7 @@ export default function SkusTab({
   const [barcode, setBarcode] = useState("");
   const [active, setActive] = useState(true);
 
-  const [platingOrigin, setPlatingOrigin] = useState("");
-  const [platingMillesimal, setPlatingMillesimal] = useState(""); // string pra input
-
   const skuBase = useMemo(() => skuBaseFromProductName(productName), [productName]);
-  const needM = requiresMillesimal(variantName);
 
   async function loadSkus() {
     setLoading(true);
@@ -86,9 +66,7 @@ export default function SkusTab({
 
     const { data, error } = await supabase
       .from("skus")
-      .select(
-        "id,product_id,sku_code,variant_name,price_cents,active,barcode,plating_millesimal,plating_origin,created_at"
-      )
+      .select("id,product_id,sku_code,variant_name,price_cents,active,barcode,created_at")
       .eq("product_id", productId)
       .order("created_at", { ascending: true });
 
@@ -96,6 +74,7 @@ export default function SkusTab({
     setSkus((data ?? []) as SkuRow[]);
     setLoading(false);
 
+    // seleciona o primeiro se nada selecionado
     if (!selectedSkuId && (data ?? []).length > 0) onSelectSku((data ?? [])[0].id);
   }
 
@@ -105,33 +84,29 @@ export default function SkusTab({
   }, [productId]);
 
   async function nextSkuCode() {
-    const { data, error } = await supabase.from("skus").select("sku_code").eq("product_id", productId);
+    // busca todos do padrão CAL-BASE-XX
+    const { data, error } = await supabase
+      .from("skus")
+      .select("sku_code")
+      .eq("product_id", productId);
+
     if (error) throw new Error(error.message);
 
     const used = new Set((data ?? []).map((x: any) => String(x.sku_code || "")));
 
+    // tenta 01..99
     for (let n = 1; n <= 99; n++) {
       const cand = `${skuBase}-${String(n).padStart(2, "0")}`;
       if (!used.has(cand)) return cand;
     }
+    // fallback
     return `${skuBase}-${Date.now().toString().slice(-6)}`;
   }
 
   async function createSku() {
     setErr(null);
-
-    const vName = variantName.trim();
-    if (!vName) {
+    if (!variantName.trim()) {
       setErr("Informe o nome da variação (ex: Ouro 18k).");
-      return;
-    }
-
-    // valida milésimos quando necessário
-    const mustHaveM = requiresMillesimal(vName);
-    const m = platingMillesimal.trim() ? parseMillesimal(platingMillesimal.trim()) : null;
-
-    if (mustHaveM && !m) {
-      setErr("Milésimos do banho é obrigatório para variações de Ouro/Prata (ex: 750 ou 925).");
       return;
     }
 
@@ -144,24 +119,23 @@ export default function SkusTab({
         .insert({
           product_id: productId,
           sku_code,
-          variant_name: vName,
+          variant_name: variantName.trim(),
           price_cents: toCents(price),
           active,
           barcode: barcode.trim() || null,
-          plating_origin: platingOrigin.trim() || null,
-          plating_millesimal: m,
         })
         .select("id")
         .single();
 
       if (error || !data) throw new Error(error?.message || "Erro ao criar SKU.");
 
+      // (Opcional) cria inventory default se você já tiver tabela inventory:
+      // await supabase.from("inventory").insert({ sku_id: data.id, available: 0, reserved: 0 });
+
       setVariantName("");
       setPrice("0,00");
       setBarcode("");
       setActive(true);
-      setPlatingOrigin("");
-      setPlatingMillesimal("");
 
       await loadSkus();
       onSelectSku(data.id);
@@ -174,17 +148,6 @@ export default function SkusTab({
 
   async function updateSku(id: string, patch: Partial<SkuRow>) {
     setErr(null);
-
-    // validação: se estiver mudando variant_name ou plating_millesimal, checa regra
-    const row = skus.find((x) => x.id === id);
-    const nextVariant = (patch.variant_name ?? row?.variant_name ?? "").trim();
-    const nextM = patch.plating_millesimal ?? row?.plating_millesimal ?? null;
-
-    if (requiresMillesimal(nextVariant) && !nextM) {
-      setErr("Milésimos é obrigatório para variações de Ouro/Prata.");
-      return;
-    }
-
     const { error } = await supabase.from("skus").update(patch).eq("id", id);
     if (error) setErr(error.message);
     else loadSkus();
@@ -197,6 +160,7 @@ export default function SkusTab({
     const { error } = await supabase.from("skus").delete().eq("id", id);
     if (error) setErr(error.message);
     else {
+      // se deletou o selecionado, limpa seleção
       if (selectedSkuId === id) onSelectSku("");
       loadSkus();
     }
@@ -222,35 +186,9 @@ export default function SkusTab({
             <label className="text-sm text-gray-700">Variação *</label>
             <input
               className="mt-1 w-full rounded-xl border px-4 py-3 bg-white"
-              placeholder="Ex: Ouro 18k / Prata 925 / Ródio"
+              placeholder="Ex: Ouro 18k"
               value={variantName}
               onChange={(e) => setVariantName(e.target.value)}
-            />
-            {needM && (
-              <p className="mt-1 text-xs text-gray-600">
-                Ouro/Prata detectado: milésimos será obrigatório.
-              </p>
-            )}
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="text-sm text-gray-700">Milésimos {needM ? "*" : ""}</label>
-            <input
-              className="mt-1 w-full rounded-xl border px-4 py-3 bg-white"
-              value={platingMillesimal}
-              onChange={(e) => setPlatingMillesimal(e.target.value)}
-              inputMode="numeric"
-              placeholder={needM ? "Ex: 750 ou 925" : "Opcional"}
-            />
-          </div>
-
-          <div className="md:col-span-3">
-            <label className="text-sm text-gray-700">Origem do banho</label>
-            <input
-              className="mt-1 w-full rounded-xl border px-4 py-3 bg-white"
-              value={platingOrigin}
-              onChange={(e) => setPlatingOrigin(e.target.value)}
-              placeholder="Ex: Galvânica XYZ"
             />
           </div>
 
@@ -305,10 +243,10 @@ export default function SkusTab({
         ) : (
           <div className="overflow-hidden rounded-2xl border">
             <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs text-gray-500 border-b bg-gray-50">
-              <div className="col-span-3">Variação</div>
+              <div className="col-span-4">Variação</div>
               <div className="col-span-3">SKU</div>
               <div className="col-span-2">Preço</div>
-              <div className="col-span-3">Banho</div>
+              <div className="col-span-2">Ativo</div>
               <div className="col-span-1 text-right">Ações</div>
             </div>
 
@@ -322,7 +260,8 @@ export default function SkusTab({
                     selected ? "bg-[#2b554e]/5" : "bg-white",
                   ].join(" ")}
                 >
-                  <div className="col-span-3">
+                  {/* Variação editável */}
+                  <div className="col-span-4">
                     <input
                       className="w-full rounded-lg border px-2 py-2 text-sm"
                       value={s.variant_name}
@@ -332,19 +271,17 @@ export default function SkusTab({
                           prev.map((x) => (x.id === s.id ? { ...x, variant_name: next } : x))
                         );
                       }}
-                      onBlur={(e) =>
-                        updateSku(s.id, { variant_name: e.target.value.trim() })
-                      }
+                      onBlur={(e) => updateSku(s.id, { variant_name: e.target.value.trim() })}
                     />
                   </div>
 
+                  {/* SKU (somente leitura) */}
                   <div className="col-span-3 text-sm text-gray-800">
                     {s.sku_code}
-                    {s.barcode ? (
-                      <div className="text-xs text-gray-500">EAN: {s.barcode}</div>
-                    ) : null}
+                    {s.barcode ? <div className="text-xs text-gray-500">EAN: {s.barcode}</div> : null}
                   </div>
 
+                  {/* Preço editável */}
                   <div className="col-span-2">
                     <input
                       className="w-full rounded-lg border px-2 py-2 text-sm"
@@ -362,53 +299,18 @@ export default function SkusTab({
                     />
                   </div>
 
-                  {/* Banho */}
-                  <div className="col-span-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        className="w-full rounded-lg border px-2 py-2 text-sm"
-                        value={s.plating_millesimal ?? ""}
-                        placeholder={requiresMillesimal(s.variant_name) ? "Milésimos*" : "Milésimos"}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          const n = v.trim() ? parseMillesimal(v.trim()) : null;
-                          setSkus((prev) =>
-                            prev.map((x) =>
-                              x.id === s.id ? { ...x, plating_millesimal: n } : x
-                            )
-                          );
-                        }}
-                        onBlur={(e) => {
-                          const v = e.target.value.trim();
-                          const n = v ? parseMillesimal(v) : null;
-                          updateSku(s.id, { plating_millesimal: n });
-                        }}
-                        inputMode="numeric"
-                      />
-                      <input
-                        className="w-full rounded-lg border px-2 py-2 text-sm"
-                        value={s.plating_origin ?? ""}
-                        placeholder="Origem"
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setSkus((prev) =>
-                            prev.map((x) =>
-                              x.id === s.id ? { ...x, plating_origin: v } : x
-                            )
-                          );
-                        }}
-                        onBlur={(e) =>
-                          updateSku(s.id, { plating_origin: e.target.value.trim() || null })
-                        }
-                      />
-                    </div>
-                    {requiresMillesimal(s.variant_name) && !s.plating_millesimal ? (
-                      <div className="text-xs text-red-600 mt-1">
-                        Obrigatório para Ouro/Prata.
-                      </div>
-                    ) : null}
+                  {/* Ativo toggle */}
+                  <div className="col-span-2">
+                    <button
+                      type="button"
+                      className="text-sm underline"
+                      onClick={() => updateSku(s.id, { active: !s.active })}
+                    >
+                      {s.active ? "Sim" : "Não"}
+                    </button>
                   </div>
 
+                  {/* Ações */}
                   <div className="col-span-1 flex justify-end gap-2">
                     <button
                       type="button"
