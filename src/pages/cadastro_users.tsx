@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase"; // ajuste o path se precisar
 
 type FormState = {
   name: string;
@@ -54,7 +55,6 @@ export default function CadastroUsuariosPage() {
     else if (!isEmail(form.email)) e.email = "E-mail inválido.";
 
     const phoneDigits = cleanPhone(form.phone);
-
     if (!phoneDigits) e.phone = "Informe seu telefone.";
     else if (phoneDigits.length < 10) e.phone = "Telefone deve ter DDD + número (10 ou 11 dígitos).";
 
@@ -79,6 +79,26 @@ export default function CadastroUsuariosPage() {
     setTouched((prev) => ({ ...prev, [key]: true }));
   }
 
+  function showError<K extends keyof FormState>(k: K) {
+    return touched[k] && errors[k];
+  }
+
+  function mapAuthErrorMessage(message: string) {
+    const m = message.toLowerCase();
+
+    if (m.includes("user already registered") || m.includes("already registered")) {
+      return "Esse e-mail já está cadastrado.";
+    }
+    if (m.includes("password") && m.includes("should be at least")) {
+      return "Senha muito curta. Use no mínimo 8 caracteres.";
+    }
+    if (m.includes("invalid") && m.includes("email")) {
+      return "E-mail inválido.";
+    }
+
+    return message || "Não foi possível cadastrar. Tente novamente.";
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setServerError(null);
@@ -98,25 +118,83 @@ export default function CadastroUsuariosPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim().toLowerCase(),
-          phone: cleanPhone(form.phone),
-          password: form.password,
-        }),
+      const email = form.email.trim().toLowerCase();
+      const phone = cleanPhone(form.phone);
+      const fullName = form.name.trim();
+
+      /**
+       * 1) Cria usuário no Supabase Auth
+       * Observação: se "Email confirmation" estiver ON, o usuário pode precisar confirmar e-mail.
+       */
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email,
+        password: form.password,
+        options: {
+          data: { full_name: fullName, phone },
+        },
       });
 
-      const data = await res.json().catch(() => ({}));
+      if (signUpErr) {
+        setServerError(mapAuthErrorMessage(signUpErr.message));
+        return;
+      }
 
-      if (!res.ok) {
-        setServerError(data?.message || "Não foi possível cadastrar. Tente novamente.");
+      const userId = signUpData.user?.id;
+      if (!userId) {
+        setServerError("Não foi possível criar o usuário (user_id ausente).");
+        return;
+      }
+
+      /**
+       * 2) Salva no seu banco (schema que você mostrou):
+       * - customers: amarra user_id + dados do cliente
+       * - profiles: cria role = customer
+       *
+       * Se RLS estiver ativo, você precisa de policies permitindo insert/upsert do próprio user_id.
+       */
+
+      // customers (preferência: upsert por user_id; fallback por email)
+      const { error: custErr } = await supabase.from("customers").upsert(
+        {
+          user_id: userId,
+          email,
+          full_name: fullName,
+          phone,
+        },
+        { onConflict: "user_id" }
+      );
+
+      if (custErr) {
+        // pode acontecer se já existir customer por email (guest checkout) sem user_id
+        // tenta amarrar por email
+        const { error: custErr2 } = await supabase
+          .from("customers")
+          .update({
+            user_id: userId,
+            full_name: fullName,
+            phone,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("email", email);
+
+        if (custErr2) {
+          setServerError("Usuário criado, mas falhou ao salvar cliente no banco.");
+          return;
+        }
+      }
+
+      // profiles
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .upsert({ user_id: userId, role: "customer" }, { onConflict: "user_id" });
+
+      if (profErr) {
+        setServerError("Usuário criado, mas falhou ao salvar perfil no banco.");
         return;
       }
 
       setSuccess("Cadastro realizado com sucesso! Redirecionando...");
+
       setForm({
         name: "",
         email: "",
@@ -142,8 +220,6 @@ export default function CadastroUsuariosPage() {
   const okBorder = "border-[#2b554e]/20 focus:border-[#b08d57]/50 focus:ring-2 focus:ring-[#b08d57]/20";
   const badBorder = "border-red-400/60 focus:border-red-400 focus:ring-2 focus:ring-red-300/30";
 
-  const showError = <K extends keyof FormState>(k: K) => touched[k] && errors[k];
-
   return (
     <div className="min-h-screen bg-[#FCFAF6] flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
@@ -155,9 +231,7 @@ export default function CadastroUsuariosPage() {
             className="mx-auto h-20 w-auto object-contain"
           />
           <h1 className="mt-2 text-2xl font-semibold text-[#2b554e]">Criar conta</h1>
-          <p className="text-[#2b554e]/70 mt-1">
-            Acompanhe pedidos, favoritos e novidades.
-          </p>
+          <p className="text-[#2b554e]/70 mt-1">Acompanhe pedidos, favoritos e novidades.</p>
         </div>
 
         <div className="rounded-2xl border border-[#2b554e]/10 bg-white p-6 shadow-sm">
@@ -182,7 +256,7 @@ export default function CadastroUsuariosPage() {
                 onChange={(e) => update("name", e.target.value)}
                 onBlur={() => markTouched("name")}
                 className={`${fieldBase} ${showError("name") ? badBorder : okBorder}`}
-                placeholder="Ex: Giovanna Pires"
+                placeholder="Nome e Sobrenome"
                 autoComplete="name"
               />
               {showError("name") && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
@@ -205,7 +279,7 @@ export default function CadastroUsuariosPage() {
 
             {/* Telefone */}
             <div>
-              <label className="text-sm text-[#2b554e]">Telefone </label>
+              <label className="text-sm text-[#2b554e]">Telefone</label>
               <input
                 required
                 value={form.phone}
@@ -217,7 +291,6 @@ export default function CadastroUsuariosPage() {
                 inputMode="tel"
               />
               {showError("phone") && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
-
             </div>
 
             {/* Senha */}
@@ -286,9 +359,14 @@ export default function CadastroUsuariosPage() {
               />
               <div className="text-sm text-[#2b554e]/80">
                 Aceito os{" "}
-                <a href="/termos" className="underline hover:text-[#b08d57]">termos de uso</a>{" "}
+                <a href="/termos" className="underline hover:text-[#b08d57]">
+                  termos de uso
+                </a>{" "}
                 e a{" "}
-                <a href="/privacidade" className="underline hover:text-[#b08d57]">política de privacidade</a>.
+                <a href="/privacidade" className="underline hover:text-[#b08d57]">
+                  política de privacidade
+                </a>
+                .
                 {showError("acceptTerms") && (
                   <p className="mt-1 text-xs text-red-600">{errors.acceptTerms}</p>
                 )}
@@ -315,7 +393,7 @@ export default function CadastroUsuariosPage() {
             </p>
 
             <p className="text-center text-[11px] text-[#2b554e]/55">
-              Heritage Maison • Elegância sem esforço.
+              Caléa • Elegância sem esforço.
             </p>
           </form>
         </div>

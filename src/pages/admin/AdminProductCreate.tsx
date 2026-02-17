@@ -23,8 +23,21 @@ const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "seo", label: "E-commerce (SEO)" },
 ];
 
-type Category = { id: string; name: string; slug: string };
-type Supplier = { id: string; name: string };
+type CategoryRow = {
+  id: string;
+  name: string;
+  type: "tipo_peca" | "colecao" | "estilo";
+  parent_id: string | null;
+};
+
+type SupplierRow = {
+  id: string;
+  name: string; // campo antigo
+  trade_name: string | null;
+  corporate_name: string | null;
+  cnpj: string | null; // 14 dígitos
+  active: boolean | null;
+};
 
 function scrollToId(id: string) {
   const el = document.getElementById(id);
@@ -108,6 +121,19 @@ function parseCsvList(v: string) {
   return arr.length ? arr : [];
 }
 
+function cleanCNPJ(v: string) {
+  return (v || "").replace(/\D/g, "").slice(0, 14);
+}
+
+function formatCNPJ(v: string | null) {
+  const n = cleanCNPJ(v || "");
+  if (n.length !== 14) return v || "";
+  return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(
+    8,
+    12
+  )}-${n.slice(12)}`;
+}
+
 export default function AdminProductCreate() {
   const nav = useNavigate();
 
@@ -119,21 +145,23 @@ export default function AdminProductCreate() {
   const [productId, setProductId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // ✅ SKU selecionado (para Estoque/Fotos futuramente)
+  // SKU selecionado
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
 
-  // fields: products (seu schema)
+  // fields: products
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"draft" | "active">("draft");
 
+  // categoria/coleção: vamos guardar UM id (por enquanto)
   const [categoryId, setCategoryId] = useState<string>("");
+
   const [materialBase, setMaterialBase] = useState("");
   const [mainPlating, setMainPlating] = useState("");
   const [importantNotes, setImportantNotes] = useState("");
 
-  const [supplierId, setSupplierId] = useState<string>("");
+  const [supplierId, setSupplierId] = useState<string>(""); // ✅ corrigido
   const [supplierOriginCode, setSupplierOriginCode] = useState("");
 
   // SEO
@@ -143,8 +171,8 @@ export default function AdminProductCreate() {
   const [searchTags, setSearchTags] = useState("");
 
   // combos
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   // scroll spy
@@ -171,21 +199,55 @@ export default function AdminProductCreate() {
   // load combos
   useEffect(() => {
     (async () => {
+      // categories (com subcategorias)
       const { data: c, error: cErr } = await supabase
         .from("categories")
-        .select("id,name,slug")
+        .select("id,name,type,parent_id")
+        .order("type", { ascending: true })
         .order("name", { ascending: true });
 
-      if (!cErr) setCategories((c ?? []) as Category[]);
+      if (!cErr) setCategories((c ?? []) as CategoryRow[]);
 
+      // suppliers com CNPJ etc
       const { data: s, error: sErr } = await supabase
         .from("suppliers")
-        .select("id,name")
+        .select("id,name,trade_name,corporate_name,cnpj,active")
         .order("name", { ascending: true });
 
-      if (!sErr) setSuppliers((s ?? []) as Supplier[]);
+      if (!sErr) setSuppliers((s ?? []) as SupplierRow[]);
     })();
   }, []);
+
+  // monta tree p/ dropdown
+  const categoryDropdown = useMemo(() => {
+    const byId = new Map(categories.map((c) => [c.id, c]));
+
+    const tipoPais = categories
+      .filter((c) => c.type === "tipo_peca" && !c.parent_id)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((p) => ({
+        ...p,
+        children: categories
+          .filter((c) => c.type === "tipo_peca" && c.parent_id === p.id)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+
+    const colecoes = categories
+      .filter((c) => c.type === "colecao" && !c.parent_id)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const estilos = categories
+      .filter((c) => c.type === "estilo" && !c.parent_id)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    // caso você tenha filhos em colecao/estilo também:
+    const childrenOf = (parentId: string, type: CategoryRow["type"]) =>
+      categories
+        .filter((c) => c.type === type && c.parent_id === parentId)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { tipoPais, colecoes, estilos, childrenOf, byId };
+  }, [categories]);
 
   // slug auto quando digita nome (se slug vazio)
   useEffect(() => {
@@ -215,7 +277,7 @@ export default function AdminProductCreate() {
         slug: finalSlug,
         description: description.trim() || null,
         status,
-        category_id: categoryId || null,
+        category_id: categoryId || null, // se você migrar pra product_categories depois, eu ajusto
         material_base: materialBase.trim() || null,
         main_plating: mainPlating.trim() || null,
         important_notes: importantNotes.trim() || null,
@@ -362,11 +424,45 @@ export default function AdminProductCreate() {
                   className="mt-1 w-full rounded-xl border px-4 py-3 bg-white"
                 >
                   <option value="">—</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+
+                  <optgroup label="Tipo de peça">
+                    {categoryDropdown.tipoPais.map((p) => (
+                      <React.Fragment key={p.id}>
+                        <option value={p.id}>{p.name}</option>
+                        {p.children.map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            {"\u00A0\u00A0\u00A0"}• {ch.name}
+                          </option>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                  </optgroup>
+
+                  <optgroup label="Coleções">
+                    {categoryDropdown.colecoes.map((c) => (
+                      <React.Fragment key={c.id}>
+                        <option value={c.id}>{c.name}</option>
+                        {categoryDropdown.childrenOf(c.id, "colecao").map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            {"\u00A0\u00A0\u00A0"}• {ch.name}
+                          </option>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                  </optgroup>
+
+                  <optgroup label="Estilo / Ocasião">
+                    {categoryDropdown.estilos.map((c) => (
+                      <React.Fragment key={c.id}>
+                        <option value={c.id}>{c.name}</option>
+                        {categoryDropdown.childrenOf(c.id, "estilo").map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            {"\u00A0\u00A0\u00A0"}• {ch.name}
+                          </option>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
@@ -378,12 +474,20 @@ export default function AdminProductCreate() {
                   className="mt-1 w-full rounded-xl border px-4 py-3 bg-white"
                 >
                   <option value="">—</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
+                  {suppliers
+                    .filter((s) => s.active !== false)
+                    .map((s) => {
+                      const label = s.trade_name || s.name || s.corporate_name || "Fornecedor";
+                      const cnpj = s.cnpj ? ` — ${formatCNPJ(s.cnpj)}` : "";
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {label}
+                          {cnpj}
+                        </option>
+                      );
+                    })}
                 </select>
+
                 <p className="mt-1 text-xs text-gray-500">
                   OBS: fornecedor por SKU também existe; aqui é “padrão do produto”.
                 </p>
@@ -487,7 +591,7 @@ export default function AdminProductCreate() {
                 productId={productId}
                 productName={name}
                 selectedSkuId={selectedSkuId}
-                onSelectSku={setSelectedSkuId as any} // se seu SkusTab ainda está com (id: string) => void, ajuste ele pra (string|null)
+                onSelectSku={setSelectedSkuId as any}
               />
             )}
           </CardSection>
@@ -510,7 +614,8 @@ export default function AdminProductCreate() {
           {/* ESTOQUE */}
           <CardSection id="estoque" title="Estoque" defaultOpen={false}>
             <div className="text-sm text-gray-600 mb-4">
-              Estoque auditável por movimentações (entrada/saída/ajuste), com vínculo opcional ao lote/galvânica.
+              Estoque auditável por movimentações (entrada/saída/ajuste), com vínculo opcional ao
+              lote/galvânica.
             </div>
 
             {!productId ? (
