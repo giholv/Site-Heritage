@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import ProductTab from "./tabs/ProductTab";
 import SkusTab from "./tabs/SkusTab";
-import PhotosTab from "./tabs/PhotosTab";
+import PhotosTab from "./tabs/SkuImagesDnd";
 import StockTab from "./tabs/StockTab";
 import SeoTab from "./tabs/SeoTab";
 
