@@ -16,6 +16,7 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import { AdminGuard } from "./routes/AdminGuard";
 import AdminProductEdit from "./pages/admin/AdminProductEdit";
 import AdminProductCreate from "./pages/admin/AdminProductCreate";
+import AdminSuppliersPage from "./pages/admin/AdminSuppliers";
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="produtos" element={<AdminProducts />} />
             <Route path="produtos/novo" element={<AdminProductCreate />} />
             <Route path="produtos/:productId" element={<AdminProductEdit />} />
+             <Route path="fornecedores" element={<AdminSuppliersPage />} />
           </Route>
         </Route>
         <Route path="*" element={<div className="p-6">404</div>} />

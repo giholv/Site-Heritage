@@ -36,6 +36,12 @@ function toCents(input: string) {
   return Math.round(v * 100);
 }
 
+function isUniqueViolation(err: any) {
+  // PostgREST: 409 + message costuma indicar unique
+  const msg = String(err?.message || "").toLowerCase();
+  return err?.status === 409 || msg.includes("duplicate") || msg.includes("unique");
+}
+
 export default function SkusTab({
   productId,
   productName,
@@ -43,7 +49,7 @@ export default function SkusTab({
   onSelectSku,
 }: {
   productId: string;
-  productName: string; // pra gerar SKU automático
+  productName: string;
   selectedSkuId: string | null;
   onSelectSku: (id: string) => void;
 }) {
@@ -52,7 +58,6 @@ export default function SkusTab({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // form de criação
   const [variantName, setVariantName] = useState("");
   const [price, setPrice] = useState("0,00");
   const [barcode, setBarcode] = useState("");
@@ -60,9 +65,15 @@ export default function SkusTab({
 
   const skuBase = useMemo(() => skuBaseFromProductName(productName), [productName]);
 
+  function log(label: string, extra?: any) {
+    // eslint-disable-next-line no-console
+    console.log(`[SkusTab] ${label}`, { productId, skuBase, ...extra });
+  }
+
   async function loadSkus() {
     setLoading(true);
     setErr(null);
+    log("LOAD_START");
 
     const { data, error } = await supabase
       .from("skus")
@@ -70,12 +81,16 @@ export default function SkusTab({
       .eq("product_id", productId)
       .order("created_at", { ascending: true });
 
-    if (error) setErr(error.message);
-    setSkus((data ?? []) as SkuRow[]);
+    if (error) {
+      log("LOAD_ERROR", { error });
+      setErr(error.message);
+    } else {
+      setSkus((data ?? []) as SkuRow[]);
+      log("LOAD_OK", { count: (data ?? []).length, skus: (data ?? []).map((s: any) => s.sku_code) });
+      if (!selectedSkuId && (data ?? []).length > 0) onSelectSku((data ?? [])[0].id);
+    }
     setLoading(false);
-
-    // seleciona o primeiro se nada selecionado
-    if (!selectedSkuId && (data ?? []).length > 0) onSelectSku((data ?? [])[0].id);
+    log("LOAD_END");
   }
 
   useEffect(() => {
@@ -83,23 +98,27 @@ export default function SkusTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
 
-  async function nextSkuCode() {
-    // busca todos do padrão CAL-BASE-XX
+  // Checa colisão GLOBAL do sku_code
+  async function skuCodeExistsGlobal(code: string) {
     const { data, error } = await supabase
       .from("skus")
-      .select("sku_code")
-      .eq("product_id", productId);
+      .select("id")
+      .eq("sku_code", code)
+      .maybeSingle();
 
     if (error) throw new Error(error.message);
+    return !!data;
+  }
 
-    const used = new Set((data ?? []).map((x: any) => String(x.sku_code || "")));
-
-    // tenta 01..99
+  async function nextSkuCodeGlobal() {
+    // tenta 01..99 com checagem global
     for (let n = 1; n <= 99; n++) {
       const cand = `${skuBase}-${String(n).padStart(2, "0")}`;
-      if (!used.has(cand)) return cand;
+      // eslint-disable-next-line no-await-in-loop
+      const exists = await skuCodeExistsGlobal(cand);
+      if (!exists) return cand;
     }
-    // fallback
+    // fallback muito improvável colidir
     return `${skuBase}-${Date.now().toString().slice(-6)}`;
   }
 
@@ -111,38 +130,65 @@ export default function SkusTab({
     }
 
     setSaving(true);
-    try {
-      const sku_code = await nextSkuCode();
+    log("CREATE_START", { variantName, price, barcode, active });
 
-      const { data, error } = await supabase
-        .from("skus")
-        .insert({
+    try {
+      // retry para caso de corrida (dois creates ao mesmo tempo)
+      let lastError: any = null;
+
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        const sku_code = await nextSkuCodeGlobal();
+        log("CREATE_ATTEMPT", { attempt, sku_code });
+
+        const payload = {
           product_id: productId,
           sku_code,
           variant_name: variantName.trim(),
           price_cents: toCents(price),
           active,
           barcode: barcode.trim() || null,
-        })
-        .select("id")
-        .single();
+        };
 
-      if (error || !data) throw new Error(error?.message || "Erro ao criar SKU.");
+        const { data, error } = await supabase
+          .from("skus")
+          .insert(payload)
+          .select("id,sku_code")
+          .single();
 
-      // (Opcional) cria inventory default se você já tiver tabela inventory:
-      // await supabase.from("inventory").insert({ sku_id: data.id, available: 0, reserved: 0 });
+        if (!error && data?.id) {
+          log("CREATE_OK", { id: data.id, sku_code: data.sku_code });
 
-      setVariantName("");
-      setPrice("0,00");
-      setBarcode("");
-      setActive(true);
+          setVariantName("");
+          setPrice("0,00");
+          setBarcode("");
+          setActive(true);
 
-      await loadSkus();
-      onSelectSku(data.id);
+          await loadSkus();
+          onSelectSku(data.id);
+          setSaving(false);
+          return;
+        }
+
+        lastError = error;
+        log("CREATE_ERROR", { attempt, error });
+
+        // se for unique/409, tenta de novo com outro código
+        if (isUniqueViolation(error)) continue;
+
+        // erro diferente: explode
+        throw new Error(error?.message || "Erro ao criar SKU.");
+      }
+
+      // se chegou aqui, só deu colisão
+      throw new Error(
+        lastError?.message ||
+          "Não consegui gerar um sku_code único (muitas colisões)."
+      );
     } catch (e: any) {
       setErr(e?.message || "Erro inesperado ao criar SKU.");
     } finally {
       setSaving(false);
+      log("CREATE_END");
     }
   }
 
@@ -160,7 +206,6 @@ export default function SkusTab({
     const { error } = await supabase.from("skus").delete().eq("id", id);
     if (error) setErr(error.message);
     else {
-      // se deletou o selecionado, limpa seleção
       if (selectedSkuId === id) onSelectSku("");
       loadSkus();
     }
@@ -179,7 +224,6 @@ export default function SkusTab({
         </div>
       )}
 
-      {/* Criar SKU */}
       <div className="mt-6 rounded-2xl border bg-gray-50 p-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           <div className="md:col-span-4">
@@ -234,7 +278,6 @@ export default function SkusTab({
         </button>
       </div>
 
-      {/* Lista */}
       <div className="mt-6">
         {loading ? (
           <div className="text-sm text-gray-600">Carregando SKUs...</div>
@@ -260,7 +303,6 @@ export default function SkusTab({
                     selected ? "bg-[#2b554e]/5" : "bg-white",
                   ].join(" ")}
                 >
-                  {/* Variação editável */}
                   <div className="col-span-4">
                     <input
                       className="w-full rounded-lg border px-2 py-2 text-sm"
@@ -275,13 +317,11 @@ export default function SkusTab({
                     />
                   </div>
 
-                  {/* SKU (somente leitura) */}
                   <div className="col-span-3 text-sm text-gray-800">
                     {s.sku_code}
                     {s.barcode ? <div className="text-xs text-gray-500">EAN: {s.barcode}</div> : null}
                   </div>
 
-                  {/* Preço editável */}
                   <div className="col-span-2">
                     <input
                       className="w-full rounded-lg border px-2 py-2 text-sm"
@@ -299,7 +339,6 @@ export default function SkusTab({
                     />
                   </div>
 
-                  {/* Ativo toggle */}
                   <div className="col-span-2">
                     <button
                       type="button"
@@ -310,7 +349,6 @@ export default function SkusTab({
                     </button>
                   </div>
 
-                  {/* Ações */}
                   <div className="col-span-1 flex justify-end gap-2">
                     <button
                       type="button"

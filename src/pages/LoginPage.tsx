@@ -71,6 +71,10 @@ export default function LoginPage() {
         .select("role")
         .eq("user_id", authData.user.id)
         .single();
+        
+      if (profileError) {
+        console.log("profileError:", profileError);
+      }
 
       if (profileError || !profile) {
         // se não encontrou perfil, encerra sessão por segurança
