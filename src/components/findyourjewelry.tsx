@@ -1,143 +1,135 @@
-import React, { useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { supabase } from "../lib/supabase"; // ajuste o caminho
 
 type Category = {
-  title: string;
+  id: string;
+  name: string;
   slug: string;
-  image: string;
-  filters?: Record<string, string>;
+  cover_image_path: string | null;
+  position: number;
 };
 
-function toQuery(filters?: Record<string, string>) {
-  if (!filters) return "";
-  const qs = new URLSearchParams(filters);
-  const str = qs.toString();
-  return str ? `?${str}` : "";
+const CATEGORY_BUCKET = "category-images"; // TROQUE se usar outro bucket (ou o mesmo do produto)
+
+function publicUrl(bucket: string, path?: string | null) {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
 }
 
-const FALLBACK = "/cats/fallback.jpg";
+export default function EncontreSuaJoia() {
+  const [cats, setCats] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
 
-export default function CategoriesStrip() {
-  const navigate = useNavigate();
-  const trackRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    let alive = true;
 
-  const categories = useMemo<Category[]>(
-    () => [
-      { title: "Anéis", slug: "aneis", image: "/cats/Aneis.jpg" },
-      { title: "Brincos", slug: "brincos", image: "/cats/Brincos.jpg" },
-      { title: "Colares", slug: "colares", image: "/cats/Colares.jpg" },
-      { title: "Pulseiras", slug: "pulseiras", image: "/cats/Pulseiras.jpg" },
-      { title: "Pingentes", slug: "pingentes", image: "/cats/Pingentes.jpg" },
-    ],
-    []
-  );
+    (async () => {
+      setLoading(true);
+      setErr(null);
 
-  const [broken, setBroken] = useState<Record<string, boolean>>({});
+      const { data, error } = await supabase
+        .from("category_tree")
+        .select("id,name,slug,cover_image_path,position,parent_id,active")
+        .eq("active", true)
+        .is("parent_id", null) // <<< SÓ CATEGORIA PAI
+        .order("position", { ascending: true });
 
-  const onClick = (c: Category) => {
-    navigate(`/joias/${c.slug}${toQuery(c.filters)}`);
-  };
+      if (!alive) return;
 
-  const scrollByCards = (dir: 1 | -1) => {
-    const el = trackRef.current;
-    if (!el) return;
-    const amount = Math.round(el.clientWidth * 0.75) * dir;
-    el.scrollBy({ left: amount, behavior: "smooth" });
-  };
+      if (error) {
+        setErr(error.message);
+        setCats([]);
+      } else {
+        setCats((data ?? []) as Category[]);
+      }
+
+      setLoading(false);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
-   <section id="EncontreSuaJoia" className="bg-[#FCFAF6] mt-10 md:mt-14">
+    <section id="categorias" className="bg-[#FCFAF6] py-14">
       <div className="container mx-auto px-4 md:px-6">
-        {/* topo */}
-        <div className="text-center mb-8 md:mb-10">
-          <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e]">
-            Encontre sua <span className="text-[#b08d57]">JOIA</span>
-          </h2>
-          <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mt-4 mb-4 rounded-full" />
-          <p className="text-[#2b554e]/80 text-base md:text-lg">
-            Joias para seu dia a dia — leve, elegante e atemporal.
-          </p>
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div className="text-xs tracking-[0.18em] text-black/45 uppercase">Catálogo</div>
+            <h2 className="mt-2 text-3xl md:text-4xl font-semibold text-[#2b554e]">
+              Encontre sua joia
+            </h2>
+            <div className="mt-3 h-[2px] w-20 bg-[#b08d57] rounded-full" />
+            <p className="mt-3 text-sm text-black/55">
+              Selecione uma categoria para ver todas as peças.
+            </p>
+
+            {err && <div className="mt-3 text-sm text-red-600">Erro: {err}</div>}
+          </div>
+
+          <Link
+            to="/joias"
+            className="hidden md:inline-flex h-11 px-5 rounded-2xl bg-white/80 border border-black/10 text-sm font-semibold text-[#2b554e] hover:shadow-sm transition"
+          >
+            Ver tudo
+          </Link>
         </div>
 
-        {/* carrossel com setas flutuantes */}
-        <div className="relative">
-          {/* seta esquerda (desktop) */}
-          <button
-            type="button"
-            onClick={() => scrollByCards(-1)}
-            aria-label="Voltar"
-            className={[
-              "hidden md:flex items-center justify-center",
-              "absolute left-0 top-1/2 -translate-y-1/2 z-10",
-              "h-12 w-12 rounded-full bg-white border border-black/10 shadow-sm",
-              "text-[#2b554e] hover:bg-black/5 transition",
-              // distância da borda
-              "ml-2",
-            ].join(" ")}
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </button>
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-5">
+          {loading &&
+            Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={`sk-${i}`}
+                className="rounded-3xl overflow-hidden border border-black/10 bg-white/80 animate-pulse"
+              >
+                <div className="aspect-[4/3] bg-black/5" />
+                <div className="p-4">
+                  <div className="h-4 bg-black/5 rounded w-2/3" />
+                </div>
+              </div>
+            ))}
 
-          {/* seta direita (desktop) */}
-          <button
-            type="button"
-            onClick={() => scrollByCards(1)}
-            aria-label="Avançar"
-            className={[
-              "hidden md:flex items-center justify-center",
-              "absolute right-0 top-1/2 -translate-y-1/2 z-10",
-              "h-12 w-12 rounded-full bg-white border border-black/10 shadow-sm",
-              "text-[#2b554e] hover:bg-black/5 transition",
-              "mr-2",
-            ].join(" ")}
-          >
-            <ChevronRight className="h-6 w-6" />
-          </button>
-
-          {/* trilho (padding lateral = distancia entre card e setas) */}
-          <div
-            ref={trackRef}
-            className={[
-              "px-16 md:px-20", // << AQUI aumenta o espaço entre cards e botões
-              "flex gap-6 overflow-x-auto pb-2",
-              "snap-x snap-mandatory",
-              "scroll-smooth",
-              "[scrollbar-width:none] [-ms-overflow-style:none]",
-              "[&::-webkit-scrollbar]:hidden",
-            ].join(" ")}
-          >
-            {categories.map((c) => {
-              const src = broken[c.slug] ? FALLBACK : c.image;
-
+          {!loading &&
+            cats.map((c) => {
+              const img = publicUrl(CATEGORY_BUCKET, c.cover_image_path);
               return (
-                <button
-                  key={c.slug}
-                  type="button"
-                  onClick={() => onClick(c)}
-                  className="snap-start shrink-0 text-left group"
+                <Link
+                  key={c.id}
+                  to={`/joias/categoria/${c.slug}`}
+                  className="group rounded-3xl overflow-hidden border border-black/10 bg-white/80 shadow-sm hover:shadow-md transition"
                 >
-                  <div className="w-[240px] sm:w-[260px] md:w-[280px]">
-                    <div className="relative overflow-hidden rounded-3xl bg-white border border-black/5 shadow-sm">
+                  <div className="aspect-[4/3] bg-black/5">
+                    {img ? (
                       <img
-                        src={src}
-                        alt={c.title}
-                        className="h-[260px] md:h-[300px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        src={img}
+                        alt={c.name}
+                        className="w-full h-full object-cover group-hover:scale-[1.02] transition"
                         loading="lazy"
-                        onError={() =>
-                          setBroken((prev) => ({ ...prev, [c.slug]: true }))
-                        }
                       />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
-                    </div>
-
-                    <div className="pt-4 text-lg text-black">{c.title}</div>
+                    ) : null}
                   </div>
-                </button>
+
+                  <div className="p-4">
+                    <div className="font-semibold text-[#2b554e]">{c.name}</div>
+                    <div className="mt-1 text-xs text-black/50">Ver peças</div>
+                  </div>
+                </Link>
               );
             })}
-          </div>
+        </div>
+
+        <div className="mt-8 md:hidden">
+          <Link
+            to="/joias"
+            className="inline-flex w-full h-11 items-center justify-center rounded-2xl bg-[#2b554e] text-white text-sm font-semibold"
+          >
+            Ver todo o catálogo
+          </Link>
         </div>
       </div>
     </section>

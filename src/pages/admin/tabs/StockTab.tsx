@@ -1,294 +1,467 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 
-type StockRow = {
+type LocationRow = {
+  id: string;
+  code: string;
+  name: string | null;
+  active: boolean;
+};
+
+type MovementRow = {
+  id: string;
   sku_id: string;
-  available: number;
-};
-
-type Movement = {
-  id: string;
-  movement_type: "entrada" | "saida" | "ajuste" | "venda";
+  location_id: string;
+  type: string;
   quantity: number;
-  reference: string | null;
+  reason: string | null;
+  note: string | null;
   created_at: string;
-  plating_batch_id: string | null;
+  order_id: string | null;
 };
 
-type Batch = {
-  id: string;
-  galvanica_name: string;
-  lote: string;
-  lote_date: string; // ISO date
-  bath_type: string | null;
-  millesimal: number | null;
+type CurrentStockRow = {
+  sku_id: string;
+  location_id: string;
+  location_code: string;
+  total_qty: number;
+  reserved_qty: number;
+  available_qty: number;
 };
 
-export default function StockTab({ skuId }: { skuId: string }) {
-  const [stock, setStock] = useState<StockRow | null>(null);
-  const [history, setHistory] = useState<Movement[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([]);
+const MOV_TYPES: Array<{ value: string; label: string }> = [
+  { value: "in", label: "Entrada" },
+  { value: "out", label: "Saída" },
+  { value: "adjust", label: "Ajuste (+/-)" },
+  { value: "reserve", label: "Reserva" },
+  { value: "release", label: "Libera reserva" },
+];
 
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+function cx(...v: Array<string | false | null | undefined>) {
+  return v.filter(Boolean).join(" ");
+}
 
-  // form
-  const [type, setType] = useState<Movement["movement_type"]>("entrada");
-  const [qty, setQty] = useState("1");
-  const [reference, setReference] = useState("");
-  const [batchId, setBatchId] = useState<string>("");
+function CardStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border bg-white p-4">
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-gray-900">{value ?? 0}</div>
+    </div>
+  );
+}
 
-  const batchOptions = useMemo(() => {
-    return batches.map((b) => {
-      const label = [
-        b.galvanica_name,
-        `Lote ${b.lote}`,
-        new Date(b.lote_date).toLocaleDateString("pt-BR"),
-        b.bath_type ? b.bath_type : null,
-        b.millesimal ? `${b.millesimal}` : null,
-      ]
-        .filter(Boolean)
-        .join(" • ");
-      return { value: b.id, label };
-    });
-  }, [batches]);
 
-  async function loadAll() {
-    setLoading(true);
-    setErr(null);
+function computeFromMovements(rows: Array<Pick<MovementRow, "type" | "quantity">>) {
+  let total = 0; // físico
+  let reserved = 0;
 
-    // saldo atual
-    const { data: s, error: e1 } = await supabase
-      .from("current_stock")
-      .select("sku_id,available")
-      .eq("sku_id", skuId)
-      .maybeSingle();
+  for (const r of rows) {
+    const q = Number(r.quantity) || 0;
+    const t = (r.type || "").toLowerCase();
 
-    if (e1) {
-      setErr(e1.message);
-      setLoading(false);
-      return;
-    }
-
-    // histórico (últimos 50)
-    const { data: h, error: e2 } = await supabase
-      .from("inventory_movements")
-      .select("id,movement_type,quantity,reference,created_at,plating_batch_id")
-      .eq("sku_id", skuId)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (e2) {
-      setErr(e2.message);
-      setLoading(false);
-      return;
-    }
-
-    // lotes (para vincular entradas/ajustes)
-    const { data: b, error: e3 } = await supabase
-      .from("plating_batches")
-      .select("id,galvanica_name,lote,lote_date,bath_type,millesimal")
-      .order("lote_date", { ascending: false })
-      .limit(200);
-
-    if (e3) {
-      setErr(e3.message);
-      setLoading(false);
-      return;
-    }
-
-    setStock((s as any) ?? { sku_id: skuId, available: 0 });
-    setHistory((h as any) ?? []);
-    setBatches((b as any) ?? []);
-    setLoading(false);
+    if (t === "in" || t === "entrada") total += q;
+    else if (t === "out" || t === "saida") total -= q;
+    else if (t === "adjust" || t === "ajuste") total += q;
+    else if (t === "reserve" || t === "reserva") reserved += q;
+    else if (t === "release" || t === "libera_reserva") reserved -= q;
   }
 
+  const available = total - reserved;
+  return { total, reserved, available };
+}
+
+export default function StockTab({ skuId }: { skuId: string }) {
+  const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const [locations, setLocations] = useState<LocationRow[]>([]);
+  const [locationId, setLocationId] = useState<string>("");
+
+  const [stock, setStock] = useState<{ total: number; reserved: number; available: number }>({
+    total: 0,
+    reserved: 0,
+    available: 0,
+  });
+
+  const [movements, setMovements] = useState<MovementRow[]>([]);
+
+  // form
+  const [type, setType] = useState("in");
+  const [quantity, setQuantity] = useState("1");
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+
+  // criar localização (opcional)
+  const [newLocCode, setNewLocCode] = useState("");
+  const [newLocName, setNewLocName] = useState("");
+
+  const locationOptions = useMemo(
+    () => locations.filter((l) => l.active !== false).sort((a, b) => a.code.localeCompare(b.code)),
+    [locations]
+  );
+
+  async function loadLocations() {
+    const { data, error } = await supabase
+      .from("stock_locations")
+      .select("id,code,name,active")
+      .eq("active", true)
+      .order("code", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as LocationRow[];
+    setLocations(rows);
+
+    // escolhe MAIN se existir, senão primeira
+    if (!locationId) {
+      const main = rows.find((r) => r.code === "MAIN");
+      setLocationId(main?.id || rows[0]?.id || "");
+    }
+  }
+
+  async function loadMovements(locId: string) {
+    const { data, error } = await supabase
+      .from("stock_movements")
+      .select("id,sku_id,location_id,type,quantity,reason,note,created_at,order_id")
+      .eq("sku_id", skuId)
+      .eq("location_id", locId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+    setMovements((data ?? []) as MovementRow[]);
+    return (data ?? []) as MovementRow[];
+  }
+
+  async function loadStock(locId: string, movementRows?: MovementRow[]) {
+  const { data, error } = await supabase
+    .from("current_stock")
+    .select("sku_id,location_id,location_code,total_qty,reserved_qty,available_qty")
+    .eq("sku_id", skuId)
+    .eq("location_id", locId)
+    .maybeSingle();
+
+  // erro real
+  if (error) {
+    const msg = (error as any)?.message || "";
+
+    // view não existe / cache
+    if (msg.includes("schema cache") || msg.includes("Could not find the table")) {
+      const rows = movementRows ?? (await loadMovements(locId));
+      const s = computeFromMovements(rows);
+      setStock({ total: s.total, reserved: s.reserved, available: s.available });
+      return;
+    }
+
+    throw new Error(msg || "Erro ao carregar saldo.");
+  }
+
+  // view voltou vazia => saldo zero (ou calcula pelas movimentações)
+  if (!data) {
+    const rows = movementRows ?? [];
+    const s = computeFromMovements(rows);
+    setStock({ total: s.total, reserved: s.reserved, available: s.available });
+    return;
+  }
+
+  const r = data as CurrentStockRow;
+  setStock({
+    total: r.total_qty ?? 0,
+    reserved: r.reserved_qty ?? 0,
+    available: r.available_qty ?? 0,
+  });
+}
+
+async function refresh() {
+  if (!skuId || !locationId) return;
+
+  setErr(null);
+  setOk(null);
+  setLoading(true);
+  try {
+    const rows = await loadMovements(locationId); // pega rows direto (não depende do setState)
+    await loadStock(locationId, rows);
+  } catch (e: any) {
+    setErr(e?.message || "Erro no estoque.");
+  } finally {
+    setLoading(false);
+  }
+}
+
   useEffect(() => {
-    loadAll();
+    setErr(null);
+    setOk(null);
+    setLocations([]);
+    setLocationId("");
+    setMovements([]);
+    setStock({ total: 0, reserved: 0, available: 0 });
+
+    (async () => {
+      try {
+        await loadLocations();
+      } catch (e: any) {
+        setErr(e?.message || "Erro ao carregar localizações.");
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skuId]);
 
-  async function addMovement() {
-    setErr(null);
+  useEffect(() => {
+    if (!locationId) return;
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationId]);
 
-    const n = Number(qty);
-    if (!Number.isFinite(n) || n <= 0) {
-      setErr("Quantidade inválida.");
-      return;
+  async function createLocation() {
+  setErr(null);
+  setOk(null);
+
+  const code = newLocCode.trim().toUpperCase();
+  const name = newLocName.trim() || null;
+  if (!code) return;
+
+  // 1) tenta achar
+  const { data: existing, error: selErr } = await supabase
+    .from("stock_locations")
+    .select("id, code, name")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (selErr) return setErr(selErr.message);
+
+  if (existing) {
+    setLocationId(existing.id);
+
+    // opcional: só tenta update se você tiver policy de UPDATE
+    if (name && !existing.name) {
+      const { error: upErr } = await supabase
+        .from("stock_locations")
+        .update({ name })
+        .eq("id", existing.id);
+
+      if (upErr) return setErr(upErr.message);
     }
 
-    // regra simples: saída não pode estourar o saldo
-    const current = stock?.available ?? 0;
-    if ((type === "saida" || type === "venda") && n > current) {
-      setErr(`Saída maior que o disponível (atual: ${current}).`);
-      return;
-    }
-
-    const payload: any = {
-      sku_id: skuId,
-      movement_type: type,
-      quantity: Math.floor(n),
-      reference: reference.trim() ? reference.trim() : null,
-      plating_batch_id: batchId ? batchId : null,
-    };
-
-    const { error } = await supabase.from("inventory_movements").insert(payload);
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
-    // limpa form e recarrega
-    setQty("1");
-    setReference("");
-    setBatchId("");
-    await loadAll();
+    setOk("Localização já existia. Selecionada.");
+    return;
   }
 
-  if (loading) return <div className="p-6">Carregando...</div>;
+  // 2) não existe -> cria
+  const { data: created, error: insErr } = await supabase
+    .from("stock_locations")
+    .insert({ code, name })
+    .select("id")
+    .single();
+
+  if (insErr) return setErr(insErr.message);
+
+  setLocationId(created.id);
+  setNewLocCode("");
+  setNewLocName("");
+  setOk("Localização criada.");
+  await loadLocations();
+}
+
+async function createMovement() {
+  setErr(null);
+  setOk(null);
+
+  if (!locationId) return setErr("Selecione a localização.");
+
+  const q = Number(quantity);
+  if (!Number.isFinite(q) || q === 0) return setErr("Quantidade inválida.");
+
+  // IMPORTANTE: ver item (3) abaixo sobre negativo
+  if (q < 0) return setErr("Hoje seu banco não aceita negativo. Use tipo 'out' ou ajuste o CHECK.");
+
+  const { error } = await supabase.from("stock_movements").insert({
+    sku_id: skuId,
+    location_id: locationId,
+    type,
+    quantity: q,
+    reason: reason.trim() || null,
+    note: note.trim() || null,
+    order_id: null,
+  });
+
+  if (error) return setErr(error.message);
+
+  setOk("Movimentação registrada.");
+  setReason("");
+  setNote("");
+  setQuantity("1");
+  await refresh();
+}
 
   return (
-    <div className="rounded-2xl border bg-white p-6 space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Estoque</h2>
-        <div className="text-sm text-gray-600 mt-1">
-          Saldo calculado por movimentações (auditável).
-        </div>
-      </div>
-
-      {err && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700">
+    <div className="space-y-5">
+      {err ? (
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700">
           {err}
         </div>
-      )}
+      ) : null}
 
-      {/* Saldo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <div className="text-sm text-gray-600">Disponível</div>
-          <div className="mt-1 w-full rounded-xl border px-4 py-3 bg-gray-50">
-            {stock?.available ?? 0}
-          </div>
+      {ok ? (
+        <div className="rounded-2xl border border-emerald-900/15 bg-emerald-900/5 px-4 py-3 text-sm text-emerald-900">
+          {ok}
         </div>
-        <div>
-          <div className="text-sm text-gray-600">Reservado</div>
-          <div className="mt-1 w-full rounded-xl border px-4 py-3 bg-gray-50">
-            0
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            (Você pode plugar isso depois com carrinho/pedidos)
-          </div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-600">Total</div>
-          <div className="mt-1 w-full rounded-xl border px-4 py-3 bg-gray-50">
-            {(stock?.available ?? 0) + 0}
-          </div>
-        </div>
-      </div>
+      ) : null}
 
-      {/* Nova movimentação */}
-      <div className="rounded-2xl border p-4">
-        <div className="font-semibold mb-3">Lançar movimentação</div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      {/* Localização */}
+      <div className="rounded-3xl border bg-white p-5 overflow-visible">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm text-gray-600">Tipo</div>
+            <div className="text-sm font-semibold text-gray-900">Localização</div>
+            <div className="text-xs text-gray-500 mt-1">Ex: A1, A2, B7…</div>
+          </div>
+          <div className="text-xs text-gray-500">{loading ? "Carregando…" : null}</div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-6 min-w-0">
+            <label className="text-sm font-medium text-gray-900">Selecionar</label>
             <select
-              className="mt-1 w-full rounded-xl border px-3 py-3"
-              value={type}
-              onChange={(e) => setType(e.target.value as any)}
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="mt-1 w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
             >
-              <option value="entrada">Entrada</option>
-              <option value="saida">Saída</option>
-              <option value="ajuste">Ajuste</option>
-              <option value="venda">Venda</option>
+              {locationOptions.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.code}{l.name ? ` — ${l.name}` : ""}
+                </option>
+              ))}
             </select>
           </div>
 
-          <div>
-            <div className="text-sm text-gray-600">Quantidade</div>
-            <input
-              className="mt-1 w-full rounded-xl border px-4 py-3"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              inputMode="numeric"
-            />
-          </div>
+          <div className="md:col-span-6 min-w-0">
+            <label className="text-sm font-medium text-gray-900">Criar nova (opcional)</label>
 
-          <div className="md:col-span-2">
-            <div className="text-sm text-gray-600">
-              Lote / Galvânica (opcional)
+            <div className="mt-1 flex flex-wrap items-center gap-2 min-w-0">
+              <input
+                className="w-32 shrink-0 rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
+                placeholder="A1"
+                value={newLocCode}
+                onChange={(e) => setNewLocCode(e.target.value)}
+              />
+              <input
+                className="flex-1 min-w-0 rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
+                placeholder="Nome (opcional)"
+                value={newLocName}
+                onChange={(e) => setNewLocName(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={createLocation}
+                className="shrink-0 whitespace-nowrap rounded-2xl px-4 py-3 text-sm font-medium text-white"
+                style={{ backgroundColor: "#2b554e" }}
+              >
+                Criar
+              </button>
             </div>
+          </div>
+        </div>
+      </div>
+      {/* Saldo */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardStat label="Disponível" value={stock.available} />
+        <CardStat label="Reservado" value={stock.reserved} />
+        <CardStat label="Total" value={stock.total} />
+      </div>
+
+      {/* Lançar movimentação */}
+      <div className="rounded-3xl border bg-white p-5">
+        <div className="text-sm font-semibold text-gray-900">Lançar movimentação</div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-4">
+            <label className="text-sm font-medium text-gray-900">Tipo</label>
             <select
-              className="mt-1 w-full rounded-xl border px-3 py-3"
-              value={batchId}
-              onChange={(e) => setBatchId(e.target.value)}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="mt-1 w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
             >
-              <option value="">—</option>
-              {batchOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+              {MOV_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="md:col-span-4">
-            <div className="text-sm text-gray-600">Referência (opcional)</div>
+            <label className="text-sm font-medium text-gray-900">Quantidade</label>
             <input
-              className="mt-1 w-full rounded-xl border px-4 py-3"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              placeholder='Ex: "Entrada banho", "Ajuste inventário", "Pedido #123"'
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="mt-1 w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
+              inputMode="numeric"
+              placeholder={type === "adjust" ? "Pode ser -5, 10…" : "Ex: 1"}
             />
           </div>
-        </div>
 
-        <button
-          onClick={addMovement}
-          className="mt-4 rounded-xl bg-[#2b554e] text-white px-4 py-3"
-        >
-          Registrar movimentação
-        </button>
+          <div className="md:col-span-4">
+            <label className="text-sm font-medium text-gray-900">Referência (opcional)</label>
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="mt-1 w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
+              placeholder='Ex: "Entrada banho", "Ajuste inventário"'
+            />
+          </div>
+
+          <div className="md:col-span-12">
+            <label className="text-sm font-medium text-gray-900">Observação (opcional)</label>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="mt-1 w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
+              placeholder="Detalhes…"
+            />
+          </div>
+
+          <div className="md:col-span-12 flex justify-end">
+            <button
+              type="button"
+              onClick={createMovement}
+              disabled={loading}
+              className={cx(
+                "rounded-2xl px-5 py-3 text-sm font-medium text-white",
+                loading && "opacity-60 cursor-not-allowed"
+              )}
+              style={{ backgroundColor: "#2b554e" }}
+            >
+              Registrar movimentação
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Histórico */}
-      <div>
-        <div className="font-semibold mb-3">Histórico</div>
-        <div className="overflow-hidden rounded-2xl border">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="text-left px-4 py-3">Data</th>
-                <th className="text-left px-4 py-3">Tipo</th>
-                <th className="text-right px-4 py-3">Qtd</th>
-                <th className="text-left px-4 py-3">Referência</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.length === 0 ? (
-                <tr>
-                  <td className="px-4 py-4 text-gray-500" colSpan={4}>
-                    Nenhuma movimentação registrada.
-                  </td>
-                </tr>
-              ) : (
-                history.map((m) => (
-                  <tr key={m.id} className="border-t">
-                    <td className="px-4 py-3">
-                      {new Date(m.created_at).toLocaleString("pt-BR")}
-                    </td>
-                    <td className="px-4 py-3">{m.movement_type}</td>
-                    <td className="px-4 py-3 text-right">{m.quantity}</td>
-                    <td className="px-4 py-3">{m.reference ?? "—"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      <div className="rounded-3xl border bg-white overflow-hidden">
+        <div className="bg-gray-50 px-5 py-3 border-b flex items-center justify-between">
+          <div className="text-sm font-semibold text-gray-900">Histórico (local selecionado)</div>
+          <div className="text-xs text-gray-500">{movements.length} item(ns)</div>
         </div>
+
+        {movements.length === 0 ? (
+          <div className="p-5 text-sm text-gray-600">Nenhuma movimentação ainda.</div>
+        ) : (
+          <div className="divide-y">
+            {movements.map((m) => (
+              <div key={m.id} className="p-4 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {m.type} • {m.quantity}
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500 truncate">
+                    {m.reason || "—"} {m.note ? `• ${m.note}` : ""}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500">{new Date(m.created_at).toLocaleString("pt-BR")}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
-}
+  }

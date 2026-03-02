@@ -39,13 +39,16 @@ export default function App() {
       <ScrollToHash />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/produto/:slug" element={<ProductPage />} />
         <Route path="/cadastro" element={<CadastroUsuariosPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/carrinho" element={<div className="p-6">Carrinho</div>} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/checkout/identificacao" element={<CheckoutIdentificacao />} />
-        <Route path="/joias/:slug" element={<JewelryListing />} />
+        <Route path="/joias" element={<JewelryListing />} />
+        <Route path="/joias/categoria/:categorySlug" element={<JewelryListing />} />
+        <Route path="/joias/colecao/:collectionSlug" element={<JewelryListing />} />
+        <Route path="/produto/:slug" element={<ProductPage />} />
+
 
         {/* ADMIN */}
         <Route path="/admin" element={<AdminGuard />}>
@@ -54,7 +57,7 @@ export default function App() {
             <Route path="produtos" element={<AdminProducts />} />
             <Route path="produtos/novo" element={<AdminProductCreate />} />
             <Route path="produtos/:productId" element={<AdminProductEdit />} />
-             <Route path="fornecedores" element={<AdminSuppliersPage />} />
+            <Route path="fornecedores" element={<AdminSuppliersPage />} />
           </Route>
         </Route>
         <Route path="*" element={<div className="p-6">404</div>} />

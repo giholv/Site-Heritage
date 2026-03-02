@@ -1,242 +1,216 @@
-// src/components/lancamento.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useCart } from "../context/CartContext";
+import { Link, useNavigate } from "react-router-dom";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { supabase } from "../lib/supabase"; // ajuste o caminho
 
-export type ProdutoCarouselItem = {
+type CatalogProduct = {
+  id: string;
   slug: string;
-  nome: string;
-  descricao?: string;
-  preco: number;
-  imagem: string;
-  tag?: string; // ex: "Novo", "Mais vendido", "925"
-  variant?: string; // o que vai pro carrinho (ex: "Prata 925", "Banho Ouro 18k")
+  name: string;
+  min_price_cents: number | null;
+  image_path: string | null;
+  image_alt: string | null;
+  tag_slugs: string[] | null;
+  created_at: string;
+  status: string;
 };
 
-type Props = {
-  id?: string; // âncora: "destaques"
-  title: React.ReactNode; // pode passar JSX (ex: Linha <span>...)
-  subtitle?: string;
-  items: ProdutoCarouselItem[];
-  from?: string; // querystring: ?from=...
-  autoplayMs?: number; // default 7800
-  showDots?: boolean; // default true
-};
+const PRODUCT_BUCKET = "product-images"; // <<< TROQUE pro seu bucket real
+const FEATURE_TAG = "destaque"; // <<< TROQUE pra "lancamentos" se preferir
 
-function formatBRL(v: number) {
+function moneyBRLFromCents(cents?: number | null) {
+  const v = ((cents ?? 0) / 100) || 0;
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function ProductCarousel({
-  id,
-  title,
-  subtitle,
-  items,
-  from,
-  autoplayMs = 7800,
-  showDots = true,
-}: Props) {
+function publicUrl(bucket: string, path?: string | null) {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+function pickBadge(tagSlugs?: string[] | null) {
+  const t = tagSlugs ?? [];
+  if (t.includes("novo")) return "Novo";
+  if (t.includes("destaque")) return "Destaque";
+  if (t.includes("mais-vendido")) return "Mais vendido";
+  return undefined;
+}
+
+export default function Semijoias() {
   const navigate = useNavigate();
-  const { add } = useCart();
 
-  const pecas = useMemo(() => items ?? [], [items]);
-  const total = pecas.length;
-
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [items, setItems] = useState<CatalogProduct[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (paused || total <= 1) return;
-    const timer = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % total);
-    }, autoplayMs);
-    return () => clearInterval(timer);
-  }, [paused, total, autoplayMs]);
+    let alive = true;
 
-  useEffect(() => {
-    // se a lista mudar e o índice ficar inválido
-    if (activeIndex > total - 1) setActiveIndex(0);
-  }, [total, activeIndex]);
+    (async () => {
+      setLoading(true);
 
-  const next = () => total && setActiveIndex((prev) => (prev + 1) % total);
-  const prev = () => total && setActiveIndex((prev) => (prev - 1 + total) % total);
+      const { data, error } = await supabase
+        .from("v_catalog_products")
+        .select("id,slug,name,min_price_cents,image_path,image_alt,tag_slugs,created_at,status")
+        .eq("status", "active")
+        .contains("tag_slugs", [FEATURE_TAG])
+        .order("created_at", { ascending: false })
+        .limit(12);
 
-  const onAddToCart = (e: React.MouseEvent, peca: ProdutoCarouselItem) => {
-    e.stopPropagation();
-    add({
-      id: peca.slug,
-      name: peca.nome,
-      price: peca.preco,
-      image: peca.imagem,
-      variant: peca.variant ?? peca.tag ?? "Produto",
-      qty: 1,
-    });
+      if (!alive) return;
+
+      if (error) {
+        console.error("Semijoias:", error.message);
+        setItems([]);
+      } else {
+        setItems((data ?? []) as CatalogProduct[]);
+      }
+
+      setLoading(false);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const scrollBy = (dir: "left" | "right") => {
+    const el = document.getElementById("lancamentos-scroll");
+    if (!el) return;
+    const step = Math.max(320, Math.floor(el.clientWidth * 0.8));
+    el.scrollBy({ left: dir === "left" ? -step : step, behavior: "smooth" });
   };
 
-  const goToProduct = (slug: string) => {
-    const qs = from ? `?from=${encodeURIComponent(from)}` : "";
-    navigate(`/produto/${slug}${qs}`);
-  };
-
-  if (!total) return null;
+  const title = useMemo(() => {
+    // Se FEATURE_TAG for destaque, o texto “Lançamentos” pode continuar como na sua imagem.
+    return "Linha SEMIJOIAS";
+  }, []);
 
   return (
-    <section id={id} className="py-16 bg-[#FCFAF6] scroll-mt-[140px]">
+    <section id="lancamentos" className="bg-[#FCFAF6] py-16">
       <div className="container mx-auto px-4 md:px-6">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e]">
-            {title}
-          </h2>
-          <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mt-4 mb-4 rounded-full" />
-          {subtitle && (
-            <p className="text-[#2b554e]/80 text-base md:text-lg">{subtitle}</p>
-          )}
+        <div className="text-center">
+          <h2 className="text-4xl md:text-5xl font-semibold text-[#2b554e]">{title}</h2>
+          <div className="mx-auto mt-4 h-[2px] w-24 bg-[#b08d57] rounded-full" />
+          <p className="mt-6 text-sm md:text-base text-black/55">
+            Peças com banho premium — brilho marcante, acabamento impecável.
+          </p>
         </div>
 
-        <div
-          className="relative max-w-6xl mx-auto"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          <div className="flex items-center justify-center gap-4 md:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory md:snap-none pb-2">
-            {pecas.map((peca, index) => {
-              const offset = (index - activeIndex + total) % total;
+        <div className="relative mt-12">
+          {/* setas */}
+          <button
+            type="button"
+            onClick={() => scrollBy("left")}
+            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 h-12 w-12 items-center justify-center rounded-full bg-white/90 border border-black/10 shadow-sm"
+            aria-label="Anterior"
+          >
+            <ChevronLeft className="h-5 w-5 text-[#2b554e]" />
+          </button>
 
-              let scale = 0.72;
-              let opacity = 0.25;
-              let zIndex = 10;
-              let translateY = 18;
+          <button
+            type="button"
+            onClick={() => scrollBy("right")}
+            className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 h-12 w-12 items-center justify-center rounded-full bg-white/90 border border-black/10 shadow-sm"
+            aria-label="Próximo"
+          >
+            <ChevronRight className="h-5 w-5 text-[#2b554e]" />
+          </button>
 
-              if (offset === 0) {
-                scale = 1;
-                opacity = 1;
-                zIndex = 30;
-                translateY = 0;
-              } else if (offset === 1 || offset === total - 1) {
-                scale = 0.88;
-                opacity = 0.75;
-                zIndex = 20;
-                translateY = 8;
-              }
-
-              const handleCardClick = () => {
-                if (offset !== 0) {
-                  setActiveIndex(index);
-                  return;
-                }
-                goToProduct(peca.slug);
-              };
-
-              return (
-                <motion.div
-                  key={`${peca.slug}-${index}`}
-                  className="w-56 md:w-60 lg:w-72 cursor-pointer select-none snap-center"
-                  onClick={handleCardClick}
-                  initial={false}
-                  animate={{ scale, opacity, y: translateY }}
-                  transition={{ duration: 0.75, ease: "easeInOut" }}
-                  style={{ zIndex }}
+          {/* trilho */}
+          <div
+            id="lancamentos-scroll"
+            className="flex gap-6 overflow-x-auto scroll-smooth pb-2 snap-x snap-mandatory"
+          >
+            {loading &&
+              Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={`sk-${i}`}
+                  className="min-w-[260px] md:min-w-[320px] snap-start rounded-3xl bg-white/80 border border-black/10 overflow-hidden animate-pulse"
                 >
-                  <div className="bg-white/90 rounded-3xl shadow-md overflow-hidden border border-[#2b554e]/10">
+                  <div className="aspect-[4/5] bg-black/5" />
+                  <div className="p-5">
+                    <div className="h-4 bg-black/5 rounded w-2/3" />
+                    <div className="h-4 bg-black/5 rounded w-1/3 mt-3" />
+                    <div className="h-10 bg-black/5 rounded-2xl mt-5" />
+                  </div>
+                </div>
+              ))}
+
+            {!loading &&
+              items.map((p) => {
+                const img = publicUrl(PRODUCT_BUCKET, p.image_path);
+                const badge = pickBadge(p.tag_slugs);
+
+                return (
+                  <div
+                    key={p.id}
+                    className="min-w-[260px] md:min-w-[340px] snap-start rounded-3xl bg-white/80 border border-black/10 overflow-hidden shadow-sm hover:shadow-md transition"
+                  >
                     <div className="relative">
-                      <div className="aspect-[4/5] overflow-hidden">
-                        <img
-                          src={peca.imagem}
-                          alt={peca.nome}
-                          className="block w-full h-full object-cover"
-                          loading="lazy"
-                        />
+                      <div className="aspect-[4/5] bg-black/5">
+                        {img ? (
+                          <img
+                            src={img}
+                            alt={p.image_alt ?? p.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : null}
                       </div>
 
-                      {peca.tag && (
-                        <span className="absolute top-3 left-3 text-xs font-semibold bg-[#2b554e] text-[#F8F3EA] px-3 py-1 rounded-full">
-                          {peca.tag}
+                      {badge && (
+                        <span className="absolute top-4 left-4 text-xs font-semibold bg-[#2b554e] text-[#F8F3EA] px-3 py-1 rounded-full">
+                          {badge}
                         </span>
                       )}
                     </div>
 
-                    {offset === 0 && (
-                      <div className="p-5">
-                        <h3 className="text-lg font-semibold text-[#2b554e]">
-                          {peca.nome}
-                        </h3>
+                    <div className="p-6">
+                      <div className="text-xl font-semibold text-[#2b554e]">{p.name}</div>
+                      <div className="mt-2 text-sm text-black/55">Minimalista • combina com tudo</div>
 
-                        {peca.descricao && (
-                          <p className="text-sm text-[#2b554e]/70 mt-1">
-                            {peca.descricao}
-                          </p>
-                        )}
+                      <div className="mt-4 text-lg font-semibold text-[#b08d57]">
+                        {moneyBRLFromCents(p.min_price_cents)}
+                      </div>
 
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <div className="text-sm font-semibold text-[#b08d57]">
-                            {formatBRL(peca.preco)}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={(e) => onAddToCart(e, peca)}
-                            className="inline-flex items-center gap-2 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-4 py-2 text-sm font-semibold hover:opacity-95 transition"
-                            aria-label="Adicionar à sacola"
-                          >
-                            <ShoppingBag className="h-4 w-4" />
-                            Adicionar
-                          </button>
-                        </div>
-
+                      <div className="mt-5 flex gap-3">
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            goToProduct(peca.slug);
-                          }}
-                          className="mt-3 w-full rounded-md border border-[#2b554e]/20 px-4 py-2 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
+                          onClick={() => navigate(`/produto/${p.slug}`)}
+                          className="flex-1 h-11 rounded-2xl bg-[#2b554e] text-white text-sm font-semibold"
                         >
-                          Ver detalhes
+                          Ver
                         </button>
+
+                        <Link
+                          to={`/produto/${p.slug}`}
+                          className="h-11 px-5 inline-flex items-center justify-center rounded-2xl border border-[#2b554e]/15 text-[#2b554e] text-sm font-semibold hover:text-[#b08d57] hover:border-[#b08d57]/35 transition"
+                        >
+                          Detalhes
+                        </Link>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </motion.div>
-              );
-            })}
+                );
+              })}
+
+            {!loading && items.length === 0 && (
+              <div className="w-full rounded-3xl bg-white/80 border border-black/10 p-10 text-center text-black/60">
+                Nenhum produto marcado como “{FEATURE_TAG}”.
+              </div>
+            )}
           </div>
+        </div>
 
-          <button
-            type="button"
-            onClick={prev}
-            aria-label="Anterior"
-            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-6 bg-white/90 border border-[#2b554e]/15 rounded-full shadow-sm w-11 h-11 items-center justify-center text-[#2b554e] hover:text-[#b08d57] hover:border-[#b08d57]/40"
+        <div className="mt-10 text-center">
+          <Link
+            to="/joias"
+            className="inline-flex h-11 px-6 items-center justify-center rounded-2xl bg-white/80 border border-black/10 text-sm font-semibold text-[#2b554e] hover:shadow-sm transition"
           >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={next}
-            aria-label="Próximo"
-            className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 bg-white/90 border border-[#2b554e]/15 rounded-full shadow-sm w-11 h-11 items-center justify-center text-[#2b554e] hover:text-[#b08d57] hover:border-[#b08d57]/40"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-
-          {showDots && (
-            <div className="flex justify-center mt-7 gap-2">
-              {pecas.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveIndex(i)}
-                  aria-label={`Ir para item ${i + 1}`}
-                  className={`h-2.5 rounded-full transition-all ${
-                    i === activeIndex
-                      ? "w-8 bg-[#b08d57]"
-                      : "w-2.5 bg-[#2b554e]/20 hover:bg-[#2b554e]/35"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
+            Ver catálogo completo
+          </Link>
         </div>
       </div>
     </section>
