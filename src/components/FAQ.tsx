@@ -1,9 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
+type FAQAnswer = string | string[];
+
 type FAQItem = {
   q: string;
-  a: string;
+  a: FAQAnswer;
+  img?: { src: string; alt?: string };
 };
 
 const FAQ: React.FC = () => {
@@ -11,38 +14,57 @@ const FAQ: React.FC = () => {
     () => [
       {
         q: "Qual a diferença entre semijoia e bijuteria?",
-        a: "Semijoias são feitas com base metálica e recebem banho de metais nobres, como ouro ou prata, além de acabamento superior. Duram mais, têm melhor resistência e qualidade quando bem cuidadas. Bijuterias não passam por esse processo e, por isso, têm menor durabilidade.",
+        a: "Nossas semijoias são feitas com base metálica e recebem banho espesso de metais nobres, como ouro ou prata, além de um acabamento com verniz para maior durabilidade. Duram mais, têm melhor resistência e qualidade quando bem cuidadas. Bijuterias não passam por esse processo e, por isso, têm menor durabilidade.",
+        img: { src: "/semijoia-vs-bijuteria.svg", alt: "Semijoia e bijuteria" },
+      },
+      {
+        q: "Porque as peças em prata escurecem?",
+        a: "A prata sofre oxidação, uma reação química natural ao entrar em contato com o ar, suor, perfumes e outros produtos químicos. Esse processo escurece a peça, mas não é defeito. Com a limpeza correta da sua peça, o brilho original é recuperado.",
+      },
+      {
+        q: "Como cuidar das minhas semijoias ?",
+        a: [
+          "Armazene as peças separadamente, nos saquinhos que enviamos com cada peça.",
+          "Mantenha longe de exposição constante à água e ao vapor.",
+          "Coloque as peças apenas após a completa absorção e secagem de perfumes, cremes e cosméticos.",
+          "Não utilize produtos químicos/abrasivos na limpeza.",
+          "Para limpar, use água e sabão neutro; enxágue e seque totalmente com secador (ar frio).",
+          "É recomendado que retire as peças para dormir, pois o atrtito pode danificar ou entortar partes delicadas.",
+          "Retire as suas peças antes de praticar exercícios físicos.",
+        ],
+      },
+      {
+        q: "As peças podem me dar alergia?",
+        a: "Nossas peças são free níquel e hipoalergênicas, desenvolvidas para oferecer mais conforto, segurança e a melhor experiência no uso diário.",
       },
 
       {
-        q: "É normal peças em prata escurecer?",
-        a: "Sim, é normal. A prata sofre oxidação, uma reação química natural ao entrar em contato com o ar, suor, perfumes e outros produtos químicos. Esse processo escurece a peça, mas não é defeito. Com a limpeza correta, o brilho original é recuperado.",
-      },
-      {
-        q: "Como cuidar das semijoias com banho de ouro?",
-        a: "Evite contato com perfumes, cremes e, principalmente, com produtos de limpeza. Guarde as peças separadas nos saquinhos que enviamos ou em caixinhas, sempre longe da umidade. A limpeza semanal é crucial para remover resíduos de suor e produtos, ajudando a preservar o brilho e aumentar a durabilidade do banho. Utilize flanela macia ou pano antiembaçante. Se necessário, lave com água morna e sabão neutro, enxágue e seque bem. Evite produtos abrasivos.",
-      },
-      {
-        q: "Posso molhar as peças?",
-        a: "Prata 925 até pode ter contato ocasional com água, mas o ideal é evitar químicos (cloro, sabonete, mar). Para semijoias com banho, evite molhar para preservar o banho.",
-      },
-      {
-        q: "As peças dão alergia?",
-        a: "Nossas peças são free níquel e hipoalergênicas, desenvolvidas para oferecer mais conforto, segurança e a melhor experiência no uso diário.",
-      },
-      {
-        q: "Como cuidar das semijoias com banho de prata?",
-        a: "Use flanela macia própria para prata. Se necessário, lave com água morna e sabão neutro, enxágue e seque muito bem. Evite produtos abrasivos. Principalmente, não use pasta de dente nem o famoso “truque do papel-alumínio”, que podem riscar e danificar a prata. Mozi, nem pensar.",
-      },
-      {
         q: "Como funciona troca e devolução?",
-        a: "Você pode solicitar troca/devolução dentro do prazo legal (compras online) e seguindo as condições: peça sem uso, com embalagem e em perfeito estado. Para iniciar, chame no nosso atendimento.",
+        a: "Você pode solicitar troca/devolução dentro do prazo legal (compras online) e seguindo as condições: peça sem uso, com embalagem e em perfeito estado. Para iniciar, entre em contato conosco.",
       },
     ],
     []
   );
 
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  const Answer = ({ a }: { a: FAQAnswer }) => {
+    if (Array.isArray(a)) {
+      return (
+        <ul className="list-disc pl-5 space-y-2 text-sm md:text-base text-[#2b554e]/75 leading-relaxed">
+          {a.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+      );
+    }
+
+    return (
+      <p className="text-sm md:text-base text-[#2b554e]/75 leading-relaxed">
+        {a}
+      </p>
+    );
+  };
 
   return (
     <section id="faq" className="py-20 bg-[#FCFAF6] scroll-mt-[140px]">
@@ -53,7 +75,7 @@ const FAQ: React.FC = () => {
           </h2>
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mb-4 rounded-full" />
           <p className="text-[#2b554e]/75 text-base md:text-lg">
-            Banho, cuidados e trocas — sem mistério.
+            Banho, cuidados e trocas
           </p>
         </div>
 
@@ -72,10 +94,7 @@ const FAQ: React.FC = () => {
                   className="w-full flex items-center justify-between gap-4 p-5 text-left"
                   aria-expanded={open}
                 >
-                  <span className="text-[#2b554e] font-semibold">
-                    {item.q}
-                  </span>
-
+                  <span className="text-[#2b554e] font-semibold">{item.q}</span>
                   <ChevronDown
                     className={`h-5 w-5 text-[#2b554e] transition-transform ${
                       open ? "rotate-180" : ""
@@ -85,9 +104,18 @@ const FAQ: React.FC = () => {
 
                 {open && (
                   <div className="px-5 pb-5">
-                    <p className="text-sm md:text-base text-[#2b554e]/75 leading-relaxed">
-                      {item.a}
-                    </p>
+                    {item.img?.src && (
+                      <div className="mb-4 overflow-hidden rounded-xl border border-[#2b554e]/10">
+                        <img
+                          src={item.img.src}
+                          alt={item.img.alt ?? item.q}
+                          className="w-full h-[180px] md:h-[220px] object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+
+                    <Answer a={item.a} />
                   </div>
                 )}
               </div>

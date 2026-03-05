@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "../lib/supabase"; // ajuste o caminho
 
 type Category = {
@@ -10,7 +11,7 @@ type Category = {
   position: number;
 };
 
-const CATEGORY_BUCKET = "category-images"; // TROQUE se usar outro bucket (ou o mesmo do produto)
+const CATEGORY_BUCKET = "product-images"; // ajuste se necessário
 
 function publicUrl(bucket: string, path?: string | null) {
   if (!path) return null;
@@ -24,6 +25,25 @@ export default function EncontreSuaJoia() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  // carousel controls
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const updateArrows = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 2);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  };
+
+  const scrollByCards = (dir: "left" | "right") => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const amount = Math.round(el.clientWidth * 0.85);
+    el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
+  };
+
   useEffect(() => {
     let alive = true;
 
@@ -35,7 +55,7 @@ export default function EncontreSuaJoia() {
         .from("category_tree")
         .select("id,name,slug,cover_image_path,position,parent_id,active")
         .eq("active", true)
-        .is("parent_id", null) // <<< SÓ CATEGORIA PAI
+        .is("parent_id", null)
         .order("position", { ascending: true });
 
       if (!alive) return;
@@ -48,12 +68,33 @@ export default function EncontreSuaJoia() {
       }
 
       setLoading(false);
+
+      // dá um tempo pro DOM calcular scrollWidth
+      requestAnimationFrame(updateArrows);
     })();
 
     return () => {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    updateArrows();
+
+    const onScroll = () => updateArrows();
+    const onResize = () => updateArrows();
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      el.removeEventListener("scroll", onScroll as any);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [cats.length]);
 
   return (
     <section id="categorias" className="bg-[#FCFAF6] py-14">
@@ -80,47 +121,82 @@ export default function EncontreSuaJoia() {
           </Link>
         </div>
 
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-5">
-          {loading &&
-            Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={`sk-${i}`}
-                className="rounded-3xl overflow-hidden border border-black/10 bg-white/80 animate-pulse"
-              >
-                <div className="aspect-[4/3] bg-black/5" />
-                <div className="p-4">
-                  <div className="h-4 bg-black/5 rounded w-2/3" />
-                </div>
-              </div>
-            ))}
+        {/* CAROUSEL */}
+        <div className="relative mt-8">
+          {/* botão esquerda */}
+          {canLeft && (
+            <button
+              type="button"
+              onClick={() => scrollByCards("left")}
+              aria-label="Voltar categorias"
+              className="hidden md:inline-flex absolute -left-6 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-white shadow-xl border border-black/10 items-center justify-center"
+            >
+              <ChevronLeft className="h-5 w-5 text-[#2b554e]" />
+            </button>
+          )}
 
-          {!loading &&
-            cats.map((c) => {
-              const img = publicUrl(CATEGORY_BUCKET, c.cover_image_path);
-              return (
-                <Link
-                  key={c.id}
-                  to={`/joias/categoria/${c.slug}`}
-                  className="group rounded-3xl overflow-hidden border border-black/10 bg-white/80 shadow-sm hover:shadow-md transition"
+          {/* botão direita */}
+          {canRight && (
+            <button
+              type="button"
+              onClick={() => scrollByCards("right")}
+              aria-label="Avançar categorias"
+              className="hidden md:inline-flex absolute -right-6 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-white shadow-xl border border-black/10 items-center justify-center"
+            >
+              <ChevronRight className="h-5 w-5 text-[#2b554e]" />
+            </button>
+          )}
+
+          <div
+            ref={scrollerRef}
+            className="flex gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pr-2
+                       [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {loading &&
+              Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={`sk-${i}`}
+                  className="snap-start shrink-0 w-[260px] md:w-[300px] rounded-3xl overflow-hidden border border-black/10 bg-white/80 animate-pulse"
                 >
-                  <div className="aspect-[4/3] bg-black/5">
-                    {img ? (
-                      <img
-                        src={img}
-                        alt={c.name}
-                        className="w-full h-full object-cover group-hover:scale-[1.02] transition"
-                        loading="lazy"
-                      />
-                    ) : null}
-                  </div>
-
+                  <div className="aspect-[4/3] bg-black/5" />
                   <div className="p-4">
-                    <div className="font-semibold text-[#2b554e]">{c.name}</div>
-                    <div className="mt-1 text-xs text-black/50">Ver peças</div>
+                    <div className="h-4 bg-black/5 rounded w-2/3" />
+                    <div className="h-3 bg-black/5 rounded w-1/3 mt-3" />
                   </div>
-                </Link>
-              );
-            })}
+                </div>
+              ))}
+
+            {!loading &&
+              cats.map((c) => {
+                const img = publicUrl(CATEGORY_BUCKET, c.cover_image_path);
+                return (
+                  <Link
+                    key={c.id}
+                    to={`/joias/categoria/${c.slug}`}
+                    className="snap-start shrink-0 w-[260px] md:w-[300px] group rounded-3xl overflow-hidden border border-black/10 bg-white/80 shadow-sm hover:shadow-md transition"
+                  >
+                    <div className="aspect-[4/3] bg-black/5">
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={c.name}
+                          className="w-full h-full object-cover group-hover:scale-[1.02] transition"
+                          loading="lazy"
+                        />
+                      ) : null}
+                    </div>
+
+                    <div className="p-4 flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-[#2b554e]">{c.name}</div>
+                        <div className="mt-1 text-xs text-black/50">Ver peças</div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-[#2b554e]/40" />
+                    </div>
+                  </Link>
+                );
+              })}
+          </div>
         </div>
 
         <div className="mt-8 md:hidden">

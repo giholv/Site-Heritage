@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 
 type NavItem = {
@@ -65,7 +65,8 @@ const NAV: NavItem[] = [
   { to: "/admin", label: "Dashboard", icon: <IconGrid /> },
   { to: "/admin/produtos", label: "Produtos", icon: <IconTag /> },
   { to: "/admin/fornecedores", label: "Fornecedores", icon: <IconTruck /> },
-  { to: "/admin/clientes", label: "Clientes", icon: <IconUsers /> }, // deixa rota futura
+  { to: "/admin/clientes", label: "Clientes", icon: <IconUsers /> }, 
+  { to: "/admin/catalogo/imagens", label: "Imagens do Catálogo", icon: <IconGrid /> }
 ];
 
 export default function AdminLayout() {

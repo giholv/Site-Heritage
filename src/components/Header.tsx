@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Menu, X, Search, ShoppingBag, User } from "lucide-react";
 import { Link } from "./ui/Link";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import CartDrawer from "./CartDrawer";
 import { useCart } from "../context/CartContext";
 
@@ -20,6 +20,48 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
   const [qLocal, setQLocal] = useState("");
   const q = searchValue ?? qLocal;
   const navigate = useNavigate();
+
+  const location = useLocation();
+
+  const menuItems = [
+    { label: "Início", id: "home" },
+    { label: "Encontre Sua Joia", id: "categorias" },
+    { label: "Lançamentos", id: "semijoias" },
+    { label: "Sobre Nós", id: "about" },
+    { label: "Contato", id: "contact" },
+  ];
+
+  const scrollToId = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    else window.location.hash = id;
+  };
+
+  const goSection = (id: string) => {
+    setIsOpen(false);
+
+    // se já estiver na home, só scrolla
+    if (location.pathname === "/") {
+      scrollToId(id);
+      return;
+    }
+
+    // se estiver em outra rota, vai pra home e espera renderizar
+    navigate("/", { replace: false });
+
+    let tries = 0;
+    const t = setInterval(() => {
+      tries += 1;
+      const el = document.getElementById(id);
+      if (el) {
+        clearInterval(t);
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (tries >= 40) {
+        clearInterval(t);
+        window.location.hash = id;
+      }
+    }, 50);
+  };
 
   const setQ = (v: string) => {
     onSearchChange?.(v);
@@ -51,21 +93,13 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
     };
   }, [isOpen]);
 
-  const menuItems = [
-    { label: "Início", href: "#home" },
-    { label: "Encontre Sua Joia", href: "#EncontreSuaJoia" },
-    { label: "Lançamentos", href: "#lancamentos" },
 
-    { label: "Semijoias", href: "#semijoias" },
-    { label: "Sobre Nós", href: "#about" },
-    { label: "Contato", href: "#contact" },
-  ];
 
- const handleSearchSubmit = (e: React.FormEvent) => {
-  e.preventDefault();
-  if (onSearchSubmit) return onSearchSubmit(q);
-  console.log("Pesquisar:", q);
-};
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onSearchSubmit) return onSearchSubmit(q);
+    console.log("Pesquisar:", q);
+  };
   const onLogin = () => navigate("/login");
 
   const openCart = () => {
@@ -112,13 +146,21 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
               </button>
 
               <div className="justify-self-center">
-                <Link href="#home" className="inline-flex items-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate("/");
+                  }}
+                  className="inline-flex items-center"
+                  aria-label="Ir para Home"
+                >
                   <img
                     src="/logo_fundo_escuro_mobile.svg"
                     alt="Logo da loja"
                     className="h-14 w-auto object-contain"
                   />
-                </Link>
+                </button>
               </div>
 
               <div className="justify-self-end flex items-center gap-1">
@@ -157,19 +199,18 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
 
               {/* Logo - UMA só */}
               <div className="flex-none w-[260px] flex items-center pt-8">
-
-                <Link href="#home" className="inline-flex items-center">
+                <button
+                  type="button"
+                  onClick={() => navigate("/")}
+                  className="inline-flex items-center"
+                  aria-label="Ir para Home"
+                >
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
                     className="h-[110px] lg:h-[130px] w-auto object-contain"
-
-
-
-
-
                   />
-                </Link>
+                </button>
               </div>
 
               {/* Busca */}
@@ -221,81 +262,81 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
           <nav className="hidden md:block">
             <div className="container mx-auto px-4 md:px-6 h-12 flex items-center justify-center gap-10">
               {menuItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => goSection(item.id)}
                   className="text-sm font-medium tracking-wide text-[#2b554e] hover:text-[#b08d57] transition-colors"
                 >
                   {item.label}
-                </Link>
+                </button>
               ))}
             </div>
           </nav>
-        </div>
-
-        {/* MOBILE DRAWER MENU */}
-        <div
-          className={`md:hidden fixed inset-0 z-40 ${isOpen ? "pointer-events-auto" : "pointer-events-none"
-            }`}
-        >
-          {/* overlay */}
-          <button
-            type="button"
-            aria-label="Fechar menu"
-            onClick={() => setIsOpen(false)}
-            className={`absolute inset-0 bg-black/30 transition-opacity ${isOpen ? "opacity-100" : "opacity-0"
-              }`}
-          />
-
-          {/* painel */}
+          {/* MOBILE DRAWER MENU */}
           <div
-            className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${isOpen ? "translate-x-0" : "translate-x-full"
+            className={`md:hidden fixed inset-0 z-40 ${isOpen ? "pointer-events-auto" : "pointer-events-none"
               }`}
           >
-            <div className="pt-6 px-6 flex items-center justify-between">
-              <span className="text-sm tracking-[0.18em] opacity-90">MENU</span>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                aria-label="Fechar"
-                className="h-11 w-11 inline-flex items-center justify-center text-[#f3f0e0]/80 hover:text-white"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
+            {/* overlay */}
+            <button
+              type="button"
+              aria-label="Fechar menu"
+              onClick={() => setIsOpen(false)}
+              className={`absolute inset-0 bg-black/30 transition-opacity ${isOpen ? "opacity-100" : "opacity-0"
+                }`}
+            />
 
-            <div className="pt-8 px-6">
-              {/* Busca mobile */}
-              <form onSubmit={handleSearchSubmit} className="mb-8">
-                <div className="relative">
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Buscar por nome ou código"
-                    className="w-full h-12 pl-4 pr-12 rounded-md border border-white/25 bg-transparent text-[#f3f0e0] placeholder:text-[#f3f0e0]/60 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/50"
-                  />
-                  <button
-                    type="submit"
-                    aria-label="Pesquisar"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#f3f0e0]/90 hover:text-white"
-                  >
-                    <Search className="h-6 w-6" />
-                  </button>
+            {/* painel */}
+            <div
+              className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${isOpen ? "translate-x-0" : "translate-x-full"
+                }`}
+            >
+              <div className="pt-6 px-6 flex items-center justify-between">
+                <span className="text-sm tracking-[0.18em] opacity-90">MENU</span>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Fechar"
+                  className="h-11 w-11 inline-flex items-center justify-center text-[#f3f0e0]/80 hover:text-white"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="pt-8 px-6">
+                {/* Busca mobile */}
+                <form onSubmit={handleSearchSubmit} className="mb-8">
+                  <div className="relative">
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Buscar por nome ou código"
+                      className="w-full h-12 pl-4 pr-12 rounded-md border border-white/25 bg-transparent text-[#f3f0e0] placeholder:text-[#f3f0e0]/60 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/50"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Pesquisar"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#f3f0e0]/90 hover:text-white"
+                    >
+                      <Search className="h-6 w-6" />
+                    </button>
+                  </div>
+                </form>
+
+                {/* Links */}
+                <div className="flex flex-col gap-6">
+                  {menuItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => goSection(item.id)}
+                      className="text-left text-[#f3f0e0] text-xl font-medium hover:text-[#e7d3a8]"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
-              </form>
-
-              {/* Links */}
-              <div className="flex flex-col gap-6">
-                {menuItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="text-[#f3f0e0] text-xl font-medium hover:text-[#e7d3a8]"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
 
                 {/* Ações */}
                 <div className="mt-2 grid grid-cols-2 gap-3">

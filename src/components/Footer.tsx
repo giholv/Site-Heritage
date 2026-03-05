@@ -1,8 +1,50 @@
 import React from "react";
 import { Instagram, Mail, Phone, MapPin } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Link } from "./ui/Link";
 
 const Footer: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const navItems = [
+    { label: "Início", id: "home" },
+    { label: "Encontre Sua Joia", id: "categorias" },
+    { label: "Lançamentos", id: "semijoias" },
+    { label: "Sobre Nós", id: "about" },
+    { label: "Contato", id: "contact" },
+  ];
+
+  const scrollToId = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    else window.location.hash = id;
+  };
+
+  const goSection = (id: string) => {
+    // já na home → só scroll
+    if (location.pathname === "/") {
+      scrollToId(id);
+      return;
+    }
+
+    // outra rota → vai pra home e espera renderizar
+    navigate("/", { replace: false });
+
+    let tries = 0;
+    const t = setInterval(() => {
+      tries += 1;
+      const el = document.getElementById(id);
+      if (el) {
+        clearInterval(t);
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (tries >= 40) {
+        clearInterval(t);
+        window.location.hash = id;
+      }
+    }, 50);
+  };
+
   return (
     <footer className="bg-[#2b554e] text-[#FCFAF6] pt-14 pb-8">
       <div className="container mx-auto px-4 md:px-6">
@@ -10,16 +52,22 @@ const Footer: React.FC = () => {
           {/* Marca */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img
-                src="/logo_fundo_escuro.svg"
-                alt="Caléa Logo"
-                className="h-[95px] w-auto object-contain"
-              />
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="inline-flex items-center"
+                aria-label="Ir para Home"
+              >
+                <img
+                  src="/logo_fundo_escuro.svg"
+                  alt="Caléa Logo"
+                  className="h-[95px] w-auto object-contain"
+                />
+              </button>
             </div>
 
             <p className="text-[#FCFAF6]/75 text-sm leading-relaxed">
-              Semijoias com estética clean, brilho elegante e acabamento
-              premium — feitas pra acompanhar sua fase.
+              Semijoias com estética clean, brilho elegante e acabamento premium — feitas pra acompanhar sua fase.
             </p>
 
             <div className="mt-5 flex items-center gap-4">
@@ -40,22 +88,17 @@ const Footer: React.FC = () => {
             <h3 className="text-sm font-semibold tracking-wide text-[#FCFAF6] mb-4">
               Navegação
             </h3>
+
             <ul className="space-y-2 text-sm">
-              {[
-                { label: "Início", href: "#home" },
-                { label: "Lançamentos", href: "#lancamentos" },
-                { label: "Pratas", href: "#pratas" },
-                { label: "Semijoias", href: "#semijoias" },
-                { label: "Sobre Nós", href: "#about" },
-                { label: "Contato", href: "#contact" },
-              ].map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
+              {navItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => goSection(item.id)}
                     className="text-[#FCFAF6]/75 hover:text-[#b08d57] transition-colors"
                   >
                     {item.label}
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -90,7 +133,7 @@ const Footer: React.FC = () => {
               <div className="flex items-start gap-3 text-[#FCFAF6]/75">
                 <Mail className="h-4 w-4 mt-0.5 text-[#b08d57]" />
                 <a
-                  href="mailto:contato@heritage.com.br"
+                  href="mailto:contato@calea.com.br"
                   className="hover:text-[#b08d57] transition-colors"
                 >
                   contato@calea.com.br
@@ -100,10 +143,10 @@ const Footer: React.FC = () => {
               <div className="flex items-start gap-3 text-[#FCFAF6]/75">
                 <Phone className="h-4 w-4 mt-0.5 text-[#b08d57]" />
                 <a
-                  href="tel:+5511999999999"
+                  href="tel:+5511997946257"
                   className="hover:text-[#b08d57] transition-colors"
                 >
-                  +55 (11) 99999-9999
+                  +55 (11) 99794-6257
                 </a>
               </div>
 
@@ -122,26 +165,17 @@ const Footer: React.FC = () => {
         <div className="mt-10 pt-6 border-t border-[#FCFAF6]/15">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-[#FCFAF6]/65">
-              © {new Date().getFullYear()} Caléa. Todos os direitos reservados.
+              Copyright © {new Date().getFullYear()} Caléa. Todos os direitos reservados. CNPJ: 64.568.833/0001-36
             </p>
 
             <div className="flex items-center gap-6 text-xs">
-              <Link
-                href="#"
-                className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors"
-              >
+              <Link href="#" className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors">
                 Política de Privacidade
               </Link>
-              <Link
-                href="#"
-                className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors"
-              >
+              <Link href="#" className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors">
                 Trocas e Devoluções
               </Link>
-              <Link
-                href="#"
-                className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors"
-              >
+              <Link href="#" className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors">
                 Termos
               </Link>
             </div>
