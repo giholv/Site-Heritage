@@ -5,16 +5,26 @@ import { useNavigate } from "react-router-dom";
 import CartDrawer from "./CartDrawer";
 import { useCart } from "../context/CartContext";
 
+type HeaderProps = {
+  searchValue?: string;
+  onSearchChange?: (v: string) => void;
+  onSearchSubmit?: (v: string) => void;
+};
 
-const Header: React.FC = () => {
-  const navigate = useNavigate();
+const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSubmit }) => {
   const { state, subtotal, count, remove, setQty } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [q, setQ] = useState("");
+  const [qLocal, setQLocal] = useState("");
+  const q = searchValue ?? qLocal;
+  const navigate = useNavigate();
 
+  const setQ = (v: string) => {
+    onSearchChange?.(v);
+    if (searchValue === undefined) setQLocal(v);
+  };
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener("scroll", handleScroll);
@@ -44,18 +54,18 @@ const Header: React.FC = () => {
   const menuItems = [
     { label: "Início", href: "#home" },
     { label: "Encontre Sua Joia", href: "#EncontreSuaJoia" },
-{ label: "Lançamentos", href: "#lancamentos" },
+    { label: "Lançamentos", href: "#lancamentos" },
 
     { label: "Semijoias", href: "#semijoias" },
     { label: "Sobre Nós", href: "#about" },
     { label: "Contato", href: "#contact" },
   ];
 
-  const onSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Pesquisar:", q);
-  };
-
+ const handleSearchSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  if (onSearchSubmit) return onSearchSubmit(q);
+  console.log("Pesquisar:", q);
+};
   const onLogin = () => navigate("/login");
 
   const openCart = () => {
@@ -146,17 +156,17 @@ const Header: React.FC = () => {
             <div className="hidden md:flex h-20 items-center gap-6">
 
               {/* Logo - UMA só */}
-             <div className="flex-none w-[260px] flex items-center pt-8">
+              <div className="flex-none w-[260px] flex items-center pt-8">
 
                 <Link href="#home" className="inline-flex items-center">
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                  className="h-[110px] lg:h-[130px] w-auto object-contain"
+                    className="h-[110px] lg:h-[130px] w-auto object-contain"
 
 
 
-                    
+
 
                   />
                 </Link>
@@ -164,7 +174,7 @@ const Header: React.FC = () => {
 
               {/* Busca */}
               <div className="flex-1 flex justify-center">
-                <form onSubmit={onSearchSubmit} className="w-full max-w-[560px]">
+                <form onSubmit={handleSearchSubmit} className="w-full max-w-[560px]">
                   <div className="relative">
                     <input
                       value={q}
@@ -225,25 +235,22 @@ const Header: React.FC = () => {
 
         {/* MOBILE DRAWER MENU */}
         <div
-          className={`md:hidden fixed inset-0 z-40 ${
-            isOpen ? "pointer-events-auto" : "pointer-events-none"
-          }`}
+          className={`md:hidden fixed inset-0 z-40 ${isOpen ? "pointer-events-auto" : "pointer-events-none"
+            }`}
         >
           {/* overlay */}
           <button
             type="button"
             aria-label="Fechar menu"
             onClick={() => setIsOpen(false)}
-            className={`absolute inset-0 bg-black/30 transition-opacity ${
-              isOpen ? "opacity-100" : "opacity-0"
-            }`}
+            className={`absolute inset-0 bg-black/30 transition-opacity ${isOpen ? "opacity-100" : "opacity-0"
+              }`}
           />
 
           {/* painel */}
           <div
-            className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${
-              isOpen ? "translate-x-0" : "translate-x-full"
-            }`}
+            className={`absolute right-0 top-0 h-full w-[88%] max-w-[380px] bg-[#2b554e] text-[#f3f0e0] transition-transform duration-300 ${isOpen ? "translate-x-0" : "translate-x-full"
+              }`}
           >
             <div className="pt-6 px-6 flex items-center justify-between">
               <span className="text-sm tracking-[0.18em] opacity-90">MENU</span>
@@ -259,7 +266,7 @@ const Header: React.FC = () => {
 
             <div className="pt-8 px-6">
               {/* Busca mobile */}
-              <form onSubmit={onSearchSubmit} className="mb-8">
+              <form onSubmit={handleSearchSubmit} className="mb-8">
                 <div className="relative">
                   <input
                     value={q}

@@ -14,6 +14,8 @@ const T = {
   PRODUCT_COLLECTIONS: "product_collections",
   PRODUCT_STYLES: "product_styles",
   SKUS: "skus",
+  STONES: "stones",
+  STONE_COLORS: "stone_colors",
 };
 
 type SectionKey = "info" | "variacoes" | "fotos" | "estoque" | "seo";
@@ -75,6 +77,13 @@ type SkuDbRow = {
   name?: string | null;
   label?: string | null;
   variant_name?: string | null;
+
+  stone_id?: string | null;
+  stone_color_id?: string | null;
+
+  cost_cents?: number | null;
+  target_margin_pct?: number | null;
+  price_round_step_cents?: number | null;
 
   [k: string]: any;
 };
@@ -543,7 +552,7 @@ function ChipMultiSelect({
       />
 
       <div className="rounded-3xl border bg-white overflow-hidden">
-        <div className="max-h-48 overflow-auto">
+        <div className="max-h-56 overflow-auto">
           {filtered.length === 0 ? (
             <div className="p-4 text-sm text-gray-500">Nada encontrado.</div>
           ) : (
@@ -558,15 +567,19 @@ function ChipMultiSelect({
                     else onChange([...value, o.id]);
                   }}
                   className={cx(
-                    "w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-gray-50",
+                    "w-full flex items-center justify-between gap-3 px-4 py-3 text-sm",
+                    "hover:bg-gray-50",
                     isOn && "bg-emerald-900/5"
                   )}
                 >
                   <span className="truncate">{o.name}</span>
+
                   <span
                     className={cx(
-                      "text-xs rounded-full px-2 py-1 border",
-                      isOn ? "border-emerald-900/20 bg-emerald-900 text-white" : "border-gray-200 text-gray-500"
+                      "shrink-0 inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium border",
+                      isOn
+                        ? "border-emerald-900/20 bg-emerald-900 text-white"
+                        : "border-gray-200 text-gray-600 bg-white"
                     )}
                   >
                     {isOn ? "Selecionado" : "Adicionar"}
@@ -701,8 +714,9 @@ function TopBar({
 
 function normalizePriceToCents(v: string) {
   const cleaned = (v || "").replace(/[^\d.,]/g, "").replace(",", ".");
+  if (!cleaned.trim()) return null; // <- ESSA LINHA resolve
   const n = Number(cleaned);
-  if (!Number.isFinite(n) || n < 0) return null;
+  if (!Number.isFinite(n) || n <= 0) return null; // custo/preço não pode ser 0
   return Math.round(n * 100);
 }
 
@@ -713,6 +727,8 @@ function SkuEditor({
   onSave,
   saving,
   canActivate,
+  stoneOptions,
+  stoneColorOptions,
 }: {
   isRing: boolean;
   initial?: Partial<SkuDbRow> | null;
@@ -720,33 +736,69 @@ function SkuEditor({
   onSave: (payload: Partial<SkuDbRow>) => void;
   saving: boolean;
   canActivate: boolean;
+  stoneOptions: Array<{ id: string; name: string; search?: string }>;
+  stoneColorOptions: Array<{ id: string; name: string; search?: string }>;
 }) {
   const [title, setTitle] = useState((initial as any)?.title ?? (initial as any)?.name ?? "");
   const [barcode, setBarcode] = useState(initial?.barcode ?? "");
-  const [price, setPrice] = useState(initial?.price_cents ? String((initial?.price_cents ?? 0) / 100) : "");
   const [platingType, setPlatingType] = useState(initial?.plating_type ?? "");
   const [millesimal, setMillesimal] = useState(initial?.plating_millesimal ? String(initial?.plating_millesimal) : "");
   const [ringSize, setRingSize] = useState(initial?.ring_size ? String(initial?.ring_size) : "");
   const [active, setActive] = useState<boolean>(initial?.active ?? false); // default false (evita CHECK)
   const [err, setErr] = useState<string | null>(null);
+  const [stoneId, setStoneId] = useState((initial as any)?.stone_id ?? "");
+  const [stoneColorId, setStoneColorId] = useState((initial as any)?.stone_color_id ?? "");
+  const [cost, setCost] = useState(initial?.cost_cents ? String((initial.cost_cents ?? 0) / 100) : "");
+  const [marginPct, setMarginPct] = useState(String((initial as any)?.target_margin_pct ?? "0"));
+  const [roundStep, setRoundStep] = useState(String((initial as any)?.price_round_step_cents ?? "100"));
 
   const canSave = useMemo(() => {
-    const pc = normalizePriceToCents(price);
+    const cc = normalizePriceToCents(cost);
+    if (cc === null || cc <= 0) return false;
+
     if (!platingType.trim()) return false;
     if (!millesimal.trim() || !Number.isFinite(Number(millesimal))) return false;
     if (isRing && (!ringSize.trim() || !Number.isFinite(Number(ringSize)))) return false;
-    if (pc === null) return false;
+
+    if (!Number.isFinite(Number(marginPct))) return false;
+    if (!Number.isFinite(Number(roundStep)) || Number(roundStep) <= 0) return false;
+
     return true;
-  }, [platingType, millesimal, ringSize, price, isRing]);
+  }, [cost, platingType, millesimal, ringSize, isRing, marginPct, roundStep]);
 
   return (
     <div className="rounded-3xl border bg-gray-50 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-gray-900">{(initial as any)?.id ? "Editar SKU" : "Novo SKU"}</div>
-          <div className="text-xs text-gray-500 mt-1">
-            Banho + milésimo obrigatórios. {isRing ? "Anel exige tamanho." : "Sem tamanho de anel."}
+          <div className="text-xs text-gray-500">
           </div>
+        </div>
+        <div className="md:col-span-4">
+          <SearchSelect
+            label="Pedra"
+            value={stoneId}
+            onChange={(v) => {
+              setStoneId(v);
+              if (!v) setStoneColorId(""); // limpou pedra => limpa cor
+            }}
+            placeholder="Selecionar…"
+            options={stoneOptions}
+            allowClear
+          />
+        </div>
+
+        <div className="md:col-span-4">
+
+          <SearchSelect
+            label="Cor da pedra"
+            value={stoneColorId}
+            onChange={(v) => setStoneColorId(v)}
+            placeholder="Selecionar…"
+            options={stoneColorOptions}
+            allowClear
+          />
+
         </div>
         <div className="flex gap-2">
           <GhostButton disabled={saving} onClick={onCancel}>
@@ -754,11 +806,21 @@ function SkuEditor({
           </GhostButton>
           <PrimaryButton
             disabled={saving || !canSave}
+
             onClick={() => {
               setErr(null);
 
-              const price_cents = normalizePriceToCents(price);
-              if (price_cents === null) return setErr("Preço inválido.");
+              // CUSTO obrigatório
+              const cost_cents = normalizePriceToCents(cost);
+              if (cost_cents === null) return setErr("Custo inválido.");
+
+              // margem e arredondamento
+              const target_margin_pct = Number(marginPct);
+              if (!Number.isFinite(target_margin_pct)) return setErr("Margem inválida.");
+
+              const price_round_step_cents = Number(roundStep);
+              if (!Number.isFinite(price_round_step_cents) || price_round_step_cents <= 0) return setErr("Arredondamento inválido.");
+
               if (!platingType.trim()) return setErr("Informe o tipo de banho.");
               const pm = Number(millesimal);
               if (!Number.isFinite(pm) || pm <= 0) return setErr("Milésimo inválido.");
@@ -766,16 +828,28 @@ function SkuEditor({
               const rs = ringSize.trim() ? Number(ringSize) : null;
               if (isRing && (!rs || !Number.isFinite(rs))) return setErr("Tamanho do anel inválido.");
 
-              const finalActive = active && canActivate; // evita violar CHECK
+              const finalActive = active && canActivate;
+
+              const finalStoneId = stoneId ? stoneId : null;
+              const finalStoneColorId = finalStoneId ? (stoneColorId ? stoneColorId : null) : null;
 
               onSave({
                 title: title.trim() || null,
                 barcode: barcode.trim() || null,
-                price_cents,
+
                 plating_type: platingType.trim(),
                 plating_millesimal: pm,
                 ring_size: isRing ? (rs ?? null) : null,
+
                 active: finalActive,
+
+                stone_id: finalStoneId,
+                stone_color_id: finalStoneColorId,
+
+                cost_cents,
+                target_margin_pct,
+                price_round_step_cents,
+
               });
             }}
           >
@@ -796,7 +870,7 @@ function SkuEditor({
 
       <div className="mt-5 grid grid-cols-1 md:grid-cols-12 gap-4">
         <div className="md:col-span-5">
-          <Field label="Nome da variação (interno)" hint="Ex: Ouro 10 • Tam 16">
+          <Field label="Nome da variação" hint="Ex: Ouro 10 • Tam 16">
             <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Opcional" />
           </Field>
         </div>
@@ -827,11 +901,58 @@ function SkuEditor({
           </Field>
         </div>
         <div className="md:col-span-4">
-          <Field label="Preço" required>
-            <TextInput value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" placeholder="0,00" />
+          <Field label="Custo" required hint="Base para cálculo automático">
+            <TextInput value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="0,00" />
           </Field>
         </div>
 
+        <div className="md:col-span-4">
+          <Field label="Margem (%)" required>
+            <TextInput
+              value={marginPct}
+              onChange={(e) => setMarginPct(e.target.value.replace(/[^\d.]/g, ""))}
+              inputMode="decimal"
+              placeholder="Ex: 55"
+            />
+          </Field>
+        </div>
+
+        <div className="md:col-span-4">
+          <Field label="Arredondar (centavos)" required hint="100=R$1, 500=R$5">
+            <TextInput
+              value={roundStep}
+              onChange={(e) => setRoundStep(e.target.value.replace(/[^\d]/g, ""))}
+              inputMode="numeric"
+              placeholder="100"
+            />
+          </Field>
+          <Field label="Preço (calculado)">
+            <TextInput
+              value={initial?.price_cents ? formatBRL(initial.price_cents) : "Salve para calcular"}
+              disabled
+              className="bg-gray-50"
+            />
+          </Field>
+        </div>
+        {(() => {
+          const pc = initial?.price_cents ?? null;      // preço do banco
+          const cc = normalizePriceToCents(cost);      // custo digitado
+
+          if (!pc || !cc) return null;
+
+          const markup = (pc - cc) / cc;
+          const margin = (pc - cc) / pc;
+
+          return (
+            <div className="md:col-span-4">
+              <Field label="Margem / Markup" hint="Com base no preço calculado">
+                <div className="rounded-2xl border bg-white px-4 py-3 text-sm text-gray-800">
+                  Margem: <b>{(margin * 100).toFixed(1)}%</b> • Markup: <b>{(markup * 100).toFixed(1)}%</b>
+                </div>
+              </Field>
+            </div>
+          );
+        })()}
         {isRing ? (
           <div className="md:col-span-4">
             <Field label="Tamanho do anel" required>
@@ -850,7 +971,8 @@ function SkuEditor({
             <select
               value={active ? "1" : "0"}
               onChange={(e) => setActive(e.target.value === "1")}
-              className="w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
+              className="w-full -mb-2 rounded-2xl border bg-white px-4 py-3 text-sm
+              focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
             >
               <option value="1">Sim</option>
               <option value="0">Não</option>
@@ -870,6 +992,8 @@ function SkusManager({
   selectedSkuId,
   onSelectSku,
   onSelectedSkuMeta,
+  stoneOptions,
+  stoneColorOptions,
 }: {
   productId: string;
   isRing: boolean;
@@ -878,6 +1002,8 @@ function SkusManager({
   selectedSkuId: string | null;
   onSelectSku: (id: string | null) => void;
   onSelectedSkuMeta: (meta: { priceCents: number; platingLabel: string | null; ringSize: number | null }) => void;
+  stoneOptions: Array<{ id: string; name: string; search?: string }>;
+  stoneColorOptions: Array<{ id: string; name: string; search?: string }>;
 }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -904,9 +1030,14 @@ function SkusManager({
       "sku_code",
       "barcode",
       "price_cents",
+      "cost_cents",
+      "target_margin_pct",
+      "price_round_step_cents",
       "plating_type",
       "plating_millesimal",
       "ring_size",
+      "stone_id",
+      "stone_color_id",
       "supplier_id",
       "plating_supplier_id",
       "active",
@@ -923,7 +1054,6 @@ function SkusManager({
     if (error) return { ok: false as const, error };
     return { ok: true as const, data: (data ?? []) as SkuDbRow[] };
   }
-
   async function load() {
     setErr(null);
     setLoading(true);
@@ -996,43 +1126,71 @@ function SkusManager({
     try {
       const skuPayload: any = {
         ...payload,
-
-        // obrigatório pelo seu CHECK quando active=true
         supplier_id: supplierId || null,
         plating_supplier_id: platingSupplierId || null,
       };
 
-      // Se tentou ativar sem fornecedores, salva inativo e pronto
       if (skuPayload.active && !canActivate) skuPayload.active = false;
 
+      const retSelect = [
+        "id",
+        "product_id",
+        titleField,
+        "sku_code",
+        "barcode",
+        "price_cents",
+        "cost_cents",
+        "target_margin_pct",
+        "price_round_step_cents",
+        "plating_type",
+        "plating_millesimal",
+        "ring_size",
+        "stone_id",
+        "stone_color_id",
+        "supplier_id",
+        "plating_supplier_id",
+        "active",
+        "created_at",
+        "updated_at",
+      ].join(",");
+
+      let saved: SkuDbRow;
+
       if (editing?.id) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from(T.SKUS)
           .update({ ...skuPayload, updated_at: new Date().toISOString() })
-          .eq("id", editing.id);
+          .eq("id", editing.id)
+          .select(retSelect)
+          .single();
 
         if (error) throw new Error(error.message);
+        saved = data as SkuDbRow;
+
+        setList((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+        setEditing(saved); // opcional (mantém editor com preço atualizado)
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from(T.SKUS)
-          .insert({
-            product_id: productId,
-            ...skuPayload,
-          });
+          .insert({ product_id: productId, ...skuPayload })
+          .select(retSelect)
+          .single();
 
         if (error) throw new Error(error.message);
+        saved = data as SkuDbRow;
+
+        setList((prev) => [...prev, saved].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")));
       }
 
-      setEditing(null);
       setCreating(false);
-      await load();
+      // se quiser fechar editor após salvar:
+      // setEditing(null);
     } catch (e: any) {
       setErr(e?.message || "Erro ao salvar SKU.");
     } finally {
       setSaving(false);
     }
   }
-
   async function removeSku(id: string) {
     const ok = window.confirm("Excluir este SKU? (Fotos/estoque vinculados podem quebrar)");
     if (!ok) return;
@@ -1087,6 +1245,8 @@ function SkusManager({
           initial={editing}
           saving={saving}
           canActivate={canActivate}
+          stoneOptions={stoneOptions}
+          stoneColorOptions={stoneColorOptions}
           onCancel={() => {
             setCreating(false);
             setEditing(null);
@@ -1106,12 +1266,19 @@ function SkusManager({
         ) : (
           <div className="divide-y">
             {list.map((s) => {
+
+              const stoneName = s.stone_id ? (stoneOptions.find(o => o.id === s.stone_id)?.name ?? "Pedra") : null;
+              const stoneColorName = s.stone_color_id ? (stoneColorOptions.find(o => o.id === s.stone_color_id)?.name ?? "Cor") : null;
+
+
               const isSel = s.id === selectedSkuId;
 
               const label = [
                 s.plating_type ? `${s.plating_type}` : null,
                 s.plating_millesimal ? `${s.plating_millesimal}` : null,
                 isRing ? (s.ring_size ? `Tam ${s.ring_size}` : "Tam -") : null,
+                stoneName ? (stoneColorName ? `${stoneName} • ${stoneColorName}` : stoneName) : null,
+
               ]
                 .filter(Boolean)
                 .join(" • ");
@@ -1228,6 +1395,8 @@ export default function AdminProductCreateUX() {
   const [collections, setCollections] = useState<TagRow[]>([]);
   const [styles, setStyles] = useState<TagRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [stones, setStones] = useState<TagRow[]>([]);
+  const [stoneColors, setStoneColors] = useState<TagRow[]>([]);
 
   // SEO
   const [seoTitle, setSeoTitle] = useState("");
@@ -1292,7 +1461,7 @@ export default function AdminProductCreateUX() {
     (async () => {
       setErr(null);
       try {
-        const [ctRes, colRes, stRes, supRes] = await Promise.all([
+        const [ctRes, colRes, stRes, supRes, stoneRes, stoneColorRes] = await Promise.all([
           supabase
             .from(T.CATEGORY_TREE)
             .select("id,name,slug,parent_id,position,active")
@@ -1314,18 +1483,40 @@ export default function AdminProductCreateUX() {
             .order("position", { ascending: true })
             .order("name", { ascending: true }),
 
-          supabase.from(T.SUPPLIERS).select("id,name,corporate_name,cnpj,active").order("name", { ascending: true }),
+          supabase
+            .from(T.SUPPLIERS)
+            .select("id,name,corporate_name,cnpj,active")
+            .order("name", { ascending: true }),
+
+          supabase
+            .from(T.STONES)
+            .select("id,name,slug,active,position")
+            .eq("active", true)
+            .order("position", { ascending: true })
+            .order("name", { ascending: true }),
+
+          supabase
+            .from(T.STONE_COLORS)
+            .select("id,name,slug,active,position")
+            .eq("active", true)
+            .order("position", { ascending: true })
+            .order("name", { ascending: true }),
+
         ]);
 
         if (ctRes.error) throw new Error(ctRes.error.message);
         if (colRes.error) throw new Error(colRes.error.message);
         if (stRes.error) throw new Error(stRes.error.message);
         if (supRes.error) throw new Error(supRes.error.message);
+        if (stoneRes.error) throw new Error(stoneRes.error.message);
+        if (stoneColorRes.error) throw new Error(stoneColorRes.error.message);
 
         setCategoryTree((ctRes.data ?? []) as CategoryTreeRow[]);
         setCollections((colRes.data ?? []) as TagRow[]);
         setStyles((stRes.data ?? []) as TagRow[]);
         setSuppliers((supRes.data ?? []) as SupplierRow[]);
+        setStones((stoneRes.data ?? []) as TagRow[]);
+        setStoneColors((stoneColorRes.data ?? []) as TagRow[]);
       } catch (e: any) {
         setErr(e?.message || "Erro ao carregar dados.");
       }
@@ -1382,6 +1573,16 @@ export default function AdminProductCreateUX() {
   const styleOptions = useMemo(
     () => styles.filter((s) => s.active !== false).map((s) => ({ id: s.id, name: s.name, search: s.name })),
     [styles]
+  );
+
+  const stoneOptions = useMemo(
+    () => stones.filter((s) => s.active !== false).map((s) => ({ id: s.id, name: s.name, search: s.name })),
+    [stones]
+  );
+
+  const stoneColorOptions = useMemo(
+    () => stoneColors.filter((c) => c.active !== false).map((c) => ({ id: c.id, name: c.name, search: c.name })),
+    [stoneColors]
   );
 
   const selectedCategory = useMemo(
@@ -1611,17 +1812,39 @@ export default function AdminProductCreateUX() {
 
               <div className="md:col-span-4">
                 <Field label="Status">
-                  <select
-                    value={status}
-                    onChange={(e) => {
-                      setStatus(e.target.value as ProductStatus);
-                      markDirty();
-                    }}
-                    className="w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
-                  >
-                    <option value="draft">Rascunho</option>
-                    <option value="active">Ativo</option>
-                  </select>
+                  <div className="w-full rounded-2xl border bg-white p-1 flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatus("draft");
+                        markDirty();
+                      }}
+                      className={cx(
+                        "flex-1 h-10 rounded-2xl text-sm font-medium whitespace-nowrap transition",
+                        status === "draft"
+                          ? "bg-emerald-900 text-white"
+                          : "text-gray-700 hover:bg-gray-50"
+                      )}
+                    >
+                      Rascunho
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatus("active");
+                        markDirty();
+                      }}
+                      className={cx(
+                        "flex-1 h-10 rounded-2xl text-sm font-medium whitespace-nowrap transition",
+                        status === "active"
+                          ? "bg-emerald-900 text-white"
+                          : "text-gray-700 hover:bg-gray-50"
+                      )}
+                    >
+                      Ativo
+                    </button>
+                  </div>
                 </Field>
               </div>
 
@@ -1712,57 +1935,49 @@ export default function AdminProductCreateUX() {
                   </div>
                 </div>
               </div>
+              <div className="md:col-span-12">
+                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
 
-              <div className="md:col-span-6">
-                <Field label="Material base">
-                  <TextInput
-                    value={materialBase}
-                    onChange={(e) => {
-                      setMaterialBase(e.target.value);
-                      markDirty();
-                    }}
-                    placeholder="Ex: latão"
-                  />
-                </Field>
+                  {/* esquerda */}
+                  <div className="space-y-5 min-w-0">
+                    <Field label="Material base">
+                      <TextInput
+                        value={materialBase}
+                        onChange={(e) => {
+                          setMaterialBase(e.target.value);
+                          markDirty();
+                        }}
+                        placeholder="Ex: latão"
+                      />
+                    </Field>
+
+                    <ChipMultiSelect
+                      label="Estilo / Ocasião"
+                      value={styleIds}
+                      onChange={(v) => {
+                        setStyleIds(v);
+                        markDirty();
+                      }}
+                      options={styleOptions}
+                    />
+                  </div>
+
+                  {/* direita */}
+                  <div className="space-y-5 min-w-0">
+                    <ChipMultiSelect
+                      label="Coleções"
+                      value={collectionIds}
+                      onChange={(v) => {
+                        setCollectionIds(v);
+                        markDirty();
+                      }}
+                      options={collectionOptions}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="md:col-span-6">
-                <Field label="Observações importantes">
-                  <TextInput
-                    value={importantNotes}
-                    onChange={(e) => {
-                      setImportantNotes(e.target.value);
-                      markDirty();
-                    }}
-                    placeholder="Opcional"
-                  />
-                </Field>
-              </div>
-
-              <div className="md:col-span-6">
-                <ChipMultiSelect
-                  label="Coleções"
-                  value={collectionIds}
-                  onChange={(v) => {
-                    setCollectionIds(v);
-                    markDirty();
-                  }}
-                  options={collectionOptions}
-                />
-              </div>
-
-              <div className="md:col-span-6">
-                <ChipMultiSelect
-                  label="Estilo / Ocasião"
-                  value={styleIds}
-                  onChange={(v) => {
-                    setStyleIds(v);
-                    markDirty();
-                  }}
-                  options={styleOptions}
-                />
-              </div>
-
+              {/* descrição embaixo, largura total */}
               <div className="md:col-span-12">
                 <Field label="Descrição (texto de venda)">
                   <TextArea
@@ -1810,7 +2025,6 @@ export default function AdminProductCreateUX() {
           <SoftCard
             id="variacoes"
             title="SKUs"
-            subtitle="Tipo de banho + milésimo + tamanho do anel (se aplicável)."
             right={productId ? <Badge tone="ok">Produto salvo</Badge> : <Badge tone="warn">Salve para liberar</Badge>}
           >
             {!productId ? (
@@ -1828,6 +2042,9 @@ export default function AdminProductCreateUX() {
                   setSelectedSkuPlatingLabel(meta.platingLabel);
                   setSelectedSkuRingSize(meta.ringSize);
                 }}
+                stoneOptions={stoneOptions}
+                stoneColorOptions={stoneColorOptions}
+
               />
             )}
           </SoftCard>
