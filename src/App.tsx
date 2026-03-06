@@ -19,6 +19,8 @@ import AdminProductCreate from "./pages/admin/AdminProductCreate";
 import AdminSuppliersPage from "./pages/admin/AdminSuppliers";
 import AdminCategoryImagesPage from "./pages/admin/AdminCategoryImagesPage";
 
+import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
+
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
 
@@ -35,9 +37,13 @@ function ScrollToHash() {
 }
 
 export default function App() {
+  const location = useLocation();
+  const hideWhatsApp = location.pathname.startsWith("/admin");
+
   return (
     <>
       <ScrollToHash />
+
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/cadastro" element={<CadastroUsuariosPage />} />
@@ -50,7 +56,6 @@ export default function App() {
         <Route path="/joias/colecao/:collectionSlug" element={<JewelryListing />} />
         <Route path="/produto/:slug" element={<ProductPage />} />
 
-
         {/* ADMIN */}
         <Route path="/admin" element={<AdminGuard />}>
           <Route element={<AdminLayout />}>
@@ -62,8 +67,11 @@ export default function App() {
             <Route path="catalogo/imagens" element={<AdminCategoryImagesPage />} />
           </Route>
         </Route>
+
         <Route path="*" element={<div className="p-6">404</div>} />
       </Routes>
+
+      {!hideWhatsApp && <WhatsAppFloatingButton />}
     </>
   );
 }

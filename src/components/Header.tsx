@@ -109,7 +109,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
 
   const badge = (n: number) =>
     n > 0 ? (
-      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] leading-none bg-[#b08d57] text-white rounded-full">
+      <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 flex items-center justify-center text-[11px] leading-none bg-[#b08d57] text-white rounded-full">
         {n > 99 ? "99+" : n}
       </span>
     ) : null;
@@ -118,14 +118,13 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
     <>
       <header className="fixed w-full z-50">
         {/* TOP BAR */}
-        <div className="bg-[#2b554e] text-[#f3f0e0]">
-          <div className="container mx-auto px-3 md:px-6 h-8 md:h-9 flex items-center justify-center">
-            <span className="text-[11px] md:text-sm opacity-95 text-center leading-none">
+        <div className="bg-[#2b554e] text-[#f3f0e0] border-b border-white/10">
+          <div className="container mx-auto px-3 md:px-6 h-9 md:h-10 flex items-center justify-center">
+            <span className="text-[12px] md:text-[14px] lg:text-[15px] opacity-95 text-center leading-none">
               Frete grátis a partir de <strong>R$699</strong> • 5% OFF no PIX • Troca fácil
             </span>
           </div>
         </div>
-
         {/* HEADER */}
         <div
           className={[
@@ -140,7 +139,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                 type="button"
                 onClick={() => setIsOpen((v) => !v)}
                 aria-label="Abrir menu"
-                className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e]"
+                className="h-12 w-12 inline-flex items-center justify-center text-[#2b554e]"
               >
                 {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
@@ -168,7 +167,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                   type="button"
                   aria-label="Pesquisar"
                   onClick={() => setIsOpen(true)}
-                  className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                  className="h-12 w-12 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
                 >
                   <Search className="h-5 w-5" />
                 </button>
@@ -177,7 +176,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                   type="button"
                   onClick={onLogin}
                   aria-label="Login"
-                  className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                  className="h-12 w-12 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
                 >
                   <User className="h-5 w-5" />
                 </button>
@@ -195,10 +194,10 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
             </div>
 
             {/* DESKTOP */}
-            <div className="hidden md:flex h-20 items-center gap-6">
+            <div className="hidden md:flex h-24 lg:h-28 items-center gap-6">
 
               {/* Logo - UMA só */}
-              <div className="flex-none w-[260px] flex items-center pt-8">
+              <div className="flex-none w-[320px] lg:w-[360px] flex items-center pt-9">
                 <button
                   type="button"
                   onClick={() => navigate("/")}
@@ -208,7 +207,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                    className="h-[110px] lg:h-[130px] w-auto object-contain"
+                    className="h-[130px] lg:h-[155px] xl:h-[175px] w-auto object-contain"
                   />
                 </button>
               </div>
@@ -221,7 +220,9 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
                       placeholder="Buscar por nome ou código"
-                      className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/20 bg-white/60 text-[#2b554e] placeholder:text-[#2b554e]/45 focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
+                      className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/20 bg-white/60
+                    text-[#2b554e] text-base lg:text-[17px] placeholder:text-[#2b554e]/45
+                    focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
                     />
                     <button
                       type="submit"
@@ -240,18 +241,19 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                   type="button"
                   onClick={onLogin}
                   aria-label="Login"
-                  className="h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                  className="h-13 w-13 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
                 >
-                  <User className="h-5 w-5" />
+                  <User className="h-6 w-6 lg:h-7 lg:w-7" />
                 </button>
 
                 <button
                   type="button"
                   onClick={openCart}
                   aria-label="Carrinho"
-                  className="relative h-11 w-11 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                  className="relative h-13 w-13 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
                 >
-                  <ShoppingBag className="h-5 w-5" />
+
+                  <ShoppingBag className="h-6 w-6 lg:h-7 lg:w-7" />
                   {badge(count)}
                 </button>
               </div>
@@ -266,7 +268,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                   key={item.id}
                   type="button"
                   onClick={() => goSection(item.id)}
-                  className="text-sm font-medium tracking-wide text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                  className="text-base lg:text-[17px] font-medium tracking-wide text-[#2b554e] hover:text-[#b08d57] transition-colors"
                 >
                   {item.label}
                 </button>
@@ -298,7 +300,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                   type="button"
                   onClick={() => setIsOpen(false)}
                   aria-label="Fechar"
-                  className="h-11 w-11 inline-flex items-center justify-center text-[#f3f0e0]/80 hover:text-white"
+                  className="h-13 w-13 inline-flex items-center justify-center text-[#f3f0e0]/80 hover:text-white"
                 >
                   <X className="h-6 w-6" />
                 </button>
