@@ -79,7 +79,7 @@ const FAQ: React.FC = () => {
           </p>
         </div>
 
-        <div className="max-w-3xl mx-auto space-y-3">
+        <div className="max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto space-y-4">
           {faqs.map((item, idx) => {
             const open = openIndex === idx;
 
@@ -91,14 +91,13 @@ const FAQ: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setOpenIndex(open ? null : idx)}
-                  className="w-full flex items-center justify-between gap-4 p-5 text-left"
+                  className="w-full flex items-center justify-between gap-4 p-5 lg:p-7 text-left"
                   aria-expanded={open}
                 >
                   <span className="text-[#2b554e] font-semibold">{item.q}</span>
                   <ChevronDown
-                    className={`h-5 w-5 text-[#2b554e] transition-transform ${
-                      open ? "rotate-180" : ""
-                    }`}
+                    className={`h-5 w-5 text-[#2b554e] transition-transform ${open ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -109,9 +108,10 @@ const FAQ: React.FC = () => {
                         <img
                           src={item.img.src}
                           alt={item.img.alt ?? item.q}
-                          className="w-full h-[180px] md:h-[220px] object-cover"
+                          className="w-full h-[180px] md:h-[220px] lg:h-[320px] object-contain bg-[#f5f1e6]"
                           loading="lazy"
                         />
+  
                       </div>
                     )}
 
