@@ -9,49 +9,44 @@ function isEmail(v: string) {
 export default function EsqueciSenhaPage() {
   const [email, setEmail] = useState("");
   const [touched, setTouched] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  const fieldError = useMemo(() => {
+  const emailError = useMemo(() => {
     if (!email.trim()) return "Informe seu e-mail.";
     if (!isEmail(email)) return "E-mail inválido.";
     return "";
   }, [email]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setTouched(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
+  const showError = (submitted || touched) && !!emailError;
 
-    if (fieldError) return;
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitted(true);
+    setServerError(null);
+
+    if (emailError) return;
 
     setLoading(true);
 
     try {
-      const normalizedEmail = email.trim().toLowerCase();
+      const redirectTo = `${window.location.origin}/redefinir-senha`;
 
-      const { data, error } = await supabase.functions.invoke("forgot-password", {
-        body: {
-          email: normalizedEmail,
-          redirectTo: `${window.location.origin}/redefinir-senha`,
-        },
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        { redirectTo }
+      );
 
       if (error) {
-        setErrorMsg("Falha ao processar a solicitação.");
+        setServerError(error.message || "Não foi possível enviar o e-mail.");
         return;
       }
 
-      if (!data?.ok) {
-        setErrorMsg(data?.message || "Não foi possível continuar.");
-        return;
-      }
-
-      setSuccessMsg(data.message || "Link de redefinição enviado com sucesso.");
+      setSuccess(true);
     } catch {
-      setErrorMsg("Falha de rede ou servidor. Tente novamente.");
+      setServerError("Falha de rede ou servidor. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -72,19 +67,19 @@ export default function EsqueciSenhaPage() {
           </div>
 
           <div className="rounded-[28px] border border-[#2b554e]/10 bg-white/80 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-8">
-            {errorMsg && (
+            {serverError && (
               <div className="mb-5 rounded-2xl border border-red-500/20 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {errorMsg}
+                {serverError}
               </div>
             )}
 
-            {successMsg && (
+            {success && (
               <div className="mb-5 rounded-2xl border border-emerald-500/20 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                {successMsg}
+                Se o e-mail existir, enviamos o link de redefinição.
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            <form onSubmit={onSubmit} className="space-y-5" noValidate>
               <div>
                 <label
                   htmlFor="email"
@@ -102,34 +97,30 @@ export default function EsqueciSenhaPage() {
                   placeholder="voce@exemplo.com"
                   autoComplete="email"
                   className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 text-sm outline-none transition placeholder:text-[#2b554e]/35 ${
-                    touched && fieldError
+                    showError
                       ? "border border-red-400 focus:ring-4 focus:ring-red-100"
                       : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
                   }`}
                 />
 
-                {touched && fieldError && (
-                  <p className="mt-2 text-xs text-red-600">{fieldError}</p>
+                {showError && (
+                  <p className="mt-2 text-xs text-red-600">{emailError}</p>
                 )}
               </div>
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || success}
                 className="h-12 w-full rounded-2xl bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:bg-[#23463f] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Enviando..." : "Enviar link"}
+                {loading ? "Enviando..." : "Enviar link de redefinição"}
               </button>
 
-              <div className="text-center text-sm text-[#2b554e]/65">
-                Lembrou sua senha?{" "}
-                <Link
-                  to="/login"
-                  className="font-medium text-[#b08d57] transition hover:underline"
-                >
-                  Voltar para entrar
+              <p className="text-center text-sm text-[#2b554e]/65">
+                <Link to="/login" className="font-medium text-[#b08d57] hover:underline">
+                  Voltar para o login
                 </Link>
-              </div>
+              </p>
             </form>
           </div>
         </div>

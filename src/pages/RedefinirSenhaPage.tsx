@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
@@ -21,8 +21,11 @@ export default function RedefinirSenhaPage() {
     password: false,
     confirmPassword: false,
   });
+
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingRecovery, setCheckingRecovery] = useState(true);
+  const [canReset, setCanReset] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -30,7 +33,9 @@ export default function RedefinirSenhaPage() {
     const e: Partial<Record<keyof FormState, string>> = {};
 
     if (!form.password) e.password = "Informe a nova senha.";
-    else if (form.password.length < 6) e.password = "Use pelo menos 6 caracteres.";
+    else if (form.password.length < 6) {
+      e.password = "Use pelo menos 6 caracteres.";
+    }
 
     if (!form.confirmPassword) e.confirmPassword = "Confirme a nova senha.";
     else if (form.confirmPassword !== form.password) {
@@ -40,13 +45,61 @@ export default function RedefinirSenhaPage() {
     return e;
   }, [form]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function validateRecoverySession() {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      if (error) {
+        setServerError("Não foi possível validar o link de recuperação.");
+        setCheckingRecovery(false);
+        return;
+      }
+
+      if (data.session) {
+        setCanReset(true);
+      }
+
+      setCheckingRecovery(false);
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
+      if (event === "PASSWORD_RECOVERY") {
+        setCanReset(true);
+        setCheckingRecovery(false);
+        setServerError(null);
+        return;
+      }
+
+      // em alguns casos a sessão já entra restaurada ao abrir a página
+      if (session) {
+        setCanReset(true);
+        setCheckingRecovery(false);
+      }
+    });
+
+    void validateRecoverySession();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (serverError) setServerError(null);
   }
 
   function shouldShowError(field: keyof FormState) {
-    return (submitted || touched[field]) && errors[field];
+    return (submitted || touched[field]) && !!errors[field];
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -54,9 +107,15 @@ export default function RedefinirSenhaPage() {
     setSubmitted(true);
     setServerError(null);
 
+    if (!canReset) {
+      setServerError("Link inválido, expirado ou sessão de recuperação não encontrada.");
+      return;
+    }
+
     if (Object.keys(errors).length > 0) return;
 
     setLoading(true);
+
     try {
       const { error } = await supabase.auth.updateUser({
         password: form.password,
@@ -68,6 +127,9 @@ export default function RedefinirSenhaPage() {
       }
 
       setSuccess(true);
+
+      // opcional, mas deixa o fluxo mais limpo
+      await supabase.auth.signOut();
 
       setTimeout(() => {
         navigate("/login");
@@ -94,6 +156,12 @@ export default function RedefinirSenhaPage() {
           </div>
 
           <div className="rounded-[28px] border border-[#2b554e]/10 bg-white/80 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-8">
+            {checkingRecovery && (
+              <div className="mb-5 rounded-2xl border border-[#2b554e]/10 bg-[#FCFAF6] px-4 py-3 text-sm text-[#2b554e]/80">
+                Validando link de recuperação...
+              </div>
+            )}
+
             {serverError && (
               <div className="mb-5 rounded-2xl border border-red-500/20 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {serverError}
@@ -106,6 +174,12 @@ export default function RedefinirSenhaPage() {
               </div>
             )}
 
+            {!checkingRecovery && !canReset && !success && (
+              <div className="mb-5 rounded-2xl border border-amber-500/20 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                Esse link é inválido ou expirou. Solicite um novo e-mail de redefinição.
+              </div>
+            )}
+
             <form onSubmit={onSubmit} className="space-y-5" noValidate>
               <div>
                 <label
@@ -114,6 +188,7 @@ export default function RedefinirSenhaPage() {
                 >
                   Nova senha
                 </label>
+
                 <div className="relative">
                   <input
                     id="password"
@@ -123,22 +198,26 @@ export default function RedefinirSenhaPage() {
                     onBlur={() =>
                       setTouched((prev) => ({ ...prev, password: true }))
                     }
+                    placeholder="Digite sua nova senha"
+                    autoComplete="new-password"
+                    disabled={loading || success || checkingRecovery || !canReset}
                     className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 pr-24 text-sm outline-none transition ${
                       shouldShowError("password")
                         ? "border border-red-400 focus:ring-4 focus:ring-red-100"
                         : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
                     }`}
-                    placeholder="Digite sua nova senha"
-                    autoComplete="new-password"
                   />
+
                   <button
                     type="button"
                     onClick={() => setShowPass((v) => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-3 py-2 text-sm text-[#2b554e]/75 transition hover:bg-[#f3f0e0] hover:text-[#2b554e]"
+                    disabled={checkingRecovery || !canReset}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-3 py-2 text-sm text-[#2b554e]/75 transition hover:bg-[#f3f0e0] hover:text-[#2b554e] disabled:opacity-50"
                   >
                     {showPass ? "Ocultar" : "Mostrar"}
                   </button>
                 </div>
+
                 {shouldShowError("password") && (
                   <p className="mt-2 text-xs text-red-600">{errors.password}</p>
                 )}
@@ -151,6 +230,7 @@ export default function RedefinirSenhaPage() {
                 >
                   Confirmar nova senha
                 </label>
+
                 <div className="relative">
                   <input
                     id="confirmPassword"
@@ -160,22 +240,26 @@ export default function RedefinirSenhaPage() {
                     onBlur={() =>
                       setTouched((prev) => ({ ...prev, confirmPassword: true }))
                     }
+                    placeholder="Confirme sua nova senha"
+                    autoComplete="new-password"
+                    disabled={loading || success || checkingRecovery || !canReset}
                     className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 pr-24 text-sm outline-none transition ${
                       shouldShowError("confirmPassword")
                         ? "border border-red-400 focus:ring-4 focus:ring-red-100"
                         : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
                     }`}
-                    placeholder="Confirme sua nova senha"
-                    autoComplete="new-password"
                   />
+
                   <button
                     type="button"
                     onClick={() => setShowConfirm((v) => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-3 py-2 text-sm text-[#2b554e]/75 transition hover:bg-[#f3f0e0] hover:text-[#2b554e]"
+                    disabled={checkingRecovery || !canReset}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-3 py-2 text-sm text-[#2b554e]/75 transition hover:bg-[#f3f0e0] hover:text-[#2b554e] disabled:opacity-50"
                   >
                     {showConfirm ? "Ocultar" : "Mostrar"}
                   </button>
                 </div>
+
                 {shouldShowError("confirmPassword") && (
                   <p className="mt-2 text-xs text-red-600">
                     {errors.confirmPassword}
@@ -185,7 +269,7 @@ export default function RedefinirSenhaPage() {
 
               <button
                 type="submit"
-                disabled={loading || success}
+                disabled={loading || success || checkingRecovery || !canReset}
                 className="h-12 w-full rounded-2xl bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:bg-[#23463f] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Salvando..." : "Salvar nova senha"}

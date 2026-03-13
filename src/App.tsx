@@ -53,6 +53,9 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/cadastro" element={<CadastroUsuariosPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
+        <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
+
         <Route path="/carrinho" element={<div className="p-6">Carrinho</div>} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/checkout/identificacao" element={<CheckoutIdentificacao />} />
@@ -61,8 +64,6 @@ export default function App() {
         <Route path="/joias/colecao/:collectionSlug" element={<JewelryListing />} />
         <Route path="/produto/:slug" element={<ProductPage />} />
         <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />
-        <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
-        <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
 
         <Route path="/admin" element={<AdminGuard />}>node -v
           <Route element={<AdminLayout />}>
