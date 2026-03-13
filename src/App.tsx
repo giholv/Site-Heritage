@@ -8,6 +8,10 @@ import LoginPage from "./pages/LoginPage";
 import Checkout from "./pages/Checkout";
 import CheckoutIdentificacao from "./pages/CheckoutIdentificacao";
 import JewelryListing from "./pages/JewelryListing";
+import CookieBanner from "./components/CookieBanner";
+import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
+import EsqueciSenhaPage from "./pages/EsqueciSenhaPage";
+import RedefinirSenhaPage from "./pages/RedefinirSenhaPage";
 
 // ADMIN
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -39,6 +43,7 @@ function ScrollToHash() {
 export default function App() {
   const location = useLocation();
   const hideWhatsApp = location.pathname.startsWith("/admin");
+  const hideCookieBanner = location.pathname.startsWith("/admin");
 
   return (
     <>
@@ -55,9 +60,11 @@ export default function App() {
         <Route path="/joias/categoria/:categorySlug" element={<JewelryListing />} />
         <Route path="/joias/colecao/:collectionSlug" element={<JewelryListing />} />
         <Route path="/produto/:slug" element={<ProductPage />} />
+        <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />
+        <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
+        <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
 
-        {/* ADMIN */}
-        <Route path="/admin" element={<AdminGuard />}>
+        <Route path="/admin" element={<AdminGuard />}>node -v
           <Route element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="produtos" element={<AdminProducts />} />
@@ -72,6 +79,7 @@ export default function App() {
       </Routes>
 
       {!hideWhatsApp && <WhatsAppFloatingButton />}
+      {!hideCookieBanner && <CookieBanner />}
     </>
   );
 }

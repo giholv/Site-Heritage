@@ -79,9 +79,12 @@ const Hero: React.FC = () => {
                 src={b.src}
                 alt={b.alt}
                 className={[
-                  "absolute inset-0 block w-full h-full object-cover rounded-2xl transition-opacity duration-700",
+                  "absolute inset-0 block h-full w-full object-cover rounded-2xl transition-opacity duration-700",
                   i === idx ? "opacity-100" : "opacity-0",
                 ].join(" ")}
+                style={{
+                  objectPosition: i === 0 ? "50% 35%" : "50% 30%",
+                }}
                 loading={i === 0 ? "eager" : "lazy"}
               />
             ))}

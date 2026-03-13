@@ -7,6 +7,7 @@ type FAQItem = {
   q: string;
   a: FAQAnswer;
   img?: { src: string; alt?: string };
+  highlight?: string;
 };
 
 const FAQ: React.FC = () => {
@@ -14,33 +15,39 @@ const FAQ: React.FC = () => {
     () => [
       {
         q: "Qual a diferença entre semijoia e bijuteria?",
-        a: "Nossas semijoias são feitas com base metálica e recebem banho espesso de metais nobres, como ouro ou prata, além de um acabamento com verniz para maior durabilidade. Duram mais, têm melhor resistência e qualidade quando bem cuidadas. Bijuterias não passam por esse processo e, por isso, têm menor durabilidade.",
+        a: [
+          "Semijoias recebem banho espesso de metais nobres, como ouro ou prata.",
+          "Também contam com acabamento em verniz para maior proteção e durabilidade.",
+          "Têm mais resistência, brilho e qualidade quando bem cuidadas.",
+          "Bijuterias não passam por esse mesmo processo e tendem a ter menor durabilidade.",
+        ],
         img: { src: "/semijoia-vs-bijuteria.svg", alt: "Semijoia e bijuteria" },
+        highlight:
+          "Nossas semijoias unem acabamento refinado e maior durabilidade para o uso diário.",
       },
       {
         q: "Porque as peças em prata escurecem?",
         a: "A prata sofre oxidação, uma reação química natural ao entrar em contato com o ar, suor, perfumes e outros produtos químicos. Esse processo escurece a peça, mas não é defeito. Com a limpeza correta da sua peça, o brilho original é recuperado.",
       },
       {
-        q: "Como cuidar das minhas semijoias ?",
+        q: "Como cuidar das minhas semijoias?",
         a: [
           "Armazene as peças separadamente, nos saquinhos que enviamos com cada peça.",
           "Mantenha longe de exposição constante à água e ao vapor.",
           "Coloque as peças apenas após a completa absorção e secagem de perfumes, cremes e cosméticos.",
-          "Não utilize produtos químicos/abrasivos na limpeza.",
-          "Para limpar, use água e sabão neutro; enxágue e seque totalmente com secador (ar frio).",
-          "É recomendado que retire as peças para dormir, pois o atrtito pode danificar ou entortar partes delicadas.",
-          "Retire as suas peças antes de praticar exercícios físicos.",
+          "Não utilize produtos químicos ou abrasivos na limpeza.",
+          "Para limpar, use água e sabão neutro; enxágue e seque totalmente com secador em ar frio.",
+          "Retire as peças para dormir, pois o atrito pode danificar ou entortar partes delicadas.",
+          "Retire as peças antes de praticar exercícios físicos.",
         ],
       },
       {
         q: "As peças podem me dar alergia?",
-        a: "Nossas peças são free níquel e hipoalergênicas, desenvolvidas para oferecer mais conforto, segurança e a melhor experiência no uso diário.",
+        a: "Nossas peças são free níquel e hipoalergênicas, desenvolvidas para oferecer mais conforto, segurança e uma melhor experiência no uso diário.",
       },
-
       {
         q: "Como funciona troca e devolução?",
-        a: "Você pode solicitar troca/devolução dentro do prazo legal (compras online) e seguindo as condições: peça sem uso, com embalagem e em perfeito estado. Para iniciar, entre em contato conosco.",
+        a: "Você pode solicitar troca ou devolução dentro do prazo legal para compras online, desde que a peça esteja sem uso, com embalagem e em perfeito estado. Para iniciar, entre em contato conosco.",
       },
     ],
     []
@@ -75,7 +82,7 @@ const FAQ: React.FC = () => {
           </h2>
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mb-4 rounded-full" />
           <p className="text-[#2b554e]/75 text-base md:text-lg">
-            Banho, cuidados e trocas
+            Banho, cuidados, materiais e trocas
           </p>
         </div>
 
@@ -94,30 +101,45 @@ const FAQ: React.FC = () => {
                   className="w-full flex items-center justify-between gap-4 p-5 lg:p-7 text-left"
                   aria-expanded={open}
                 >
-                  <span className="text-[#2b554e] font-semibold">{item.q}</span>
+                  <span className="text-[#2b554e] font-semibold text-base md:text-lg">
+                    {item.q}
+                  </span>
                   <ChevronDown
-                    className={`h-5 w-5 text-[#2b554e] transition-transform ${open ? "rotate-180" : ""
+                    className={`h-5 w-5 shrink-0 text-[#2b554e] transition-transform ${open ? "rotate-180" : ""
                       }`}
                   />
                 </button>
 
-                {open && (
-                  <div className="px-5 pb-5">
-                    {item.img?.src && (
-                      <div className="mb-4 overflow-hidden rounded-xl border border-[#2b554e]/10">
-                        <img
-                          src={item.img.src}
-                          alt={item.img.alt ?? item.q}
-                          className="w-full h-[180px] md:h-[220px] lg:h-[320px] object-contain bg-[#f5f1e6]"
-                          loading="lazy"
-                        />
-  
-                      </div>
-                    )}
+                <div
+                  className={`grid transition-all duration-300 ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                    }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="px-5 pb-5 lg:px-7 lg:pb-7">
+                      {item.img?.src && (
+                        <div className="bg-[#f4efe3] rounded-2xl mb-3 overflow-hidden">
+                          <div className="h-[210px] md:h-[260px] flex items-center justify-center">
+                            <img
+                              src={item.img.src}
+                              alt={item.img.alt || item.q}
+                              className="max-w-full max-h-full object-contain scale-[1.2]"
+                              loading="lazy"
+                            />
+                          </div>
+                        </div>
+                      )}
 
-                    <Answer a={item.a} />
+                      <Answer a={item.a} />
+
+                      {item.highlight && (
+                        <div className="mt-5 rounded-xl border border-[#e8e1cd] bg-[#f8f5ec] p-4 text-sm text-[#2b554e]/85">
+                          <strong className="text-[#2b554e]">Dica:</strong>{" "}
+                          {item.highlight}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
@@ -126,7 +148,7 @@ const FAQ: React.FC = () => {
         <div className="text-center mt-10">
           <a
             href="#contact"
-            className="inline-flex items-center justify-center rounded-md bg-[#2b554e] text-[#FCFAF6] px-6 py-3 text-sm font-semibold hover:bg-[#23463f] transition-colors"
+            className="inline-flex items-center justify-center rounded-xl bg-[#2b554e] text-[#FCFAF6] px-6 py-3 text-sm font-semibold hover:bg-[#23463f] transition-colors"
           >
             Ainda tem dúvida? Fala com a gente
           </a>
