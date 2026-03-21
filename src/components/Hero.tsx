@@ -67,9 +67,11 @@ const Hero: React.FC = () => {
 
   return (
     <section
+
       id="home"
-      className="bg-[#FCFAF6] pt-[170px] sm:pt-[190px] md:pt-[220px]"
+      className="bg-[#FCFAF6] pt-5 md:pt-6"
     >
+
       <div className="container mx-auto px-4 md:px-6">
         <div className="relative overflow-hidden rounded-2xl">
           <div className="relative h-[420px] md:h-[560px]">

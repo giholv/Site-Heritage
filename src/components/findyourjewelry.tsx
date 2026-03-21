@@ -97,7 +97,7 @@ export default function EncontreSuaJoia() {
   }, [cats.length]);
 
   return (
-    <section id="categorias" className="bg-[#FCFAF6] py-14">
+    <section id="categorias" className="bg-[#FCFAF6] py-10">
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex items-end justify-between gap-4">
           <div>

@@ -562,11 +562,10 @@ export default function JewelryListing() {
     <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
       <Header searchValue={qText} onSearchChange={setQueryParam} onSearchSubmit={setQueryParam} />
 
-      {/* spacer pq Header é fixed */}
-      <div className="h-[160px]" />
+
 
       {/* HERO */}
-      <section className="container mx-auto px-4 md:px-6 pt-6">
+     <section className="container mx-auto px-4 md:px-6 pt-4">
         <div className="rounded-[32px] overflow-hidden border border-black/10 bg-white/60 shadow-sm">
           <div className="relative h-[220px] md:h-[340px]">
             {heroImage ? (

@@ -133,6 +133,7 @@ function formatBRL(cents: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+
 async function ensureUniqueSlug(base: string, currentId?: string | null) {
   const clean = slugify(base);
   if (!clean) return "produto";
@@ -162,6 +163,21 @@ async function ensureUniqueSlug(base: string, currentId?: string | null) {
 
   return `${clean}-${Date.now()}`;
 }
+
+async function ensureAuthenticatedSession() {
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    throw new Error(`Erro de autenticação: ${error.message}`);
+  }
+
+  if (!data.session) {
+    throw new Error("Sessão inválida. Faça login novamente.");
+  }
+
+  return data.session;
+}
+
 
 /** =========================
  *  UI
@@ -744,8 +760,9 @@ function SkuEditor({
   const [platingType, setPlatingType] = useState(initial?.plating_type ?? "");
   const [millesimal, setMillesimal] = useState(initial?.plating_millesimal ? String(initial?.plating_millesimal) : "");
   const [ringSize, setRingSize] = useState(initial?.ring_size ? String(initial?.ring_size) : "");
-  const [active, setActive] = useState<boolean>(initial?.active ?? false); // default false (evita CHECK)
+  const [active, setActive] = useState<boolean>(initial?.active ?? false);
   const [err, setErr] = useState<string | null>(null);
+
   const [stoneId, setStoneId] = useState((initial as any)?.stone_id ?? "");
   const [stoneColorId, setStoneColorId] = useState((initial as any)?.stone_color_id ?? "");
   const [cost, setCost] = useState(initial?.cost_cents ? String((initial.cost_cents ?? 0) / 100) : "");
@@ -770,17 +787,19 @@ function SkuEditor({
     <div className="rounded-3xl border bg-gray-50 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-gray-900">{(initial as any)?.id ? "Editar SKU" : "Novo SKU"}</div>
-          <div className="text-xs text-gray-500">
+          <div className="text-sm font-semibold text-gray-900">
+            {(initial as any)?.id ? "Editar SKU" : "Novo SKU"}
           </div>
+          <div className="text-xs text-gray-500"></div>
         </div>
+
         <div className="md:col-span-4">
           <SearchSelect
             label="Pedra"
             value={stoneId}
             onChange={(v) => {
               setStoneId(v);
-              if (!v) setStoneColorId(""); // limpou pedra => limpa cor
+              if (!v) setStoneColorId("");
             }}
             placeholder="Selecionar…"
             options={stoneOptions}
@@ -789,7 +808,6 @@ function SkuEditor({
         </div>
 
         <div className="md:col-span-4">
-
           <SearchSelect
             label="Cor da pedra"
             value={stoneColorId}
@@ -798,58 +816,55 @@ function SkuEditor({
             options={stoneColorOptions}
             allowClear
           />
-
         </div>
+
         <div className="flex gap-2">
           <GhostButton disabled={saving} onClick={onCancel}>
             Cancelar
           </GhostButton>
+
           <PrimaryButton
             disabled={saving || !canSave}
-
             onClick={() => {
               setErr(null);
 
-              // CUSTO obrigatório
               const cost_cents = normalizePriceToCents(cost);
               if (cost_cents === null) return setErr("Custo inválido.");
 
-              // margem e arredondamento
               const target_margin_pct = Number(marginPct);
               if (!Number.isFinite(target_margin_pct)) return setErr("Margem inválida.");
 
               const price_round_step_cents = Number(roundStep);
-              if (!Number.isFinite(price_round_step_cents) || price_round_step_cents <= 0) return setErr("Arredondamento inválido.");
+              if (!Number.isFinite(price_round_step_cents) || price_round_step_cents <= 0) {
+                return setErr("Arredondamento inválido.");
+              }
 
               if (!platingType.trim()) return setErr("Informe o tipo de banho.");
+
               const pm = Number(millesimal);
               if (!Number.isFinite(pm) || pm <= 0) return setErr("Milésimo inválido.");
 
               const rs = ringSize.trim() ? Number(ringSize) : null;
-              if (isRing && (!rs || !Number.isFinite(rs))) return setErr("Tamanho do anel inválido.");
+              if (isRing && (!rs || !Number.isFinite(rs))) {
+                return setErr("Tamanho do anel inválido.");
+              }
 
               const finalActive = active && canActivate;
-
-              const finalStoneId = stoneId ? stoneId : null;
-              const finalStoneColorId = finalStoneId ? (stoneColorId ? stoneColorId : null) : null;
+              const finalStoneId = stoneId || null;
+              const finalStoneColorId = finalStoneId ? (stoneColorId || null) : null;
 
               onSave({
                 title: title.trim() || null,
                 barcode: barcode.trim() || null,
-
                 plating_type: platingType.trim(),
                 plating_millesimal: pm,
                 ring_size: isRing ? (rs ?? null) : null,
-
                 active: finalActive,
-
                 stone_id: finalStoneId,
                 stone_color_id: finalStoneColorId,
-
                 cost_cents,
                 target_margin_pct,
                 price_round_step_cents,
-
               });
             }}
           >
@@ -860,12 +875,14 @@ function SkuEditor({
 
       {!canActivate ? (
         <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
-          Para ativar o SKU, selecione **Fornecedor (Bruto)** e **Fornecedor (Galvânica)** no Produto.
+          Para ativar o SKU, selecione <b>Fornecedor (Bruto)</b> e <b>Fornecedor (Galvânica)</b> no produto.
         </div>
       ) : null}
 
       {err ? (
-        <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700">{err}</div>
+        <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700">
+          {err}
+        </div>
       ) : null}
 
       <div className="mt-5 grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -874,11 +891,13 @@ function SkuEditor({
             <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Opcional" />
           </Field>
         </div>
+
         <div className="md:col-span-3">
           <Field label="Código interno SKU" hint="Gerado automaticamente">
             <TextInput value={initial?.sku_code || "Será gerado ao salvar"} disabled className="bg-gray-50" />
           </Field>
         </div>
+
         <div className="md:col-span-4">
           <Field label="Código de barras">
             <TextInput value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Ex: 789..." />
@@ -887,9 +906,14 @@ function SkuEditor({
 
         <div className="md:col-span-4">
           <Field label="Tipo de banho" required>
-            <TextInput value={platingType} onChange={(e) => setPlatingType(e.target.value)} placeholder="Ex: ouro, ródio, prata" />
+            <TextInput
+              value={platingType}
+              onChange={(e) => setPlatingType(e.target.value)}
+              placeholder="Ex: ouro, ródio, prata"
+            />
           </Field>
         </div>
+
         <div className="md:col-span-4">
           <Field label="Milésimo" required>
             <TextInput
@@ -900,6 +924,7 @@ function SkuEditor({
             />
           </Field>
         </div>
+
         <div className="md:col-span-4">
           <Field label="Custo" required hint="Base para cálculo automático">
             <TextInput value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="0,00" />
@@ -926,6 +951,7 @@ function SkuEditor({
               placeholder="100"
             />
           </Field>
+
           <Field label="Preço (calculado)">
             <TextInput
               value={initial?.price_cents ? formatBRL(initial.price_cents) : "Salve para calcular"}
@@ -934,9 +960,10 @@ function SkuEditor({
             />
           </Field>
         </div>
+
         {(() => {
-          const pc = initial?.price_cents ?? null;      // preço do banco
-          const cc = normalizePriceToCents(cost);      // custo digitado
+          const pc = initial?.price_cents ?? null;
+          const cc = normalizePriceToCents(cost);
 
           if (!pc || !cc) return null;
 
@@ -953,6 +980,7 @@ function SkuEditor({
             </div>
           );
         })()}
+
         {isRing ? (
           <div className="md:col-span-4">
             <Field label="Tamanho do anel" required>
@@ -971,8 +999,7 @@ function SkuEditor({
             <select
               value={active ? "1" : "0"}
               onChange={(e) => setActive(e.target.value === "1")}
-              className="w-full -mb-2 rounded-2xl border bg-white px-4 py-3 text-sm
-              focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
+              className="w-full -mb-2 rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
             >
               <option value="1">Sim</option>
               <option value="0">Não</option>
@@ -983,6 +1010,7 @@ function SkuEditor({
     </div>
   );
 }
+
 
 function SkusManager({
   productId,
@@ -1059,7 +1087,8 @@ function SkusManager({
     setLoading(true);
 
     try {
-      // tenta achar um campo de título que exista sem você mexer no banco
+      await ensureAuthenticatedSession();
+
       const candidates: Array<typeof titleField> = ["title", "name", "label", "variant_name"];
 
       let loaded: SkuDbRow[] | null = null;
@@ -1073,12 +1102,13 @@ function SkusManager({
           used = f;
           break;
         }
+
         lastMsg = (r.error as any)?.message || null;
 
-        // se falhou por outro motivo, não fica tentando
         const msg = (r.error as any)?.message || "";
         const isMissingColumn =
           msg.includes("does not exist") || msg.includes("column") || msg.includes("coluna");
+
         if (!isMissingColumn) break;
       }
 
@@ -1095,42 +1125,22 @@ function SkusManager({
     }
   }
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId]);
-
-  const selectedSku = useMemo(() => list.find((s) => s.id === selectedSkuId) || null, [list, selectedSkuId]);
-
-  useEffect(() => {
-    if (!selectedSku) {
-      onSelectedSkuMeta({ priceCents: 0, platingLabel: null, ringSize: null });
-      return;
-    }
-    const platingLabel = selectedSku.plating_type
-      ? `${selectedSku.plating_type}${selectedSku.plating_millesimal ? ` ${selectedSku.plating_millesimal}` : ""}`
-      : null;
-
-    onSelectedSkuMeta({
-      priceCents: selectedSku.price_cents ?? 0,
-      platingLabel,
-      ringSize: selectedSku.ring_size ?? null,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSkuId, list]);
-
   async function upsertSku(payload: Partial<SkuDbRow>) {
     setErr(null);
     setSaving(true);
 
     try {
+      await ensureAuthenticatedSession();
+
       const skuPayload: any = {
         ...payload,
         supplier_id: supplierId || null,
         plating_supplier_id: platingSupplierId || null,
       };
 
-      if (skuPayload.active && !canActivate) skuPayload.active = false;
+      if (skuPayload.active && !canActivate) {
+        skuPayload.active = false;
+      }
 
       const retSelect = [
         "id",
@@ -1165,10 +1175,10 @@ function SkusManager({
           .single();
 
         if (error) throw new Error(error.message);
-        saved = data as SkuDbRow;
 
+        saved = data as SkuDbRow;
         setList((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
-        setEditing(saved); // opcional (mantém editor com preço atualizado)
+        setEditing(saved);
       } else {
         const { data, error } = await supabase
           .from(T.SKUS)
@@ -1177,27 +1187,29 @@ function SkusManager({
           .single();
 
         if (error) throw new Error(error.message);
-        saved = data as SkuDbRow;
 
+        saved = data as SkuDbRow;
         setList((prev) => [...prev, saved].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")));
       }
 
       setCreating(false);
-      // se quiser fechar editor após salvar:
-      // setEditing(null);
     } catch (e: any) {
       setErr(e?.message || "Erro ao salvar SKU.");
     } finally {
       setSaving(false);
     }
   }
+
   async function removeSku(id: string) {
     const ok = window.confirm("Excluir este SKU? (Fotos/estoque vinculados podem quebrar)");
     if (!ok) return;
 
     setErr(null);
     setSaving(true);
+
     try {
+      await ensureAuthenticatedSession();
+
       const { error } = await supabase.from(T.SKUS).delete().eq("id", id);
       if (error) throw new Error(error.message);
 
@@ -1411,6 +1423,15 @@ export default function AdminProductCreateUX() {
     setDirty(true);
     if (okMsg) setOkMsg(null);
   }
+  useEffect(() => {
+    (async () => {
+      try {
+        await ensureAuthenticatedSession();
+      } catch (e: any) {
+        setErr(e?.message || "Sessão inválida. Faça login novamente.");
+      }
+    })();
+  }, []);
 
   // reset primary image when sku changes
   useEffect(() => {
@@ -1628,83 +1649,108 @@ export default function AdminProductCreateUX() {
   }
 
   async function saveProduct(nextStatus?: ProductStatus) {
-    setErr(null);
-    setOkMsg(null);
+  setErr(null);
+  setOkMsg(null);
 
-    const v = validateBasics();
-    if (!v.ok) {
-      setErr(v.msg);
-      scrollToId(v.section);
-      return null;
-    }
-
-    setSaving(true);
-    try {
-      const cleanName = name.trim();
-      const finalSlug = slug.trim()
-        ? await ensureUniqueSlug(slug.trim(), productId)
-        : await ensureUniqueSlug(cleanName, productId);
-
-      const payload: any = {
-        name: cleanName,
-        slug: finalSlug,
-        description: description.trim() || null,
-        status: nextStatus ?? status,
-        primary_category_id: primaryCategoryId || null,
-
-        material_base: materialBase.trim() || null,
-        important_notes: importantNotes.trim() || null,
-
-        supplier_id: supplierId || null, // bruto
-        plating_supplier_id: platingSupplierId || null, // galvânica
-
-        supplier_order_number: supplierOrderNumber.trim() || null,
-        supplier_origin_code: supplierOriginCode.trim() || null,
-        galvanic_plating_code: galvanicPlatingCode.trim() || null,
-
-        seo_title: seoTitle.trim() || null,
-        seo_description: seoDescription.trim() || null,
-        seo_keywords: parseCsvList(seoKeywords),
-        search_tags: parseCsvList(searchTags),
-      };
-
-      if (!productId) {
-        const { data, error } = await supabase.from(T.PRODUCTS).insert(payload).select("id,slug,status").single();
-        if (error) throw new Error(error.message);
-
-        await syncProductLinks((data as any).id);
-
-        setProductId((data as any).id);
-        setSlug((data as any).slug);
-        setStatus((data as any).status as ProductStatus);
-        setSelectedSkuId(null);
-
-        setDirty(false);
-        setOkMsg("Produto salvo.");
-        return (data as any).id as string;
-      } else {
-        const { error } = await supabase
-          .from(T.PRODUCTS)
-          .update({ ...payload, updated_at: new Date().toISOString() })
-          .eq("id", productId);
-
-        if (error) throw new Error(error.message);
-
-        await syncProductLinks(productId);
-
-        setSlug(finalSlug);
-        setStatus((nextStatus ?? status) as ProductStatus);
-        setDirty(false);
-        setOkMsg("Produto salvo.");
-        return productId;
-      }
-    } catch (e: any) {
-      setErr(e?.message || "Erro ao salvar produto.");
-      return null;
-    } finally {
-      setSaving(false);
-    }
+  const v = validateBasics();
+  if (!v.ok) {
+    setErr(v.msg);
+    scrollToId(v.section);
+    return null;
   }
+
+  setSaving(true);
+
+  try {
+    await ensureAuthenticatedSession();
+
+    const cleanName = name.trim();
+    const finalSlug = slug.trim()
+      ? await ensureUniqueSlug(slug.trim(), productId)
+      : await ensureUniqueSlug(cleanName, productId);
+
+    const payload: any = {
+      name: cleanName,
+      slug: finalSlug,
+      description: description.trim() || null,
+      status: nextStatus ?? status,
+      primary_category_id: primaryCategoryId || null,
+
+      material_base: materialBase.trim() || null,
+      important_notes: importantNotes.trim() || null,
+
+      supplier_id: supplierId || null,
+      plating_supplier_id: platingSupplierId || null,
+
+      supplier_order_number: supplierOrderNumber.trim() || null,
+      supplier_origin_code: supplierOriginCode.trim() || null,
+      galvanic_plating_code: galvanicPlatingCode.trim() || null,
+
+      seo_title: seoTitle.trim() || null,
+      seo_description: seoDescription.trim() || null,
+      seo_keywords: parseCsvList(seoKeywords),
+      search_tags: parseCsvList(searchTags),
+    };
+
+    if (!productId) {
+      const { data, error } = await supabase
+        .from(T.PRODUCTS)
+        .insert(payload)
+        .select("id,slug,status")
+        .single();
+
+      if (error) {
+        console.error("ERRO INSERT PRODUCTS:", error);
+        throw new Error(error.message);
+      }
+
+      try {
+        await syncProductLinks((data as any).id);
+      } catch (linkErr: any) {
+        console.error("ERRO SYNC LINKS:", linkErr);
+        throw new Error(linkErr?.message || "Erro ao vincular coleções/estilos.");
+      }
+
+      setProductId((data as any).id);
+      setSlug((data as any).slug);
+      setStatus((data as any).status as ProductStatus);
+      setSelectedSkuId(null);
+
+      setDirty(false);
+      setOkMsg("Produto salvo.");
+      return (data as any).id as string;
+    }
+
+    const { error } = await supabase
+      .from(T.PRODUCTS)
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq("id", productId);
+
+    if (error) {
+      console.error("ERRO UPDATE PRODUCTS:", error);
+      throw new Error(error.message);
+    }
+
+    try {
+      await syncProductLinks(productId);
+    } catch (linkErr: any) {
+      console.error("ERRO SYNC LINKS:", linkErr);
+      throw new Error(linkErr?.message || "Erro ao vincular coleções/estilos.");
+    }
+
+    setSlug(finalSlug);
+    setStatus((nextStatus ?? status) as ProductStatus);
+    setDirty(false);
+    setOkMsg("Produto salvo.");
+    return productId;
+  } catch (e: any) {
+    setErr(e?.message || "Erro ao salvar produto.");
+    return null;
+  } finally {
+    setSaving(false);
+  }
+}
+
 
   const sectionState = useMemo(() => {
     const infoOk = !!name.trim() && !!primaryCategoryId;

@@ -116,7 +116,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
 
   return (
     <>
-      <header className="fixed w-full z-50">
+      <header className="sticky top-0 left-0 w-full z-50">
         {/* TOP BAR */}
         <div className="bg-[#2b554e] text-[#f3f0e0] border-b border-white/10">
           <div className="container mx-auto px-3 md:px-6 h-9 md:h-10 flex items-center justify-center">

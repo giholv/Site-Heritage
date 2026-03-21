@@ -1,330 +1,309 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import ProductHero, { ProductImage } from "../components/ProductHero";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { products } from "../data/Products";
 import { useCart } from "../context/CartContext";
 
-function formatBRL(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const SKU_IMAGES_BUCKET = "product-images"; // troque se necessário
+
+const FALLBACK_IMAGE =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="900" height="1100" viewBox="0 0 900 1100">
+      <rect width="100%" height="100%" fill="#f3efe8"/>
+      <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+        font-family="Arial, sans-serif" font-size="32" fill="#7c8884">
+        Imagem indisponível
+      </text>
+    </svg>
+  `);
+
+type ProductRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: "draft" | "active";
+};
+
+type SkuRow = {
+  id: string;
+  product_id: string;
+  variant_name: string;
+  title: string | null;
+  price_cents: number;
+  active: boolean;
+};
+
+type SkuImageRow = {
+  id: string;
+  sku_id: string;
+  path: string;
+  alt: string | null;
+  sort_order: number;
+  is_primary: boolean;
+};
+
+function resolveImageUrl(path: string) {
+  if (!path) return FALLBACK_IMAGE;
+
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+
+  const cleanedPath = path.replace(/^\/+/, "");
+
+  const { data } = supabase.storage
+    .from(SKU_IMAGES_BUCKET)
+    .getPublicUrl(cleanedPath);
+
+  return data.publicUrl || FALLBACK_IMAGE;
 }
 
-function onlyDigits(s: string) {
-  return String(s ?? "").replace(/\D/g, "");
-}
+function formatCep(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
 
-function Accordion({
-  title,
-  children,
-  defaultOpen = false,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className="border-t border-[#2b554e]/15 py-4">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between text-left"
-      >
-        <span className="text-xs tracking-[0.18em] uppercase font-semibold text-[#2b554e]">
-          {title}
-        </span>
-        <span className="text-2xl leading-none text-[#2b554e]">
-          {open ? "−" : "+"}
-        </span>
-      </button>
-
-      {open && <div className="mt-3 text-sm text-[#2b554e]/75">{children}</div>}
-    </div>
-  );
+  return digits
+    .replace(/^(\d{5})(\d)/, "$1-$2")
+    .replace(/(-\d{3}).+?$/, "$1");
 }
 
 export default function ProductPage() {
-  const { slug } = useParams();
-  const location = useLocation();
+  const { slug = "" } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { add } = useCart();
 
-  const qs = new URLSearchParams(location.search);
-  const from = qs.get("from") || ""; // ex: "lancamentos" | "pratas" | "semijoias"
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const product = useMemo(() => products.find((p) => p.slug === slug), [slug]);
+  const [product, setProduct] = useState<ProductRow | null>(null);
+  const [skus, setSkus] = useState<SkuRow[]>([]);
+  const [selectedSkuId, setSelectedSkuId] = useState("");
+  const [images, setImages] = useState<ProductImage[]>([]);
 
-  const imagens = useMemo(() => {
-    if (!product) return [];
-    return product.imagens?.length ? product.imagens : [product.imagem];
-  }, [product]);
+  const [quantity, setQuantity] = useState(1);
+  const [postalCode, setPostalCode] = useState("");
+  const [shippingText, setShippingText] = useState("");
 
-  const [mainImg, setMainImg] = useState("");
-  const [qty, setQty] = useState(1);
+  const selectedSku = useMemo(() => {
+    return skus.find((sku) => sku.id === selectedSkuId) ?? skus[0] ?? null;
+  }, [skus, selectedSkuId]);
 
-  const [cep, setCep] = useState("");
-  const [freteResult, setFreteResult] = useState<null | {
-    servico: string;
-    prazo: string;
-    valor: string;
-  }>(null);
+  const variants = useMemo(() => {
+    return skus.map((sku, index) => ({
+      id: sku.id,
+      label:
+        sku.title?.trim() ||
+        sku.variant_name?.trim() ||
+        `Variação ${index + 1}`,
+    }));
+  }, [skus]);
+
+  const price = selectedSku ? selectedSku.price_cents / 100 : 0;
 
   useEffect(() => {
-    if (!product) return;
-    document.title = `${product.nome} - Caléa`;
-    setMainImg(product.imagens?.[0] ?? product.imagem);
-    setQty(1);
-    setFreteResult(null);
-  }, [product]);
+    let cancelled = false;
 
-  if (!product) {
-    return (
-      <div className="min-h-screen bg-[#FCFAF6]">
-        <Header />
-        <div className="max-w-6xl mx-auto px-4 py-10 text-[#2b554e]">
-          Produto não encontrado.
-        </div>
-        <Footer />
-      </div>
-    );
+    async function loadProduct() {
+      if (!slug) {
+        setError("Slug do produto não informado.");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      setProduct(null);
+      setSkus([]);
+      setSelectedSkuId("");
+      setImages([]);
+
+      try {
+        const { data: productData, error: productError } = await supabase
+          .from("products")
+          .select("id, name, slug, description, status")
+          .eq("slug", slug)
+          .single();
+
+        if (productError) throw productError;
+        if (!productData) throw new Error("Produto não encontrado.");
+
+        if (cancelled) return;
+        setProduct(productData as ProductRow);
+
+        const { data: skuData, error: skuError } = await supabase
+          .from("skus")
+          .select("id, product_id, variant_name, title, price_cents, active")
+          .eq("product_id", productData.id)
+          .eq("active", true)
+          .order("created_at", { ascending: true });
+
+        if (skuError) throw skuError;
+
+        const safeSkus = (skuData ?? []) as SkuRow[];
+
+        if (cancelled) return;
+        setSkus(safeSkus);
+        setSelectedSkuId(safeSkus[0]?.id ?? "");
+      } catch (err: any) {
+        if (cancelled) return;
+        setError(err?.message || "Erro ao carregar produto.");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProduct();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSkuImages() {
+      if (!selectedSkuId || !product) {
+        setImages([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("sku_images")
+        .select("id, sku_id, path, alt, sort_order, is_primary")
+        .eq("sku_id", selectedSkuId)
+        .order("is_primary", { ascending: false })
+        .order("sort_order", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao buscar imagens:", error);
+        if (!cancelled) setImages([]);
+        return;
+      }
+
+      const normalizedImages: ProductImage[] = ((data ?? []) as SkuImageRow[])
+        .map((img, index) => ({
+          id: String(img.id ?? `img-${index}`),
+          src: resolveImageUrl(String(img.path ?? "")),
+          alt: String(img.alt ?? product.name ?? "Produto"),
+        }))
+        .filter((img) => img.src);
+
+      if (cancelled) return;
+
+      setImages(
+        normalizedImages.length > 0
+          ? normalizedImages
+          : [
+            {
+              id: "fallback",
+              src: FALLBACK_IMAGE,
+              alt: product.name || "Produto",
+            },
+          ]
+      );
+    }
+
+    loadSkuImages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSkuId, product]);
+
+  useEffect(() => {
+    setQuantity(1);
+  }, [selectedSkuId]);
+
+  function addCurrentItemToCart() {
+    if (!product || !selectedSku) return;
+
+    add({
+      id: selectedSku.id,
+      name: product.name,
+      price: selectedSku.price_cents / 100,
+      image: images[0]?.src || FALLBACK_IMAGE,
+      variant:
+        selectedSku.title?.trim() ||
+        selectedSku.variant_name?.trim() ||
+        "Variação",
+      qty: quantity,
+    });
   }
 
-  const backHref = from ? `/#${from}` : "/";
+  function handleAddToCart() {
+    addCurrentItemToCart();
+  }
 
-  const breadcrumbLabel =
-    from === "lancamentos"
-      ? "Lançamentos"
-      : from === "semijoias"
-      ? "Semijoias"
-      : from === "pratas"
-      ? "Pratas"
-      : "Coleção";
+  function handleBuyNow() {
+    addCurrentItemToCart();
+    navigate("/checkout");
+  }
 
-  const handleFrete = () => {
-    const cepLimpo = onlyDigits(cep);
-    if (cepLimpo.length !== 8) {
-      setFreteResult(null);
-      // sem alert (fica clean)
-      setFreteResult({
-        servico: "CEP inválido",
-        prazo: "Digite 8 números",
-        valor: "—",
-      });
+  async function handleCalculateShipping() {
+    const cep = postalCode.replace(/\D/g, "");
+
+    if (cep.length !== 8) {
+      setShippingText("Digite um CEP válido com 8 números.");
       return;
     }
 
-    // MOCK (troca por API real depois)
-    setFreteResult({
-      servico: "PAC",
-      prazo: "4–8 dias úteis",
-      valor: "R$ 19,90",
-    });
-  };
+    setShippingText(`Entrega calculada para o CEP ${formatCep(cep)}.`);
+  }
 
-  const handleAddToCart = () => {
-    add({
-      id: product.slug,
-      name: product.nome,
-      price: product.preco,
-      image: product.imagem,
-      variant: product.tag ?? undefined,
-      qty,
-    });
+  if (loading) {
+    return <div className="px-4 py-10">Carregando...</div>;
+  }
 
-    // opcional: abre a sacola
-    // navigate("/checkout"); // ou abre o drawer, dependendo do seu fluxo
-  };
+  if (error) {
+    return <div className="px-4 py-10">{error}</div>;
+  }
+
+  if (!product) {
+    return <div className="px-4 py-10">Produto não encontrado.</div>;
+  }
 
   return (
-    <div className="min-h-screen bg-[#FCFAF6]">
-      <Header />
+    <div className="min-h-screen flex flex-col bg-[#f6f3ee]">
+      <div className="mb-6">
+        <Header />
+      </div>
+      <main className="flex-1">
+        <section
+          className="mx-auto max-w-7xl px-4 pb-8 md:px-6 lg:px-8"
+          style={{ marginTop: "20px" }}
+        >
+          <ProductHero
+            name={product.name}
+            description={product.description || ""}
+            price={price}
+            installmentText=""
+            variants={variants}
+            selectedVariant={selectedSku?.id ?? ""}
+            onSelectVariant={setSelectedSkuId}
+            quantity={quantity}
+            onDecreaseQuantity={() =>
+              setQuantity((prev) => Math.max(1, prev - 1))
+            }
+            onIncreaseQuantity={() =>
+              setQuantity((prev) => Math.min(99, prev + 1))
+            }
+            onAddToCart={handleAddToCart}
+            onBuyNow={handleBuyNow}
+            images={images ?? []}
+            postalCode={postalCode}
+            onPostalCodeChange={(value) => setPostalCode(formatCep(value))}
+            onCalculateShipping={handleCalculateShipping}
+            shippingText={shippingText}
+          />
 
-      <main className="max-w-6xl mx-auto px-4 md:px-6 pt-[140px] pb-10">
-        {/* topo / voltar */}
-        <div className="flex items-center justify-between mb-6">
-          <Link
-            to={backHref}
-            className="text-sm text-[#2b554e]/70 hover:text-[#2b554e] underline underline-offset-4"
-          >
-            Voltar
-          </Link>
-
-          <div className="hidden md:flex text-xs text-[#2b554e]/55 gap-2">
-            <Link to="/" className="hover:text-[#2b554e]">
-              Início
-            </Link>
-            <span>/</span>
-            <a href={backHref} className="hover:text-[#2b554e]">
-              {breadcrumbLabel}
-            </a>
-            <span>/</span>
-            <span className="text-[#2b554e]/80">{product.nome}</span>
-          </div>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-10">
-          {/* ESQUERDA - Galeria */}
-          <div>
-            <div className="bg-white/90 rounded-3xl shadow-md overflow-hidden border border-[#2b554e]/10">
-              <div className="relative">
-                {product.tag && (
-                  <span className="absolute top-4 left-4 text-xs font-semibold bg-[#2b554e] text-[#F8F3EA] px-3 py-1 rounded-full">
-                    {product.tag}
-                  </span>
-                )}
-
-                <div className="w-full h-[560px] bg-white overflow-hidden">
-                  <img
-                    src={mainImg || product.imagem}
-                    alt={product.nome}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* miniaturas */}
-            <div className="mt-4 flex gap-3 flex-wrap">
-              {imagens.map((img) => (
-                <button
-                  key={img}
-                  type="button"
-                  onClick={() => setMainImg(img)}
-                  className={`h-20 w-20 rounded-2xl overflow-hidden border shadow-sm bg-white ${
-                    (mainImg || product.imagem) === img
-                      ? "border-[#b08d57]"
-                      : "border-[#2b554e]/10"
-                  }`}
-                  aria-label="Trocar imagem"
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* DIREITA - Compra */}
-          <div className="lg:sticky lg:top-28 h-fit">
-            <div className="bg-white/90 rounded-3xl shadow-md border border-[#2b554e]/10 p-6">
-              <h1 className="text-2xl md:text-3xl font-semibold text-[#2b554e]">
-                {product.nome}
-              </h1>
-
-              {product.descricao && (
-                <p className="mt-2 text-sm text-[#2b554e]/70">{product.descricao}</p>
-              )}
-
-              <div className="mt-5 flex items-end justify-between gap-4">
-                <div className="text-2xl font-semibold text-[#b08d57]">
-                  {formatBRL(product.preco)}
-                </div>
-                <div className="text-xs text-[#2b554e]/60">10x sem juros</div>
-              </div>
-
-              {/* quantidade + botão */}
-              <div className="mt-6 flex items-center gap-3">
-                <div className="flex items-center border border-[#2b554e]/15 rounded-2xl overflow-hidden bg-white">
-                  <button
-                    type="button"
-                    className="w-11 h-11 text-lg text-[#2b554e] hover:bg-[#2b554e]/5"
-                    onClick={() => setQty((q) => Math.max(1, q - 1))}
-                    aria-label="Diminuir"
-                  >
-                    −
-                  </button>
-                  <div className="w-14 h-11 flex items-center justify-center text-sm font-semibold text-[#2b554e]">
-                    {qty}
-                  </div>
-                  <button
-                    type="button"
-                    className="w-11 h-11 text-lg text-[#2b554e] hover:bg-[#2b554e]/5"
-                    onClick={() => setQty((q) => q + 1)}
-                    aria-label="Aumentar"
-                  >
-                    +
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  className="flex-1 h-11 rounded-2xl bg-[#2b554e] text-[#FCFAF6] text-sm font-semibold hover:bg-[#23463f] transition-colors"
-                  onClick={handleAddToCart}
-                >
-                  Adicionar ao carrinho
-                </button>
-              </div>
-
-              {/* frete */}
-              <div className="mt-8">
-                <div className="text-xs tracking-[0.18em] uppercase font-semibold text-[#2b554e]">
-                  Frete e prazo de entrega
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <input
-                    value={cep}
-                    onChange={(e) => setCep(e.target.value)}
-                    placeholder="Digite o CEP"
-                    className="flex-1 border border-[#2b554e]/15 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#b08d57] bg-white"
-                    inputMode="numeric"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleFrete}
-                    className="px-6 rounded-2xl bg-[#b08d57] text-white text-sm font-semibold hover:opacity-95"
-                  >
-                    OK
-                  </button>
-                </div>
-
-                {freteResult && (
-                  <div className="mt-4 p-4 rounded-2xl border border-[#2b554e]/10 bg-[#FCFAF6] text-sm">
-                    <div className="font-semibold text-[#2b554e]">
-                      {freteResult.servico}
-                    </div>
-                    <div className="text-[#2b554e]/70">Prazo: {freteResult.prazo}</div>
-                    <div className="text-[#2b554e]/70">Valor: {freteResult.valor}</div>
-                  </div>
-                )}
-              </div>
-
-              {/* sanfona */}
-              <div className="mt-8">
-                <Accordion title="Descrição do produto" defaultOpen>
-                  <p>{product.descriptionFull ?? "Sem descrição detalhada ainda."}</p>
-                </Accordion>
-
-                <Accordion title="Composição">
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>Banho premium / Prata 925 (conforme peça)</li>
-                    <li>Acabamento cuidadoso</li>
-                    <li>Embalagem presenteável</li>
-                  </ul>
-                </Accordion>
-
-                <Accordion title="Cuidados">
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>Evite água, perfume e produtos químicos</li>
-                    <li>Guarde em local seco, de preferência no saquinho/caixinha</li>
-                    <li>Limpe com flanela macia</li>
-                  </ul>
-                </Accordion>
-              </div>
-
-              {/* botão secundário opcional */}
-              <button
-                type="button"
-                onClick={() => navigate("/checkout")}
-                className="mt-5 w-full rounded-2xl border border-[#2b554e]/15 px-4 py-3 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
-              >
-                Ir para a sacola
-              </button>
-            </div>
-          </div>
-        </div>
+        </section>
       </main>
-
       <Footer />
     </div>
   );
