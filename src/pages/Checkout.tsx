@@ -124,20 +124,27 @@ export default function Checkout() {
   }, [cep]);
 
   function saveCheckoutDraft() {
-    const payload = {
-      items,
-      cep: onlyDigits(cep),
-      giftWrap,
-      giftWrapPrice: giftWrap ? giftWrapPrice : 0,
-      subtotal,
-      shipping: selectedShipping,
-      shippingPrice,
-      total,
-      updatedAt: new Date().toISOString(),
-    };
+  const payload = {
+    items,
+    subtotal,
+    cep: onlyDigits(cep),
+    giftWrap,
+    giftWrapPrice: giftWrap ? giftWrapPrice : 0,
+    shipping: selectedShipping
+      ? {
+          id: selectedShipping.id,
+          name: selectedShipping.name,
+          price: selectedShipping.price,
+          deadline: selectedShipping.deadline,
+        }
+      : null,
+    shippingPrice,
+    total,
+    updatedAt: new Date().toISOString(),
+  };
 
-    sessionStorage.setItem("calea_checkout", JSON.stringify(payload));
-  }
+  sessionStorage.setItem("calea_checkout", JSON.stringify(payload));
+}
 
   async function handleCalcShipping() {
     const cleanCep = onlyDigits(cep);

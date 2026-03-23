@@ -7,6 +7,7 @@ import CadastroUsuariosPage from "./pages/cadastro_users";
 import LoginPage from "./pages/LoginPage";
 import Checkout from "./pages/Checkout";
 import CheckoutIdentificacao from "./pages/CheckoutIdentificacao";
+import CheckoutPagamento from "./pages/CheckoutPagamento";
 import JewelryListing from "./pages/JewelryListing";
 import CookieBanner from "./components/CookieBanner";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
@@ -25,6 +26,7 @@ import AdminCategoryImagesPage from "./pages/admin/AdminCategoryImagesPage";
 import AdminStockLocations from "./pages/admin/AdminStockLocations";
 
 import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
+
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -60,6 +62,7 @@ export default function App() {
         <Route path="/carrinho" element={<div className="p-6">Carrinho</div>} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/checkout/identificacao" element={<CheckoutIdentificacao />} />
+        <Route path="/checkout/pagamento" element={<CheckoutPagamento />} />
         <Route path="/joias" element={<JewelryListing />} />
         <Route path="/joias/categoria/:categorySlug" element={<JewelryListing />} />
         <Route path="/joias/colecao/:collectionSlug" element={<JewelryListing />} />

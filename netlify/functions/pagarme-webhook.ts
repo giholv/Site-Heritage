@@ -1,26 +1,53 @@
 // netlify/functions/pagarme-webhook.ts
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { Handler } from "@netlify/functions";
+import { createClient } from "@supabase/supabase-js";
 
-export default async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("", { status: 204, headers: corsHeaders() });
+const headers = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+export const handler: Handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 204,
+      headers,
+      body: "",
+    };
   }
 
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ ok: false, error: "Method not allowed" }),
+    };
   }
 
   try {
-    const rawBody = await req.text();
-    const event = JSON.parse(rawBody);
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    if (!supabaseUrl || !serviceRoleKey) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          ok: false,
+          error: "SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configuradas",
+        }),
+      };
+    }
 
-    const eventType = event?.type || event?.event || null;
-    const data = event?.data || event;
+    const eventBody = JSON.parse(event.body || "{}");
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const eventType = eventBody?.type || eventBody?.event || null;
+    const data = eventBody?.data || eventBody;
+
     const providerOrderId =
       data?.id ||
       data?.order?.id ||
@@ -39,24 +66,31 @@ export default async (req: Request) => {
       case "charge.paid":
         newStatus = "paid";
         break;
+
       case "order.payment_failed":
       case "charge.payment_failed":
         newStatus = "payment_failed";
         break;
+
       case "order.canceled":
-      case "charge.refunded":
         newStatus = "canceled";
         break;
+
+      case "charge.refunded":
+        newStatus = "refunded";
+        break;
+
       case "charge.chargedback":
         newStatus = "chargedback";
         break;
+
       default:
         newStatus = "pending";
         break;
     }
 
     if (localOrderId) {
-      await supabase
+      const { error: updateError } = await supabase
         .from("orders")
         .update({
           payment_status: newStatus,
@@ -66,29 +100,31 @@ export default async (req: Request) => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", localOrderId);
+
+      if (updateError) {
+        throw updateError;
+      }
     }
 
-    return json({ ok: true });
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        ok: true,
+        received: true,
+        eventType,
+        localOrderId,
+      }),
+    };
   } catch (error: any) {
-    return json(
-      { error: "Erro ao processar webhook", details: error?.message || String(error) },
-      500
-    );
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        ok: false,
+        error: "Erro ao processar webhook",
+        details: error?.message || String(error),
+      }),
+    };
   }
 };
-
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Content-Type": "application/json",
-  };
-}
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: corsHeaders(),
-  });
-}

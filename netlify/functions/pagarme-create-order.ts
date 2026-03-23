@@ -1,153 +1,426 @@
 // netlify/functions/pagarme-create-order.ts
-export default async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("", {
-      status: 204,
-      headers: corsHeaders(),
-    });
+import type { Handler } from "@netlify/functions";
+
+type PaymentMethod = "pix" | "boleto" | "credit_card" | "debit_card";
+
+type AddressInput = {
+  line1?: string;
+  line2?: string;
+  zipCode?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+};
+
+type CustomerInput = {
+  name: string;
+  email: string;
+  document?: string;
+  type?: "individual" | "company";
+  phone?: string;
+  address?: AddressInput;
+};
+
+type ItemInput = {
+  code?: string;
+  description: string;
+  amount: number; // centavos
+  quantity?: number;
+};
+
+type ShippingInput = {
+  amount: number; // centavos
+  description?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  address?: AddressInput;
+};
+
+type CardRawInput = {
+  number: string;
+  holderName: string;
+  expMonth: number;
+  expYear: number;
+  cvv: string;
+};
+
+type CardPaymentInput = {
+  installments?: number;
+  statementDescriptor?: string;
+  operationType?: "auth_and_capture" | "auth_only" | "pre_auth";
+  recurrenceCycle?: "first" | "subsequent";
+  recurrence?: boolean;
+  cardId?: string;
+  cardToken?: string;
+  // SOMENTE se você for PCI ou estiver em ambiente de teste controlado:
+  card?: CardRawInput;
+  billingAddress?: AddressInput;
+  authentication?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+type PixInput = {
+  expiresIn?: number;
+  additionalInformation?: Array<{ name: string; value: string }>;
+};
+
+type BoletoInput = {
+  bank?: string;
+  instructions?: string;
+  dueAt?: string; // ISO
+  documentNumber?: string;
+  type?: "DM" | "BDP";
+  statementDescriptor?: string;
+  interest?: {
+    days: number;
+    type: "flat" | "percentage";
+    amount: number;
+  };
+  fine?: {
+    days: number;
+    type: "flat" | "percentage";
+    amount: number;
+  };
+  metadata?: Record<string, unknown>;
+};
+
+type CreateOrderBody = {
+  orderId?: string;
+  paymentMethod: PaymentMethod;
+  customer: CustomerInput;
+  items: ItemInput[];
+  shipping?: ShippingInput;
+  metadata?: Record<string, unknown>;
+  pix?: PixInput;
+  boleto?: BoletoInput;
+  creditCard?: CardPaymentInput;
+  debitCard?: CardPaymentInput;
+};
+
+const defaultHeaders = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+export const handler: Handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 204,
+      headers: defaultHeaders,
+      body: "",
+    };
   }
 
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
+  if (event.httpMethod !== "POST") {
+    return json(405, { ok: false, error: "Method not allowed" });
   }
 
   try {
-    const secretKey = Deno.env.get("PAGARME_SECRET_KEY");
+    const secretKey = process.env.PAGARME_SECRET_KEY;
     if (!secretKey) {
-      return json({ error: "PAGARME_SECRET_KEY não configurada" }, 500);
+      return json(500, {
+        ok: false,
+        error: "PAGARME_SECRET_KEY não configurada",
+      });
     }
 
-    const body = await req.json();
+    const body = safeJson<CreateOrderBody>(event.body);
+    validateBaseBody(body);
 
-    const {
-      orderId,
-      customer,
-      items,
-      shippingAmount = 0,
-      discountAmount = 0,
-      pixExpiresInSeconds = 1800,
-    } = body ?? {};
+    const payload = buildOrderPayload(body);
 
-    if (!orderId) return json({ error: "orderId é obrigatório" }, 400);
-    if (!customer?.name) return json({ error: "customer.name é obrigatório" }, 400);
-    if (!customer?.email) return json({ error: "customer.email é obrigatório" }, 400);
-    if (!Array.isArray(items) || items.length === 0) {
-      return json({ error: "items é obrigatório" }, 400);
-    }
-
-    const pagarmeItems = items.map((item: any) => ({
-      amount: Number(item.amount), // centavos
-      description: String(item.description),
-      quantity: Number(item.quantity ?? 1),
-      code: item.code ? String(item.code) : undefined,
-    }));
-
-    const payload = {
-      code: String(orderId),
-      customer: {
-        name: String(customer.name),
-        email: String(customer.email),
-        type: "individual",
-        document: digitsOnly(customer.document || ""),
-        phones: customer.phone
-          ? {
-              mobile_phone: {
-                country_code: "55",
-                area_code: digitsOnly(customer.phone).slice(0, 2),
-                number: digitsOnly(customer.phone).slice(2),
-              },
-            }
-          : undefined,
-      },
-      items: pagarmeItems,
-      shipping: shippingAmount > 0
-        ? {
-            amount: Number(shippingAmount),
-            description: "Frete",
-          }
-        : undefined,
-      payments: [
-        {
-          payment_method: "pix",
-          pix: {
-            expires_in: Number(pixExpiresInSeconds),
-            additional_information: [
-              {
-                name: "Pedido",
-                value: String(orderId),
-              },
-            ],
-          },
-          amount:
-            pagarmeItems.reduce((acc: number, item: any) => acc + item.amount * item.quantity, 0) +
-            Number(shippingAmount) -
-            Number(discountAmount),
-        },
-      ],
-      metadata: {
-        local_order_id: String(orderId),
-      },
-    };
-
-    const auth = "Basic " + btoa(`${secretKey}:`);
+    const auth = Buffer.from(`${secretKey}:`).toString("base64");
 
     const pagarmeRes = await fetch("https://api.pagar.me/core/v5/orders", {
       method: "POST",
       headers: {
-        Authorization: auth,
+        Authorization: `Basic ${auth}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
     });
 
-    const data = await pagarmeRes.json();
+    const data = await pagarmeRes.json().catch(() => null);
 
     if (!pagarmeRes.ok) {
-      return json(
-        {
-          error: "Erro ao criar pedido na Pagar.me",
-          pagarme_status: pagarmeRes.status,
-          details: data,
-        },
-        400
-      );
+      return json(400, {
+        ok: false,
+        error: "Erro ao criar pedido na Pagar.me",
+        pagarmeStatus: pagarmeRes.status,
+        details: data,
+        sentPayload: payload,
+      });
     }
 
-    // Salve no Supabase aqui, se quiser
-    // Ex.: provider_order_id, provider_status, payload
-
-    return json({
+    return json(200, {
       ok: true,
-      provider: "pagarme",
       order: data,
     });
   } catch (error: any) {
-    return json(
-      {
-        error: "Erro interno",
-        details: error?.message || String(error),
-      },
-      500
-    );
+    return json(500, {
+      ok: false,
+      error: error?.message || "Erro interno",
+    });
   }
 };
 
-function digitsOnly(value: string) {
-  return String(value || "").replace(/\D/g, "");
+function buildOrderPayload(body: CreateOrderBody) {
+  const customer = mapCustomer(body.customer);
+  const items = body.items.map(mapItem);
+  const shipping = body.shipping ? mapShipping(body.shipping) : undefined;
+  const metadata = {
+    ...(body.metadata || {}),
+    ...(body.orderId ? { local_order_id: String(body.orderId) } : {}),
+  };
+
+  const payment = buildPayment(body);
+
+  return removeUndefined({
+    code: body.orderId ? String(body.orderId) : undefined,
+    customer,
+    items,
+    shipping,
+    payments: [payment],
+    metadata,
+  });
 }
 
-function corsHeaders() {
+function buildPayment(body: CreateOrderBody) {
+  switch (body.paymentMethod) {
+    case "pix":
+      return buildPixPayment(body);
+    case "boleto":
+      return buildBoletoPayment(body);
+    case "credit_card":
+      return buildCreditCardPayment(body);
+    case "debit_card":
+      return buildDebitCardPayment(body);
+    default:
+      throw new Error("paymentMethod inválido");
+  }
+}
+
+function buildPixPayment(body: CreateOrderBody) {
+  return removeUndefined({
+    payment_method: "pix",
+    pix: {
+      expires_in: body.pix?.expiresIn ?? 1800,
+      additional_information:
+        body.pix?.additionalInformation ??
+        (body.orderId
+          ? [{ name: "Pedido", value: String(body.orderId) }]
+          : undefined),
+    },
+  });
+}
+
+function buildBoletoPayment(body: CreateOrderBody) {
+  const boleto = body.boleto || {};
+
+  return removeUndefined({
+    payment_method: "boleto",
+    boleto: removeUndefined({
+      bank: boleto.bank,
+      instructions: boleto.instructions || "Pagar até o vencimento",
+      due_at: boleto.dueAt,
+      document_number: boleto.documentNumber || body.orderId,
+      type: boleto.type || "DM",
+      statement_descriptor: boleto.statementDescriptor,
+      interest: boleto.interest,
+      fine: boleto.fine,
+      metadata: boleto.metadata,
+    }),
+  });
+}
+
+function buildCreditCardPayment(body: CreateOrderBody) {
+  const c = body.creditCard;
+  if (!c) throw new Error("creditCard é obrigatório para paymentMethod=credit_card");
+
+  return removeUndefined({
+    payment_method: "credit_card",
+    credit_card: removeUndefined({
+      installments: c.installments ?? 1,
+      statement_descriptor: c.statementDescriptor,
+      operation_type: c.operationType ?? "auth_and_capture",
+      recurrence_cycle: c.recurrenceCycle,
+      authentication: c.authentication,
+      metadata: c.metadata,
+      ...resolveCardSource(c),
+    }),
+  });
+}
+
+function buildDebitCardPayment(body: CreateOrderBody) {
+  const d = body.debitCard;
+  if (!d) throw new Error("debitCard é obrigatório para paymentMethod=debit_card");
+
+  return removeUndefined({
+    payment_method: "debit_card",
+    debit_card: removeUndefined({
+      installments: d.installments ?? 1,
+      statement_descriptor: d.statementDescriptor,
+      recurrence: d.recurrence ?? false,
+      authentication: d.authentication,
+      metadata: d.metadata,
+      ...resolveCardSource(d),
+    }),
+  });
+}
+
+function resolveCardSource(input: CardPaymentInput) {
+  const hasCardId = !!input.cardId;
+  const hasCardToken = !!input.cardToken;
+  const hasRawCard = !!input.card;
+
+  const count = [hasCardId, hasCardToken, hasRawCard].filter(Boolean).length;
+  if (count !== 1) {
+    throw new Error(
+      "Envie exatamente uma fonte de cartão: cardId OU cardToken OU card"
+    );
+  }
+
+  if (input.cardId) {
+    return { card_id: input.cardId };
+  }
+
+  if (input.cardToken) {
+    // Observação prática:
+    // a doc diz que billing address não é tokenizado.
+    // Se a sua conta exigir ajuste extra nesse ponto, você verá o erro
+    // retornado pela Pagar.me em `details`.
+    return { card_token: input.cardToken };
+  }
+
   return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Content-Type": "application/json",
+    card: removeUndefined({
+      number: onlyDigits(input.card!.number),
+      holder_name: input.card!.holderName,
+      exp_month: Number(input.card!.expMonth),
+      exp_year: Number(input.card!.expYear),
+      cvv: String(input.card!.cvv),
+      billing_address: input.billingAddress
+        ? mapAddress(input.billingAddress)
+        : undefined,
+    }),
   };
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: corsHeaders(),
+function mapCustomer(customer: CustomerInput) {
+  const phoneDigits = onlyDigits(customer.phone || "");
+  const areaCode = phoneDigits.length >= 10 ? phoneDigits.slice(0, 2) : undefined;
+  const number = phoneDigits.length >= 10 ? phoneDigits.slice(2) : undefined;
+
+  return removeUndefined({
+    name: customer.name,
+    email: customer.email,
+    document: customer.document ? onlyDigits(customer.document) : undefined,
+    type: customer.type || "individual",
+    address: customer.address ? mapAddress(customer.address) : undefined,
+    phones:
+      areaCode && number
+        ? {
+            mobile_phone: {
+              country_code: "55",
+              area_code: areaCode,
+              number,
+            },
+          }
+        : undefined,
   });
+}
+
+function mapShipping(shipping: ShippingInput) {
+  const phoneDigits = onlyDigits(shipping.recipientPhone || "");
+
+  return removeUndefined({
+    amount: Number(shipping.amount),
+    description: shipping.description || "Frete",
+    recipient_name: shipping.recipientName,
+    recipient_phone: phoneDigits || undefined,
+    address: shipping.address ? mapAddress(shipping.address) : undefined,
+  });
+}
+
+function mapItem(item: ItemInput) {
+  if (!item.description) throw new Error("Todo item precisa de description");
+  if (!Number.isFinite(Number(item.amount))) {
+    throw new Error(`amount inválido no item ${item.description}`);
+  }
+
+  return {
+    code: item.code || slugify(item.description),
+    description: item.description,
+    amount: Number(item.amount),
+    quantity: Number(item.quantity || 1),
+  };
+}
+
+function mapAddress(address: AddressInput) {
+  return removeUndefined({
+    line_1: address.line1,
+    line_2: address.line2,
+    zip_code: onlyDigits(address.zipCode || ""),
+    city: address.city,
+    state: address.state,
+    country: address.country || "BR",
+  });
+}
+
+function validateBaseBody(body: CreateOrderBody) {
+  if (!body) throw new Error("Body inválido");
+  if (!body.paymentMethod) throw new Error("paymentMethod é obrigatório");
+  if (!body.customer?.name) throw new Error("customer.name é obrigatório");
+  if (!body.customer?.email) throw new Error("customer.email é obrigatório");
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    throw new Error("items é obrigatório");
+  }
+}
+
+function safeJson<T>(raw: string | null): T {
+  if (!raw) throw new Error("Body vazio");
+  return JSON.parse(raw) as T;
+}
+
+function onlyDigits(value: string) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function slugify(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
+function removeUndefined<T extends Record<string, any>>(obj: T): T {
+  const out: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) continue;
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const nested = removeUndefined(value);
+      if (Object.keys(nested).length === 0) continue;
+      out[key] = nested;
+      continue;
+    }
+
+    out[key] = value;
+  }
+
+  return out as T;
+}
+
+function json(statusCode: number, body: unknown) {
+  return {
+    statusCode,
+    headers: defaultHeaders,
+    body: JSON.stringify(body),
+  };
 }
