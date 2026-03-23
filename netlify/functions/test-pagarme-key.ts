@@ -1,7 +1,7 @@
 // netlify/functions/test-pagarme-key.ts
 export default async () => {
   try {
-    const key = Deno.env.get("PAGARME_SECRET_KEY");
+    const key = process.env.PAGARME_SECRET_KEY;
 
     return new Response(
       JSON.stringify({
