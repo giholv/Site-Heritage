@@ -22,6 +22,7 @@ import AdminProductEdit from "./pages/admin/AdminProductEdit";
 import AdminProductCreate from "./pages/admin/AdminProductCreate";
 import AdminSuppliersPage from "./pages/admin/AdminSuppliers";
 import AdminCategoryImagesPage from "./pages/admin/AdminCategoryImagesPage";
+import AdminStockLocations from "./pages/admin/AdminStockLocations";
 
 import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
 
@@ -65,7 +66,7 @@ export default function App() {
         <Route path="/produto/:slug" element={<ProductPage />} />
         <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />
 
-        <Route path="/admin" element={<AdminGuard />}>node -v
+        <Route path="/admin" element={<AdminGuard />}>
           <Route element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="produtos" element={<AdminProducts />} />
@@ -73,6 +74,7 @@ export default function App() {
             <Route path="produtos/:productId" element={<AdminProductEdit />} />
             <Route path="fornecedores" element={<AdminSuppliersPage />} />
             <Route path="catalogo/imagens" element={<AdminCategoryImagesPage />} />
+            <Route path="estoques" element={<AdminStockLocations />} />
           </Route>
         </Route>
 
