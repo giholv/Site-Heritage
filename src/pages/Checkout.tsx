@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
+import CombineWith from "../components/CombineWith";
 
 const CALEA = {
   primary: "#2b554e",
@@ -382,6 +383,8 @@ export default function Checkout() {
                     ))}
                   </div>
                 )}
+
+                                {items.length > 0 && <CombineWith items={items} />}
 
                 {items.length > 0 && (
                   <div className="mt-6 rounded-[22px] border border-[#eadfce] bg-[#fcfaf6] p-4 sm:p-5">

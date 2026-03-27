@@ -100,6 +100,7 @@ const NAV: NavItem[] = [
   { to: "/admin/fornecedores", label: "Fornecedores", icon: <IconTruck /> },
   { to: "/admin/clientes", label: "Clientes", icon: <IconUsers /> },
   { to: "/admin/catalogo/imagens", label: "Imagens do Catálogo", icon: <IconGrid /> },
+  { to: "/admin/vendas-externas", label: "Vendas Externas", icon: <IconGrid /> },
 ];
 
 export default function AdminLayout() {
