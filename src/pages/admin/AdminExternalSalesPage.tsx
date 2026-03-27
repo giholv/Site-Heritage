@@ -15,31 +15,7 @@ type ItemForm = {
   unit_price_cents: number;
 };
 
-const CHANNELS = [
-  { value: "whatsapp", label: "WhatsApp" },
-  { value: "instagram", label: "Instagram" },
-  { value: "store", label: "Loja física" },
-  { value: "phone", label: "Telefone" },
-  { value: "marketplace", label: "Marketplace" },
-  { value: "other", label: "Outro" },
-];
-
-const STATUS = [
-  { value: "draft", label: "Orçamento" },
-  { value: "pending_payment", label: "Aguardando pagamento" },
-  { value: "paid", label: "Pago" },
-  { value: "shipped", label: "Enviado" },
-  { value: "delivered", label: "Entregue" },
-  { value: "cancelled", label: "Cancelado" },
-];
-
-const PAYMENT_METHODS = [
-  { value: "pix", label: "PIX" },
-  { value: "credit_card", label: "Cartão de crédito" },
-  { value: "debit_card", label: "Cartão de débito" },
-  { value: "cash", label: "Dinheiro" },
-  { value: "transfer", label: "Transferência" },
-];
+const EXTERNAL_CUSTOMER_ID = "eb7f3257-8420-440d-8636-882135c0c918";
 
 function moneyToCents(value: string) {
   const clean = value.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
@@ -109,7 +85,9 @@ export default function AdminExternalSalesPage() {
   }
 
   function updateItem(index: number, patch: Partial<ItemForm>) {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, ...patch } : item))
+    );
   }
 
   function addItem() {
@@ -136,13 +114,20 @@ export default function AdminExternalSalesPage() {
       setLoading(true);
 
       const validItems = items.filter((i) => i.sku_id && i.qty > 0);
-      if (!form.external_customer_name.trim()) throw new Error("Informe o nome do cliente.");
-      if (!validItems.length) throw new Error("Adicione ao menos 1 item.");
+
+      if (!form.external_customer_name.trim()) {
+        throw new Error("Informe o nome do cliente.");
+      }
+
+      if (!validItems.length) {
+        throw new Error("Adicione ao menos 1 item.");
+      }
 
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData.user?.id ?? null;
 
       const orderPayload = {
+        customer_id: EXTERNAL_CUSTOMER_ID,
         origin: "external",
         sales_channel: form.sales_channel,
         status: form.status,
@@ -168,19 +153,12 @@ export default function AdminExternalSalesPage() {
 
       if (orderError) throw orderError;
 
-      const orderItemsPayload = validItems.map((item) => {
-        const sku = skus.find((s) => s.id === item.sku_id);
-        return {
-          order_id: order.id,
-          sku_id: item.sku_id,
-          quantity: item.qty,
-          unit_price_cents: item.unit_price_cents,
-          line_total_cents: item.qty * item.unit_price_cents,
-          product_name: sku?.product_name ?? null,
-          sku_code: sku?.sku_code ?? null,
-          variant_name: sku?.variant_name ?? null,
-        };
-      });
+      const orderItemsPayload = validItems.map((item) => ({
+        order_id: order.id,
+        sku_id: item.sku_id,
+        quantity: item.qty,
+        unit_price_cents: item.unit_price_cents,
+      }));
 
       const { error: itemsError } = await supabase
         .from("order_items")
@@ -223,9 +201,9 @@ export default function AdminExternalSalesPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-neutral-200 p-5 space-y-5">
-            <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid lg:grid-cols-[1fr_360px] gap-6">
+          <div className="bg-white rounded-2xl border border-neutral-200 p-5 space-y-6">
+            <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm mb-1">Canal</label>
                 <select
@@ -233,9 +211,12 @@ export default function AdminExternalSalesPage() {
                   value={form.sales_channel}
                   onChange={(e) => setForm({ ...form, sales_channel: e.target.value })}
                 >
-                  {CHANNELS.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="store">Loja</option>
+                  <option value="phone">Telefone</option>
+                  <option value="marketplace">Marketplace</option>
+                  <option value="other">Outro</option>
                 </select>
               </div>
 
@@ -246,23 +227,24 @@ export default function AdminExternalSalesPage() {
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value })}
                 >
-                  {STATUS.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
+                  <option value="draft">Rascunho</option>
+                  <option value="pending_payment">Pendente pagamento</option>
+                  <option value="paid">Pago</option>
+                  <option value="processing">Em processamento</option>
+                  <option value="shipped">Enviado</option>
+                  <option value="delivered">Entregue</option>
+                  <option value="canceled">Cancelado</option>
+                  <option value="refunded">Reembolsado</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm mb-1">Forma de pagamento</label>
-                <select
+                <input
                   className="w-full rounded-xl border px-3 py-2"
                   value={form.payment_method}
                   onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
-                >
-                  {PAYMENT_METHODS.map((p) => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>
@@ -273,34 +255,48 @@ export default function AdminExternalSalesPage() {
                   onChange={(e) => setForm({ ...form, seller_name: e.target.value })}
                 />
               </div>
-            </div>
 
-            <div className="border-t pt-5">
-              <h2 className="font-medium mb-3">Cliente</h2>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm mb-1">Nome do cliente</label>
                 <input
                   className="w-full rounded-xl border px-3 py-2"
-                  placeholder="Nome do cliente"
                   value={form.external_customer_name}
-                  onChange={(e) => setForm({ ...form, external_customer_name: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, external_customer_name: e.target.value })
+                  }
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1">Telefone</label>
                 <input
                   className="w-full rounded-xl border px-3 py-2"
-                  placeholder="Telefone"
                   value={form.external_customer_phone}
-                  onChange={(e) => setForm({ ...form, external_customer_phone: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, external_customer_phone: e.target.value })
+                  }
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1">E-mail</label>
                 <input
                   className="w-full rounded-xl border px-3 py-2"
-                  placeholder="E-mail"
                   value={form.external_customer_email}
-                  onChange={(e) => setForm({ ...form, external_customer_email: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, external_customer_email: e.target.value })
+                  }
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1">Documento</label>
                 <input
                   className="w-full rounded-xl border px-3 py-2"
-                  placeholder="CPF"
                   value={form.external_customer_document}
-                  onChange={(e) => setForm({ ...form, external_customer_document: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, external_customer_document: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -313,30 +309,32 @@ export default function AdminExternalSalesPage() {
                   onClick={addItem}
                   className="rounded-xl border px-3 py-2 text-sm"
                 >
-                  + Adicionar item
+                  Adicionar item
                 </button>
               </div>
 
               <div className="space-y-3">
                 {items.map((item, index) => (
-                  <div key={index} className="grid gap-3 md:grid-cols-12">
+                  <div key={index} className="grid md:grid-cols-12 gap-3">
                     <div className="md:col-span-6">
                       <select
                         className="w-full rounded-xl border px-3 py-2"
                         value={item.sku_id}
                         onChange={(e) => {
-                          const sku = skus.find((s) => s.id === e.target.value);
+                          const skuId = e.target.value;
+                          const sku = skus.find((s) => s.id === skuId);
+
                           updateItem(index, {
-                            sku_id: e.target.value,
+                            sku_id: skuId,
                             unit_price_cents: sku?.price_cents ?? 0,
                           });
                         }}
                       >
-                        <option value="">Selecione o SKU</option>
+                        <option value="">Selecione um SKU</option>
                         {skus.map((sku) => (
                           <option key={sku.id} value={sku.id}>
-                            {sku.sku_code} — {sku.product_name}
-                            {sku.variant_name ? ` / ${sku.variant_name}` : ""}
+                            {sku.sku_code} - {sku.product_name}
+                            {sku.variant_name ? ` - ${sku.variant_name}` : ""}
                           </option>
                         ))}
                       </select>
@@ -348,7 +346,9 @@ export default function AdminExternalSalesPage() {
                         min={1}
                         className="w-full rounded-xl border px-3 py-2"
                         value={item.qty}
-                        onChange={(e) => updateItem(index, { qty: Number(e.target.value) || 1 })}
+                        onChange={(e) =>
+                          updateItem(index, { qty: Number(e.target.value) || 1 })
+                        }
                       />
                     </div>
 
@@ -357,7 +357,9 @@ export default function AdminExternalSalesPage() {
                         className="w-full rounded-xl border px-3 py-2"
                         value={(item.unit_price_cents / 100).toFixed(2).replace(".", ",")}
                         onChange={(e) =>
-                          updateItem(index, { unit_price_cents: moneyToCents(e.target.value) })
+                          updateItem(index, {
+                            unit_price_cents: moneyToCents(e.target.value),
+                          })
                         }
                       />
                     </div>
