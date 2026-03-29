@@ -27,6 +27,10 @@ import AdminStockLocations from "./pages/admin/AdminStockLocations";
 
 import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
 import AdminExternalSalesPage from "./pages/admin/AdminExternalSalesPage";
+import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
+import AdminCustomersPage from "./pages/admin/AdminCustomersPage";
+import AdminProductsPage from "./pages/admin/AdminProductsPage";
+import AdminOrdersKanban from "./pages/admin/AdminOrdersKanban";
 
 
 function ScrollToHash() {
@@ -80,6 +84,10 @@ export default function App() {
             <Route path="catalogo/imagens" element={<AdminCategoryImagesPage />} />
             <Route path="estoques" element={<AdminStockLocations />} />
             <Route path="vendas-externas" element={<AdminExternalSalesPage />} />
+            <Route path="orders" element={<AdminOrdersPage />} />
+            <Route path="customers" element={<AdminCustomersPage />} />
+            <Route path="products" element={<AdminProductsPage />} />
+            <Route path="/admin/pedidos" element={<AdminOrdersKanban />} />
           </Route>
         </Route>
 
