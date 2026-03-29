@@ -13,7 +13,7 @@ import CookieBanner from "./components/CookieBanner";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import EsqueciSenhaPage from "./pages/EsqueciSenhaPage";
 import RedefinirSenhaPage from "./pages/RedefinirSenhaPage";
-
+import ContaPage from "./pages/users/conta_page";
 // ADMIN
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -31,6 +31,8 @@ import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
 import AdminCustomersPage from "./pages/admin/AdminCustomersPage";
 import AdminProductsPage from "./pages/admin/AdminProductsPage";
 import AdminOrdersKanban from "./pages/admin/AdminOrdersKanban";
+import MinhaContaRedirect from "./pages/MinhaContaRedirect";
+
 
 
 function ScrollToHash() {
@@ -61,8 +63,11 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/cadastro" element={<CadastroUsuariosPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/minha-conta" element={<MinhaContaRedirect />} />
+        <Route path="/conta" element={<ContaPage />} />
         <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
         <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
+
 
         <Route path="/carrinho" element={<div className="p-6">Carrinho</div>} />
         <Route path="/checkout" element={<Checkout />} />
