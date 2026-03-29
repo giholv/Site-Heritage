@@ -34,7 +34,7 @@ const MOV_TYPES: Array<{ value: string; label: string }> = [
   { value: "out", label: "Saída" },
   { value: "adjust", label: "Ajuste (+/-)" },
   { value: "reserve", label: "Reserva" },
-  { value: "release", label: "Libera reserva" },
+  { value: "unreserve", label: "Libera reserva" },
 ];
 
 function cx(...v: Array<string | false | null | undefined>) {
@@ -63,7 +63,7 @@ function computeFromMovements(rows: Array<Pick<MovementRow, "type" | "quantity">
     else if (t === "out" || t === "saida") total -= q;
     else if (t === "adjust" || t === "ajuste") total += q;
     else if (t === "reserve" || t === "reserva") reserved += q;
-    else if (t === "release" || t === "libera_reserva") reserved -= q;
+    else if (t === "unreserve" || t === "release" || t === "libera_reserva") reserved -= q;;
   }
 
   const available = total - reserved;
