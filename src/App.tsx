@@ -87,7 +87,7 @@ export default function App() {
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="customers" element={<AdminCustomersPage />} />
             <Route path="products" element={<AdminProductsPage />} />
-            <Route path="/admin/pedidos" element={<AdminOrdersKanban />} />
+            <Route path="kanban" element={<AdminOrdersKanban />} />
           </Route>
         </Route>
 
