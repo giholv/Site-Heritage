@@ -6,7 +6,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
 
-const SKU_IMAGES_BUCKET = "product-images"; // troque se necessário
+const SKU_IMAGES_BUCKET = "product-images";
 
 const FALLBACK_IMAGE =
   "data:image/svg+xml;utf8," +
@@ -46,6 +46,15 @@ type SkuImageRow = {
   is_primary: boolean;
 };
 
+export type ShippingOption = {
+  id: string;
+  name: string;
+  price: number;
+  deadline: string;
+  original_price?: number;
+  posting_type?: string;
+};
+
 function resolveImageUrl(path: string) {
   if (!path) return FALLBACK_IMAGE;
 
@@ -62,8 +71,12 @@ function resolveImageUrl(path: string) {
   return data.publicUrl || FALLBACK_IMAGE;
 }
 
+function onlyDigits(v: string) {
+  return String(v ?? "").replace(/\D/g, "");
+}
+
 function formatCep(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 8);
+  const digits = onlyDigits(value).slice(0, 8);
 
   return digits
     .replace(/^(\d{5})(\d)/, "$1-$2")
@@ -85,11 +98,19 @@ export default function ProductPage() {
 
   const [quantity, setQuantity] = useState(1);
   const [postalCode, setPostalCode] = useState("");
-  const [shippingText, setShippingText] = useState("");
+
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState("");
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
+  const [selectedShippingId, setSelectedShippingId] = useState("");
 
   const selectedSku = useMemo(() => {
     return skus.find((sku) => sku.id === selectedSkuId) ?? skus[0] ?? null;
   }, [skus, selectedSkuId]);
+
+  const selectedShipping = useMemo(() => {
+    return shippingOptions.find((op) => op.id === selectedShippingId) ?? null;
+  }, [shippingOptions, selectedShippingId]);
 
   const variants = useMemo(() => {
     return skus.map((sku, index) => ({
@@ -218,7 +239,16 @@ export default function ProductPage() {
 
   useEffect(() => {
     setQuantity(1);
+    setShippingError("");
+    setShippingOptions([]);
+    setSelectedShippingId("");
   }, [selectedSkuId]);
+
+  useEffect(() => {
+    setShippingError("");
+    setShippingOptions([]);
+    setSelectedShippingId("");
+  }, [postalCode, quantity]);
 
   function addCurrentItemToCart() {
     if (!product || !selectedSku) return;
@@ -246,14 +276,78 @@ export default function ProductPage() {
   }
 
   async function handleCalculateShipping() {
-    const cep = postalCode.replace(/\D/g, "");
+    const cleanCep = onlyDigits(postalCode);
 
-    if (cep.length !== 8) {
-      setShippingText("Digite um CEP válido com 8 números.");
+    if (cleanCep.length !== 8) {
+      setShippingError("CEP inválido. Digite os 8 números.");
+      setShippingOptions([]);
+      setSelectedShippingId("");
       return;
     }
 
-    setShippingText(`Entrega calculada para o CEP ${formatCep(cep)}.`);
+    if (!selectedSku) {
+      setShippingError("Selecione uma variação do produto.");
+      setShippingOptions([]);
+      setSelectedShippingId("");
+      return;
+    }
+
+    setShippingLoading(true);
+    setShippingError("");
+    setShippingOptions([]);
+    setSelectedShippingId("");
+
+    try {
+      const totalWeight = Math.max(0.03, 0.03 * quantity);
+
+      const payload = {
+        to_postcode: cleanCep,
+        insurance_value: 0,
+        weight: Number(totalWeight.toFixed(2)),
+        services: "1,2,17,3",
+      };
+
+      const res = await fetch("/.netlify/functions/shipping-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const text = await res.text();
+      let data: any = {};
+
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        const msg =
+          data?.error ||
+          data?.details?.error ||
+          `Falha ao calcular frete (${res.status})`;
+
+        throw new Error(msg);
+      }
+
+      const opts: ShippingOption[] = Array.isArray(data?.options)
+        ? data.options
+        : [];
+
+      setShippingOptions(opts);
+
+      if (!opts.length) {
+        setShippingError("Nenhuma opção de frete encontrada para esse CEP.");
+        return;
+      }
+
+      setSelectedShippingId(opts[0].id);
+    } catch (e: any) {
+      setShippingError(e?.message ?? "Erro ao calcular frete.");
+    } finally {
+      setShippingLoading(false);
+    }
   }
 
   if (loading) {
@@ -273,6 +367,7 @@ export default function ProductPage() {
       <div className="mb-6">
         <Header />
       </div>
+
       <main className="pt-[160px] md:pt-[180px]">
         <section
           className="mx-auto max-w-7xl px-4 pb-8 md:px-6 lg:px-8"
@@ -299,11 +394,15 @@ export default function ProductPage() {
             postalCode={postalCode}
             onPostalCodeChange={(value) => setPostalCode(formatCep(value))}
             onCalculateShipping={handleCalculateShipping}
-            shippingText={shippingText}
+            shippingLoading={shippingLoading}
+            shippingError={shippingError}
+            shippingOptions={shippingOptions}
+            selectedShippingId={selectedShippingId}
+            onSelectShipping={setSelectedShippingId}
           />
-
         </section>
       </main>
+
       <Footer />
     </div>
   );
