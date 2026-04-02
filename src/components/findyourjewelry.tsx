@@ -102,14 +102,13 @@ export default function EncontreSuaJoia() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <div className="text-xs tracking-[0.18em] text-black/45 uppercase">Catálogo</div>
-            <h2 className="mt-2 text-3xl md:text-4xl font-semibold text-[#2b554e]">
+            <h2 className="mt-2 text-[28px] leading-tight md:text-4xl font-semibold text-[#2b554e]">
               Encontre sua joia
             </h2>
             <div className="mt-3 h-[2px] w-20 bg-[#b08d57] rounded-full" />
-            <p className="mt-3 text-sm text-black/55">
+            <p className="mt-3 text-[13px] md:text-sm text-black/55 max-w-[260px] md:max-w-none">
               Selecione uma categoria para ver todas as peças.
             </p>
-
             {err && <div className="mt-3 text-sm text-red-600">Erro: {err}</div>}
           </div>
 
@@ -149,14 +148,14 @@ export default function EncontreSuaJoia() {
 
           <div
             ref={scrollerRef}
-            className="flex gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pr-2
-                       [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex gap-3 md:gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 px-4 md:px-0
+             [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {loading &&
               Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={`sk-${i}`}
-                  className="snap-start shrink-0 w-[260px] md:w-[300px] rounded-3xl overflow-hidden border border-black/10 bg-white/80 animate-pulse"
+                  className="snap-center shrink-0 w-[78vw] max-w-[280px] md:w-[300px] rounded-[28px] overflow-hidden border border-black/10 bg-white/80 animate-pulse"
                 >
                   <div className="aspect-[4/3] bg-black/5" />
                   <div className="p-4">
@@ -172,10 +171,10 @@ export default function EncontreSuaJoia() {
                 return (
                   <Link
                     key={c.id}
-                    to={`/joias/categoria/${c.slug}`}
-                    className="snap-start shrink-0 w-[260px] md:w-[300px] group rounded-3xl overflow-hidden border border-black/10 bg-white/80 shadow-sm hover:shadow-md transition"
+                    to={`/joias/categoria/${c.slug}`} className="snap-center shrink-0 w-[78vw] max-w-[280px] md:w-[300px] group rounded-[28px] overflow-hidden border border-black/10 bg-white/80 shadow-sm hover:shadow-md transition"
+
                   >
-                    <div className="aspect-[4/3] bg-black/5">
+                    <div className="aspect-[4/3.2] md:aspect-[4/3] bg-black/5">
                       {img ? (
                         <img
                           src={img}
@@ -186,10 +185,12 @@ export default function EncontreSuaJoia() {
                       ) : null}
                     </div>
 
-                    <div className="p-4 flex items-center justify-between">
+                    <div className="p-3.5 md:p-4 flex items-center justify-between">
                       <div>
-                        <div className="font-semibold text-[#2b554e]">{c.name}</div>
-                        <div className="mt-1 text-xs text-black/50">Ver peças</div>
+                        <div className="font-semibold text-[15px] md:text-base text-[#2b554e] leading-tight">
+                          {c.name}
+                        </div>
+                        <div className="mt-1 text-[11px] md:text-xs text-black/50">Ver peças</div>
                       </div>
                       <ChevronRight className="h-5 w-5 text-[#2b554e]/40" />
                     </div>

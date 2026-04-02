@@ -231,7 +231,7 @@ export default function Checkout() {
     <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
       <Header />
 
-      <main>
+      <main className="pt-[160px] md:pt-[180px]">
         <section className="border-b" style={{ borderColor: CALEA.line }}>
           <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
             <div className="text-center">

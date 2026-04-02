@@ -561,7 +561,7 @@ export default function JewelryListing() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
       <Header searchValue={qText} onSearchChange={setQueryParam} onSearchSubmit={setQueryParam} />
-
+<main className="pt-[160px] md:pt-[180px]">
 
 
       {/* HERO */}
@@ -772,6 +772,7 @@ export default function JewelryListing() {
           </div>
         </div>
       )}
+      </main>
     </div>
   );
 }

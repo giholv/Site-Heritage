@@ -116,9 +116,22 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
 
   return (
     <>
-      <header className="sticky top-0 left-0 w-full z-50">
+      <header
+        className={[
+          "fixed top-0 left-0 w-full z-50 transition-all duration-300",
+          scrolled ? "backdrop-blur-xl" : "",
+        ].join(" ")}
+      >
         {/* TOP BAR */}
-        <div className="bg-[#2b554e] text-[#f3f0e0] border-b border-white/10">
+        <div
+          className={[
+            "text-[#f3f0e0] border-b border-white/10 transition-all duration-300",
+            scrolled
+              ? "bg-[#2b554e]/95 shadow-sm"
+              : "bg-[#2b554e]",
+          ].join(" ")}
+
+        >
           <div className="container mx-auto px-3 md:px-6 h-9 md:h-10 flex items-center justify-center">
             <span className="text-[12px] md:text-[14px] lg:text-[15px] opacity-95 text-center leading-none">
               Frete grátis a partir de <strong>R$699</strong> • 5% OFF no PIX • Troca fácil
@@ -128,8 +141,10 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
         {/* HEADER */}
         <div
           className={[
-            "transition-all duration-300 border-b border-[#2b554e]/10",
-            scrolled ? "bg-[#FCFAF6]/96 shadow-sm backdrop-blur-md" : "bg-[#FCFAF6]",
+            "transition-all duration-300 border-b",
+            scrolled
+              ? "bg-white/55 shadow-[0_8px_30px_rgba(43,85,78,0.10)] border-[#2b554e]/10 supports-[backdrop-filter]:bg-white/35"
+              : "bg-[#FCFAF6] border-transparent",
           ].join(" ")}
         >
           <div className="container mx-auto px-3 md:px-6">
@@ -194,10 +209,20 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
             </div>
 
             {/* DESKTOP */}
-            <div className="hidden md:flex h-24 lg:h-28 items-center gap-6">
+            <div
+              className={[
+                "hidden md:flex items-center gap-6 transition-all duration-300",
+                scrolled ? "h-20 lg:h-24" : "h-24 lg:h-28",
+              ].join(" ")}
+            >
 
               {/* Logo - UMA só */}
-              <div className="flex-none w-[320px] lg:w-[360px] flex items-center pt-9">
+              <div
+                className={[
+                  "flex-none flex items-center transition-all duration-300",
+                  scrolled ? "w-[260px] lg:w-[300px] pt-2" : "w-[320px] lg:w-[360px] pt-9",
+                ].join(" ")}
+              >
                 <button
                   type="button"
                   onClick={() => navigate("/")}
@@ -207,7 +232,10 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                   <img
                     src="/logo_fundo_claro.svg"
                     alt="Logo da loja"
-                    className="h-[130px] lg:h-[155px] xl:h-[175px] w-auto object-contain"
+                    className={[
+                      "w-auto object-contain transition-all duration-300",
+                      scrolled ? "h-[92px] lg:h-[110px] xl:h-[120px]" : "h-[130px] lg:h-[155px] xl:h-[175px]",
+                    ].join(" ")}
                   />
                 </button>
               </div>
@@ -220,9 +248,9 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
                       placeholder="Buscar por nome ou código"
-                      className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/20 bg-white/60
-                    text-[#2b554e] text-base lg:text-[17px] placeholder:text-[#2b554e]/45
-                    focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
+                      className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/15 bg-white/50
+text-[#2b554e] text-base lg:text-[17px] placeholder:text-[#2b554e]/45
+backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
                     />
                     <button
                       type="submit"

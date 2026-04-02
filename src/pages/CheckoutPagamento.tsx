@@ -138,7 +138,7 @@ export default function CheckoutPagamento() {
     <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
       <Header />
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <main className="pt-[160px] md:pt-[180px]">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="lg:col-span-2 rounded-[24px] bg-white p-6 shadow-sm ring-1 ring-black/5">
             <h1

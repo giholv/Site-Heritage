@@ -16,7 +16,7 @@ export default function HomePage() {
   return (
     <div className="antialiased">
       <Header />
-      <main>
+      <main className="pt-[160px] md:pt-[180px]">
         <Hero />
         <EncontreSuaJoia />
         <Semijoias />

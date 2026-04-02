@@ -273,7 +273,7 @@ export default function ProductPage() {
       <div className="mb-6">
         <Header />
       </div>
-      <main className="flex-1">
+      <main className="pt-[160px] md:pt-[180px]">
         <section
           className="mx-auto max-w-7xl px-4 pb-8 md:px-6 lg:px-8"
           style={{ marginTop: "20px" }}
