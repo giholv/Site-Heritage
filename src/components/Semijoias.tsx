@@ -10,7 +10,7 @@ type Peca = {
   slug: string;
   nome: string;
   descricao?: string;
-  preco: number; // em reais
+  preco: number;
   imagem: string;
   tag?: string;
 };
@@ -42,10 +42,17 @@ const SemijoiasCarousel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // carrossel
   const total = pecas.length;
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -55,8 +62,10 @@ const SemijoiasCarousel: React.FC = () => {
       setErr(null);
 
       const { data, error } = await supabase
-        .from("v_catalog_products_with_filters")
-        .select("id,slug,name,min_price_cents,image_path,image_alt,created_at,status,seo_description,search_tags,tag_slugs")
+        .from(VIEW)
+        .select(
+          "id,slug,name,min_price_cents,image_path,image_alt,created_at,status,seo_description,search_tags,tag_slugs"
+        )
         .eq("status", "active")
         .contains("search_tags", ["lancamento"])
         .order("created_at", { ascending: false })
@@ -92,15 +101,17 @@ const SemijoiasCarousel: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (paused || total === 0) return;
+    if (paused || total === 0 || isMobile) return;
+
     const timer = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % total);
     }, 7800);
-    return () => clearInterval(timer);
-  }, [paused, total]);
 
-  const next = () => total && setActiveIndex((prev) => (prev + 1) % total);
-  const prev = () => total && setActiveIndex((prev) => (prev - 1 + total) % total);
+    return () => clearInterval(timer);
+  }, [paused, total, isMobile]);
+
+  const next = () => total > 0 && setActiveIndex((prev) => (prev + 1) % total);
+  const prev = () => total > 0 && setActiveIndex((prev) => (prev - 1 + total) % total);
 
   const formatBRL = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -108,7 +119,7 @@ const SemijoiasCarousel: React.FC = () => {
   const onAddToCart = (e: React.MouseEvent, peca: Peca) => {
     e.stopPropagation();
     add({
-      id: peca.id, 
+      id: peca.id,
       name: peca.nome,
       price: peca.preco,
       image: peca.imagem,
@@ -118,34 +129,36 @@ const SemijoiasCarousel: React.FC = () => {
   };
 
   return (
-    <section id="semijoias" className="py-16 bg-[#FCFAF6] scroll-mt-[140px]">
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e]">
+    <section id="semijoias" className="py-14 md:py-16 bg-[#FCFAF6] scroll-mt-[140px]">
+      <div className="container mx-auto px-4 md:px-10 lg:px-12">
+        <div className="text-center mb-8 md:mb-10">
+          <h2 className="text-[30px] leading-tight md:text-4xl font-semibold text-[#2b554e]">
             Coleção <span className="text-[#b08d57]">NOUVEAU</span>
           </h2>
+
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mt-4 mb-4 rounded-full" />
-          <p className="text-[#2b554e]/80 text-base md:text-lg">
+
+          <p className="text-[#2b554e]/80 text-[15px] leading-relaxed md:text-lg max-w-[320px] md:max-w-none mx-auto">
             Peças com banho premium — brilho marcante, acabamento impecável.
           </p>
+
           {err && <p className="mt-3 text-sm text-red-600">Erro: {err}</p>}
         </div>
 
         <div
-          className="relative max-w-6xl mx-auto"
+          className="relative max-w-6xl mx-auto overflow-hidden md:overflow-visible"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
         >
-          {/* loading skeleton */}
           {loading && (
-            <div className="flex items-center justify-center gap-4 md:gap-6 overflow-x-auto pb-2">
+            <div className="flex items-center justify-start md:justify-center gap-3 md:gap-6 overflow-x-auto pb-2 px-4 md:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className="w-56 md:w-60 lg:w-72 rounded-3xl border border-[#2b554e]/10 bg-white/80 overflow-hidden animate-pulse"
+                  className="w-[78vw] max-w-[280px] md:w-60 lg:w-72 shrink-0 rounded-[28px] border border-[#2b554e]/10 bg-white/80 overflow-hidden animate-pulse"
                 >
                   <div className="aspect-[4/5] bg-black/5" />
-                  <div className="p-5">
+                  <div className="p-4 md:p-5">
                     <div className="h-4 bg-black/5 rounded w-3/4" />
                     <div className="h-4 bg-black/5 rounded w-1/2 mt-3" />
                     <div className="h-10 bg-black/5 rounded-xl mt-5" />
@@ -163,21 +176,21 @@ const SemijoiasCarousel: React.FC = () => {
 
           {!loading && total > 0 && (
             <>
-              <div className="flex items-center justify-center gap-4 md:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory md:snap-none pb-2">
+              <div className="flex items-center justify-start md:justify-center gap-3 md:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory md:snap-none pb-2 px-4 md:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {pecas.map((peca, index) => {
                   const offset = (index - activeIndex + total) % total;
 
-                  let scale = 0.72;
-                  let opacity = 0.25;
+                  let scale = isMobile ? 1 : 0.72;
+                  let opacity = isMobile ? 1 : 0.25;
                   let zIndex = 10;
-                  let translateY = 18;
+                  let translateY = isMobile ? 0 : 18;
 
                   if (offset === 0) {
                     scale = 1;
                     opacity = 1;
                     zIndex = 30;
                     translateY = 0;
-                  } else if (offset === 1 || offset === total - 1) {
+                  } else if (!isMobile && (offset === 1 || offset === total - 1)) {
                     scale = 0.88;
                     opacity = 0.75;
                     zIndex = 20;
@@ -185,7 +198,7 @@ const SemijoiasCarousel: React.FC = () => {
                   }
 
                   const handleCardClick = () => {
-                    if (offset !== 0) {
+                    if (!isMobile && offset !== 0) {
                       setActiveIndex(index);
                       return;
                     }
@@ -195,14 +208,14 @@ const SemijoiasCarousel: React.FC = () => {
                   return (
                     <motion.div
                       key={`${peca.id}-${index}`}
-                      className="w-56 md:w-60 lg:w-72 cursor-pointer select-none snap-center"
+                      className="w-[78vw] max-w-[280px] md:w-60 lg:w-72 cursor-pointer select-none snap-center shrink-0"
                       onClick={handleCardClick}
                       initial={false}
                       animate={{ scale, opacity, y: translateY }}
                       transition={{ duration: 0.75, ease: "easeInOut" }}
                       style={{ zIndex }}
                     >
-                      <div className="bg-white/90 rounded-3xl shadow-md overflow-hidden border border-[#2b554e]/10">
+                      <div className="bg-white/90 rounded-[28px] shadow-md overflow-hidden border border-[#2b554e]/10">
                         <div className="relative">
                           <div className="aspect-[4/5] overflow-hidden bg-black/5">
                             {peca.imagem ? (
@@ -222,19 +235,19 @@ const SemijoiasCarousel: React.FC = () => {
                           )}
                         </div>
 
-                        {offset === 0 && (
-                          <div className="p-5">
-                            <h3 className="text-lg font-semibold text-[#2b554e]">
+                        {(offset === 0 || isMobile) && (
+                          <div className="p-4 md:p-5">
+                            <h3 className="text-[17px] md:text-lg font-semibold text-[#2b554e] leading-tight line-clamp-2">
                               {peca.nome}
                             </h3>
 
                             {peca.descricao && (
-                              <p className="text-sm text-[#2b554e]/70 mt-1 line-clamp-2">
+                              <p className="text-[14px] md:text-sm text-[#2b554e]/70 mt-1 line-clamp-2">
                                 {peca.descricao}
                               </p>
                             )}
 
-                            <div className="mt-4 flex items-center justify-between gap-3">
+                            <div className="mt-4 flex items-center justify-between gap-2 md:gap-3">
                               <div className="text-sm font-semibold text-[#b08d57]">
                                 {formatBRL(peca.preco)}
                               </div>
@@ -242,7 +255,7 @@ const SemijoiasCarousel: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={(e) => onAddToCart(e, peca)}
-                                className="inline-flex items-center gap-2 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-4 py-2 text-sm font-semibold hover:opacity-95 transition"
+                                className="inline-flex items-center gap-2 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-3 md:px-4 py-2 text-sm font-semibold hover:opacity-95 transition"
                                 aria-label="Adicionar à sacola"
                               >
                                 <ShoppingBag className="h-4 w-4" />
@@ -256,7 +269,7 @@ const SemijoiasCarousel: React.FC = () => {
                                 e.stopPropagation();
                                 navigate(`/produto/${peca.slug}`);
                               }}
-                              className="mt-3 w-full rounded-md border border-[#2b554e]/20 px-4 py-2 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
+                              className="mt-3 w-full rounded-2xl border border-[#2b554e]/20 px-4 py-2.5 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
                             >
                               Ver detalhes
                             </button>
@@ -292,10 +305,11 @@ const SemijoiasCarousel: React.FC = () => {
                     key={i}
                     onClick={() => setActiveIndex(i)}
                     aria-label={`Ir para item ${i + 1}`}
-                    className={`h-2.5 rounded-full transition-all ${i === activeIndex
+                    className={`h-2.5 rounded-full transition-all ${
+                      i === activeIndex
                         ? "w-8 bg-[#b08d57]"
                         : "w-2.5 bg-[#2b554e]/20 hover:bg-[#2b554e]/35"
-                      }`}
+                    }`}
                   />
                 ))}
               </div>
