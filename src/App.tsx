@@ -25,13 +25,14 @@ import AdminSuppliersPage from "./pages/admin/AdminSuppliers";
 import AdminCategoryImagesPage from "./pages/admin/AdminCategoryImagesPage";
 import AdminStockLocations from "./pages/admin/AdminStockLocations";
 
-import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
+import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";;
 import AdminExternalSalesPage from "./pages/admin/AdminExternalSalesPage";
 import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
 import AdminCustomersPage from "./pages/admin/AdminCustomersPage";
 import AdminProductsPage from "./pages/admin/AdminProductsPage";
 import AdminOrdersKanban from "./pages/admin/AdminOrdersKanban";
 import MinhaContaRedirect from "./pages/MinhaContaRedirect";
+import AmbientSound from "./components/AmbientSound";
 
 
 
@@ -54,6 +55,7 @@ export default function App() {
   const location = useLocation();
   const hideWhatsApp = location.pathname.startsWith("/admin");
   const hideCookieBanner = location.pathname.startsWith("/admin");
+  const hideAmbientSound = location.pathname.startsWith("/admin");
 
   return (
     <>
@@ -100,6 +102,7 @@ export default function App() {
       </Routes>
 
       {!hideWhatsApp && <WhatsAppFloatingButton />}
+       {!hideAmbientSound && <AmbientSound />}
       {!hideCookieBanner && <CookieBanner />}
     </>
   );
