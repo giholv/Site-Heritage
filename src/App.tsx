@@ -14,6 +14,7 @@ import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import EsqueciSenhaPage from "./pages/EsqueciSenhaPage";
 import RedefinirSenhaPage from "./pages/RedefinirSenhaPage";
 import ContaPage from "./pages/users/conta_page";
+import CheckoutConfirmacao from "./pages/CheckoutConfirmacao";
 // ADMIN
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/checkout/identificacao" element={<CheckoutIdentificacao />} />
         <Route path="/checkout/pagamento" element={<CheckoutPagamento />} />
+        <Route path="/checkout/confirmacao" element={<CheckoutConfirmacao />} />
         <Route path="/joias" element={<JewelryListing />} />
         <Route path="/joias/categoria/:categorySlug" element={<JewelryListing />} />
         <Route path="/joias/colecao/:collectionSlug" element={<JewelryListing />} />
