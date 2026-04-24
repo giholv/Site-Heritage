@@ -12,9 +12,9 @@
     "packageJson": {
       "dependencies": [
         "npm:@eslint/js@^9.9.1",
-        "npm:@netlify/functions@^5.1.5",
+        "npm:@netlify/functions@^5.2.0",
         "npm:@supabase/supabase-js@^2.100.0",
-        "npm:@types/node@^25.0.8",
+        "npm:@types/node@^25.6.0",
         "npm:@types/react-dom@^18.3.0",
         "npm:@types/react@^18.3.5",
         "npm:@vitejs/plugin-react@^4.3.1",

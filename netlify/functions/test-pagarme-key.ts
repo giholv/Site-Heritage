@@ -1,35 +1,15 @@
-// netlify/functions/test-pagarme-key.ts
-export default async () => {
-  try {
-    const key = process.env.PAGARME_SECRET_KEY;
+import type { Handler } from "@netlify/functions";
 
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        hasKey: !!key,
-        prefix: key ? key.slice(0, 8) : null,
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
-      }
-    );
-  } catch (error: any) {
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: error?.message || "Erro interno",
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
-      }
-    );
-  }
+export const handler: Handler = async () => {
+  const key = process.env.PAGARME_SECRET_KEY || "";
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      hasKey: !!key,
+      startsWith: key.slice(0, 7),
+      length: key.length,
+      endsWith: key.slice(-4),
+    }),
+  };
 };
