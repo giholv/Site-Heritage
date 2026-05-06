@@ -17,7 +17,8 @@ import ContaPage from "./pages/users/conta_page";
 import CheckoutConfirmacao from "./pages/CheckoutConfirmacao";
 // ADMIN
 import AdminLayout from "./pages/admin/AdminLayout";
-import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminInicio from "./pages/admin/AdminInicio";
+import AdminConfiguracoes from "./pages/admin/AdminConfiguracoes";
 import AdminProducts from "./pages/admin/AdminProducts";
 import { AdminGuard } from "./routes/AdminGuard";
 import AdminProductEdit from "./pages/admin/AdminProductEdit";
@@ -34,6 +35,9 @@ import AdminProductsPage from "./pages/admin/AdminProductsPage";
 import AdminOrdersKanban from "./pages/admin/AdminOrdersKanban";
 import MinhaContaRedirect from "./pages/MinhaContaRedirect";
 import AmbientSound from "./components/AmbientSound";
+import AdminEstatisticas from "./pages/admin/AdminEstatisticas";
+import AdminCupons from "./pages/admin/AdminCupons";
+import AdminParcerias from "./pages/admin/AdminParcerias";
 
 
 
@@ -85,17 +89,25 @@ export default function App() {
 
         <Route path="/admin" element={<AdminGuard />}>
           <Route element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
+            <Route index element={<AdminInicio />} />
+
+            <Route path="estatisticas" element={<AdminEstatisticas />} />
+            <Route path="cupons" element={<AdminCupons />} />
+            <Route path="parcerias" element={<AdminParcerias />} />
+
             <Route path="produtos" element={<AdminProducts />} />
             <Route path="produtos/novo" element={<AdminProductCreate />} />
             <Route path="produtos/:productId" element={<AdminProductEdit />} />
+
             <Route path="fornecedores" element={<AdminSuppliersPage />} />
             <Route path="catalogo/imagens" element={<AdminCategoryImagesPage />} />
             <Route path="estoques" element={<AdminStockLocations />} />
             <Route path="vendas-externas" element={<AdminExternalSalesPage />} />
-            <Route path="orders" element={<AdminOrdersPage />} />
-            <Route path="customers" element={<AdminCustomersPage />} />
-            <Route path="products" element={<AdminProductsPage />} />
+
+            <Route path="vendas" element={<AdminOrdersPage />} />
+            <Route path="clientes" element={<AdminCustomersPage />} />
+
+            <Route path="configuracoes" element={<AdminConfiguracoes />} />
             <Route path="kanban" element={<AdminOrdersKanban />} />
           </Route>
         </Route>
@@ -104,7 +116,7 @@ export default function App() {
       </Routes>
 
       {!hideWhatsApp && <WhatsAppFloatingButton />}
-       {!hideAmbientSound && <AmbientSound />}
+      {!hideAmbientSound && <AmbientSound />}
       {!hideCookieBanner && <CookieBanner />}
     </>
   );

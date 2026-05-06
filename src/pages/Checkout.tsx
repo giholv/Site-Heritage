@@ -1,3 +1,4 @@
+// src/pages/Checkout.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ShoppingBag,
@@ -8,12 +9,16 @@ import {
   Gift,
   MapPin,
   ShieldCheck,
+  TicketPercent,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
 import CombineWith from "../components/CombineWith";
+import { supabase } from "../lib/supabase";
 
 const CALEA = {
   primary: "#2b554e",
@@ -23,21 +28,23 @@ const CALEA = {
   line: "#e9e2d6",
 };
 
-function moneyBRL(v: number) {
-  return v.toLocaleString("pt-BR", {
+function moneyBRL(value: number) {
+  return Number(value || 0).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
 }
 
-function onlyDigits(v: string) {
-  return String(v ?? "").replace(/\D/g, "");
+function onlyDigits(value: string) {
+  return String(value ?? "").replace(/\D/g, "");
 }
 
-function formatCEP(v: string) {
-  const d = onlyDigits(v).slice(0, 8);
-  if (d.length <= 5) return d;
-  return `${d.slice(0, 5)}-${d.slice(5)}`;
+function formatCEP(value: string) {
+  const digits = onlyDigits(value).slice(0, 8);
+
+  if (digits.length <= 5) return digits;
+
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
 
 function Step({
@@ -86,6 +93,47 @@ type ShippingOption = {
   posting_type?: string;
 };
 
+type AppliedCoupon = {
+  id: string;
+  code: string;
+  discount_type: "percent" | "fixed" | "free_shipping";
+  percent: number | null;
+  amount_cents: number | null;
+  max_discount_cents: number | null;
+  min_subtotal_cents: number;
+  first_purchase_only: boolean;
+};
+
+function calculateCouponDiscountCents(params: {
+  coupon: AppliedCoupon | null;
+  subtotalCents: number;
+  shippingCents: number;
+}) {
+  const { coupon, subtotalCents, shippingCents } = params;
+
+  if (!coupon) return 0;
+
+  if (coupon.discount_type === "percent") {
+    let discount = Math.round(subtotalCents * (Number(coupon.percent || 0) / 100));
+
+    if (coupon.max_discount_cents) {
+      discount = Math.min(discount, Number(coupon.max_discount_cents));
+    }
+
+    return Math.min(discount, subtotalCents);
+  }
+
+  if (coupon.discount_type === "fixed") {
+    return Math.min(Number(coupon.amount_cents || 0), subtotalCents);
+  }
+
+  if (coupon.discount_type === "free_shipping") {
+    return Math.max(shippingCents, 0);
+  }
+
+  return 0;
+}
+
 export default function Checkout() {
   const navigate = useNavigate();
   const { state, subtotal, remove, setQty } = useCart();
@@ -102,19 +150,45 @@ export default function Checkout() {
   const [selectedShipping, setSelectedShipping] =
     useState<ShippingOption | null>(null);
 
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+
   const count = useMemo(
-    () => items.reduce((acc, it) => acc + (it.qty ?? 1), 0),
+    () => items.reduce((acc, item) => acc + (item.qty ?? 1), 0),
     [items]
   );
 
   const shippingPrice = selectedShipping?.price ?? 0;
-  const total = subtotal + (giftWrap ? giftWrapPrice : 0) + shippingPrice;
+  const subtotalCents = Math.round(Number(subtotal || 0) * 100);
+  const shippingCents = Math.round(Number(shippingPrice || 0) * 100);
+
+  const discountCents = useMemo(() => {
+    return calculateCouponDiscountCents({
+      coupon: appliedCoupon,
+      subtotalCents,
+      shippingCents,
+    });
+  }, [appliedCoupon, subtotalCents, shippingCents]);
+
+  const discountValue = discountCents / 100;
+
+  const total = Math.max(
+    subtotal + (giftWrap ? giftWrapPrice : 0) + shippingPrice - discountValue,
+    0
+  );
 
   useEffect(() => {
     if (!items.length) {
       setShippingOptions([]);
       setSelectedShipping(null);
       setShippingError(null);
+      setAppliedCoupon(null);
+      setCouponCode("");
+      setCouponError(null);
+      setCouponSuccess(null);
     }
   }, [items.length]);
 
@@ -122,30 +196,188 @@ export default function Checkout() {
     setShippingOptions([]);
     setSelectedShipping(null);
     setShippingError(null);
+
+    if (appliedCoupon?.discount_type === "free_shipping") {
+      setCouponSuccess(null);
+      setCouponError("Recalcule o frete e reaplique o cupom de frete grátis.");
+      setAppliedCoupon(null);
+    }
   }, [cep]);
 
-  function saveCheckoutDraft() {
-  const payload = {
-    items,
-    subtotal,
-    cep: onlyDigits(cep),
-    giftWrap,
-    giftWrapPrice: giftWrap ? giftWrapPrice : 0,
-    shipping: selectedShipping
-      ? {
-          id: selectedShipping.id,
-          name: selectedShipping.name,
-          price: selectedShipping.price,
-          deadline: selectedShipping.deadline,
-        }
-      : null,
-    shippingPrice,
-    total,
-    updatedAt: new Date().toISOString(),
-  };
+  useEffect(() => {
+    if (!appliedCoupon) return;
 
-  sessionStorage.setItem("calea_checkout", JSON.stringify(payload));
-}
+    if (subtotalCents < appliedCoupon.min_subtotal_cents) {
+      setCouponError(
+        `Cupom removido. Pedido mínimo de ${moneyBRL(
+          appliedCoupon.min_subtotal_cents / 100
+        )}.`
+      );
+      setCouponSuccess(null);
+      setAppliedCoupon(null);
+    }
+  }, [subtotalCents, appliedCoupon]);
+
+  async function applyCoupon() {
+    setCouponError(null);
+    setCouponSuccess(null);
+
+    const code = couponCode.trim().toUpperCase();
+
+    if (!code) {
+      setCouponError("Digite um cupom.");
+      return;
+    }
+
+    if (!items.length) {
+      setCouponError("Adicione produtos para usar um cupom.");
+      return;
+    }
+
+    setCouponLoading(true);
+
+    try {
+      const { data: coupon, error } = await supabase
+        .from("coupons")
+        .select(
+          `
+          id,
+          code,
+          active,
+          discount_type,
+          percent,
+          amount_cents,
+          max_discount_cents,
+          min_subtotal_cents,
+          starts_at,
+          ends_at,
+          first_purchase_only
+        `
+        )
+        .ilike("code", `%${code}%`)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!coupon) {
+        setAppliedCoupon(null);
+        setCouponError("Cupom não encontrado.");
+        return;
+      }
+
+      if (!coupon.active) {
+        setAppliedCoupon(null);
+        setCouponError("Este cupom está inativo.");
+        return;
+      }
+
+      const now = new Date();
+
+      if (coupon.starts_at && new Date(coupon.starts_at) > now) {
+        setAppliedCoupon(null);
+        setCouponError("Este cupom ainda não está disponível.");
+        return;
+      }
+
+      if (coupon.ends_at && new Date(coupon.ends_at) < now) {
+        setAppliedCoupon(null);
+        setCouponError("Este cupom está expirado.");
+        return;
+      }
+
+      const minSubtotalCents = Number(coupon.min_subtotal_cents || 0);
+
+      if (subtotalCents < minSubtotalCents) {
+        setAppliedCoupon(null);
+        setCouponError(
+          `Pedido mínimo de ${moneyBRL(minSubtotalCents / 100)} para usar este cupom.`
+        );
+        return;
+      }
+
+      if (coupon.discount_type === "free_shipping" && !selectedShipping) {
+        setAppliedCoupon(null);
+        setCouponError("Selecione o frete antes de aplicar este cupom.");
+        return;
+      }
+
+      const normalizedCoupon: AppliedCoupon = {
+        id: coupon.id,
+        code: coupon.code,
+        discount_type: coupon.discount_type,
+        percent: coupon.percent === null ? null : Number(coupon.percent),
+        amount_cents:
+          coupon.amount_cents === null ? null : Number(coupon.amount_cents),
+        max_discount_cents:
+          coupon.max_discount_cents === null
+            ? null
+            : Number(coupon.max_discount_cents),
+        min_subtotal_cents: minSubtotalCents,
+        first_purchase_only: Boolean(coupon.first_purchase_only),
+      };
+
+      const nextDiscountCents = calculateCouponDiscountCents({
+        coupon: normalizedCoupon,
+        subtotalCents,
+        shippingCents,
+      });
+
+      if (nextDiscountCents <= 0 && normalizedCoupon.discount_type !== "free_shipping") {
+        setAppliedCoupon(null);
+        setCouponError("Este cupom não gerou desconto para este pedido.");
+        return;
+      }
+
+      setAppliedCoupon(normalizedCoupon);
+      setCouponCode(normalizedCoupon.code);
+      setCouponSuccess(
+        `Cupom ${normalizedCoupon.code} aplicado. Desconto de ${moneyBRL(
+          nextDiscountCents / 100
+        )}.`
+      );
+    } catch (error: any) {
+      console.error("Erro ao aplicar cupom:", error);
+      setAppliedCoupon(null);
+      setCouponError(error?.message || "Erro ao aplicar cupom.");
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError(null);
+    setCouponSuccess(null);
+  }
+
+  function saveCheckoutDraft() {
+    const payload = {
+      items,
+      subtotal,
+      cep: onlyDigits(cep),
+      giftWrap,
+      giftWrapPrice: giftWrap ? giftWrapPrice : 0,
+      shipping: selectedShipping
+        ? {
+            id: selectedShipping.id,
+            name: selectedShipping.name,
+            price: selectedShipping.price,
+            deadline: selectedShipping.deadline,
+          }
+        : null,
+      shippingPrice,
+      couponCode: appliedCoupon?.code || null,
+      coupon_id: appliedCoupon?.id || null,
+      coupon: appliedCoupon,
+      discount: discountValue,
+      discount_cents: discountCents,
+      total,
+      updatedAt: new Date().toISOString(),
+    };
+
+    sessionStorage.setItem("calea_checkout", JSON.stringify(payload));
+  }
 
   async function handleCalcShipping() {
     const cleanCep = onlyDigits(cep);
@@ -166,6 +398,12 @@ export default function Checkout() {
     setShippingError(null);
     setShippingOptions([]);
     setSelectedShipping(null);
+
+    if (appliedCoupon?.discount_type === "free_shipping") {
+      setAppliedCoupon(null);
+      setCouponSuccess(null);
+      setCouponError("Reaplique o cupom após recalcular o frete.");
+    }
 
     try {
       const totalWeight = Math.max(
@@ -196,25 +434,25 @@ export default function Checkout() {
       }
 
       if (!res.ok) {
-        const msg =
+        const message =
           data?.error ||
           data?.details?.error ||
           `Falha ao calcular frete (${res.status})`;
 
-        throw new Error(msg);
+        throw new Error(message);
       }
 
-      const opts: ShippingOption[] = Array.isArray(data?.options)
+      const options: ShippingOption[] = Array.isArray(data?.options)
         ? data.options
         : [];
 
-      setShippingOptions(opts);
+      setShippingOptions(options);
 
-      if (!opts.length) {
+      if (!options.length) {
         setShippingError("Nenhuma opção de frete encontrada para esse CEP.");
       }
-    } catch (e: any) {
-      setShippingError(e?.message ?? "Erro ao calcular frete.");
+    } catch (error: any) {
+      setShippingError(error?.message ?? "Erro ao calcular frete.");
     } finally {
       setShippingLoading(false);
     }
@@ -280,6 +518,7 @@ export default function Checkout() {
                     >
                       Sua sacola
                     </h2>
+
                     <p className="mt-1 text-sm text-gray-500">
                       {count} item(ns) selecionado(s)
                     </p>
@@ -291,6 +530,7 @@ export default function Checkout() {
                     <p className="text-base font-medium text-gray-700">
                       Seu carrinho está vazio.
                     </p>
+
                     <p className="mt-2 text-sm text-gray-500">
                       Adicione produtos para continuar.
                     </p>
@@ -306,16 +546,16 @@ export default function Checkout() {
                   </div>
                 ) : (
                   <div className="divide-y divide-[#efe8dc]">
-                    {items.map((it) => (
+                    {items.map((item) => (
                       <div
-                        key={it.id}
+                        key={item.id}
                         className="grid grid-cols-[80px_1fr] gap-4 py-5 sm:flex sm:items-center"
                       >
                         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[#f7f3ec] ring-1 ring-black/5">
-                          {it.image ? (
+                          {item.image ? (
                             <img
-                              src={it.image}
-                              alt={it.name}
+                              src={item.image}
+                              alt={item.name}
                               className="h-full w-full object-cover"
                             />
                           ) : null}
@@ -326,12 +566,12 @@ export default function Checkout() {
                             className="truncate text-base font-semibold"
                             style={{ color: CALEA.primary }}
                           >
-                            {it.name}
+                            {item.name}
                           </div>
 
-                          {it.variant ? (
+                          {item.variant ? (
                             <div className="mt-1 truncate text-sm text-gray-500">
-                              {it.variant}
+                              {item.variant}
                             </div>
                           ) : null}
                         </div>
@@ -341,7 +581,10 @@ export default function Checkout() {
                             <button
                               className="h-9 w-9 rounded-full border border-[#d8d1c6] bg-white text-base hover:bg-[#faf7f1]"
                               onClick={() =>
-                                setQty(it.id, Math.max(1, (it.qty ?? 1) - 1))
+                                setQty(
+                                  item.id,
+                                  Math.max(1, (item.qty ?? 1) - 1)
+                                )
                               }
                               type="button"
                               aria-label="Diminuir quantidade"
@@ -350,12 +593,14 @@ export default function Checkout() {
                             </button>
 
                             <div className="w-8 text-center text-sm font-medium">
-                              {it.qty ?? 1}
+                              {item.qty ?? 1}
                             </div>
 
                             <button
                               className="h-9 w-9 rounded-full border border-[#d8d1c6] bg-white text-base hover:bg-[#faf7f1]"
-                              onClick={() => setQty(it.id, (it.qty ?? 1) + 1)}
+                              onClick={() =>
+                                setQty(item.id, (item.qty ?? 1) + 1)
+                              }
                               type="button"
                               aria-label="Aumentar quantidade"
                             >
@@ -367,12 +612,12 @@ export default function Checkout() {
                             className="shrink-0 text-sm font-semibold sm:text-base"
                             style={{ color: CALEA.primary }}
                           >
-                            {moneyBRL((it.price ?? 0) * (it.qty ?? 1))}
+                            {moneyBRL((item.price ?? 0) * (item.qty ?? 1))}
                           </div>
 
                           <button
                             className="shrink-0 text-gray-400 transition hover:text-red-500"
-                            onClick={() => remove(it.id)}
+                            onClick={() => remove(item.id)}
                             type="button"
                             aria-label="Remover item"
                           >
@@ -384,7 +629,7 @@ export default function Checkout() {
                   </div>
                 )}
 
-                                {items.length > 0 && <CombineWith items={items} />}
+                {items.length > 0 && <CombineWith items={items} />}
 
                 {items.length > 0 && (
                   <div className="mt-6 rounded-[22px] border border-[#eadfce] bg-[#fcfaf6] p-4 sm:p-5">
@@ -406,6 +651,7 @@ export default function Checkout() {
                         >
                           Embalagem para presente
                         </div>
+
                         <p className="mt-1 text-sm text-gray-500">
                           Caixa premium + finalização especial para presente.
                         </p>
@@ -423,7 +669,7 @@ export default function Checkout() {
                       <input
                         type="checkbox"
                         checked={giftWrap}
-                        onChange={(e) => setGiftWrap(e.target.checked)}
+                        onChange={(event) => setGiftWrap(event.target.checked)}
                         className="h-5 w-5 shrink-0"
                         style={{ accentColor: CALEA.primary }}
                       />
@@ -444,6 +690,7 @@ export default function Checkout() {
                     className="h-4 w-4"
                     style={{ color: CALEA.accent }}
                   />
+
                   <h3
                     className="text-base font-semibold"
                     style={{ color: CALEA.primary }}
@@ -455,7 +702,7 @@ export default function Checkout() {
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <input
                     value={cep}
-                    onChange={(e) => setCep(formatCEP(e.target.value))}
+                    onChange={(event) => setCep(formatCEP(event.target.value))}
                     placeholder="Digite seu CEP"
                     className="h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e] sm:flex-1"
                     inputMode="numeric"
@@ -481,12 +728,12 @@ export default function Checkout() {
 
                 {shippingOptions.length > 0 && (
                   <div className="mt-4 space-y-3">
-                    {shippingOptions.map((op) => {
-                      const checked = selectedShipping?.id === op.id;
+                    {shippingOptions.map((option) => {
+                      const checked = selectedShipping?.id === option.id;
 
                       return (
                         <label
-                          key={op.id}
+                          key={option.id}
                           className="block cursor-pointer rounded-2xl border p-4 transition"
                           style={{
                             borderColor: checked ? CALEA.primary : "#e5ddd1",
@@ -499,7 +746,7 @@ export default function Checkout() {
                                 type="radio"
                                 name="shipping"
                                 checked={checked}
-                                onChange={() => setSelectedShipping(op)}
+                                onChange={() => setSelectedShipping(option)}
                                 className="mt-1 h-4 w-4 shrink-0"
                                 style={{ accentColor: CALEA.primary }}
                               />
@@ -509,11 +756,11 @@ export default function Checkout() {
                                   className="font-semibold"
                                   style={{ color: CALEA.primary }}
                                 >
-                                  {op.name}
+                                  {option.name}
                                 </div>
 
                                 <div className="mt-1 text-xs text-gray-500">
-                                  {op.deadline || "Prazo indisponível"}
+                                  {option.deadline || "Prazo indisponível"}
                                 </div>
                               </div>
                             </div>
@@ -523,13 +770,13 @@ export default function Checkout() {
                                 className="font-semibold"
                                 style={{ color: CALEA.primary }}
                               >
-                                {moneyBRL(op.price)}
+                                {moneyBRL(option.price)}
                               </div>
 
-                              {op.original_price &&
-                              op.original_price > op.price ? (
+                              {option.original_price &&
+                              option.original_price > option.price ? (
                                 <div className="text-xs text-gray-400 line-through">
-                                  {moneyBRL(op.original_price)}
+                                  {moneyBRL(option.original_price)}
                                 </div>
                               ) : null}
                             </div>
@@ -539,6 +786,75 @@ export default function Checkout() {
                     })}
                   </div>
                 )}
+
+                <div className="my-6 h-px bg-[#eee5d8]" />
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <TicketPercent
+                      className="h-4 w-4"
+                      style={{ color: CALEA.accent }}
+                    />
+
+                    <h3
+                      className="text-base font-semibold"
+                      style={{ color: CALEA.primary }}
+                    >
+                      Cupom de desconto
+                    </h3>
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <input
+                      value={couponCode}
+                      onChange={(event) =>
+                        setCouponCode(event.target.value.toUpperCase())
+                      }
+                      placeholder="Digite seu cupom"
+                      className="h-11 w-full rounded-xl border border-[#d8d1c6] px-3 uppercase outline-none transition focus:border-[#2b554e] sm:flex-1"
+                      disabled={couponLoading || Boolean(appliedCoupon)}
+                    />
+
+                    {appliedCoupon ? (
+                      <button
+                        onClick={removeCoupon}
+                        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#d8d1c6] px-4 font-semibold text-red-600 transition hover:bg-red-50 sm:w-auto"
+                        type="button"
+                      >
+                        <X className="h-4 w-4" />
+                        Remover
+                      </button>
+                    ) : (
+                      <button
+                        onClick={applyCoupon}
+                        disabled={couponLoading || items.length === 0}
+                        className="h-11 w-full rounded-xl px-4 font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                        style={{ backgroundColor: CALEA.primary }}
+                        type="button"
+                      >
+                        {couponLoading ? "Aplicando..." : "Aplicar"}
+                      </button>
+                    )}
+                  </div>
+
+                  {couponError && (
+                    <div className="mt-3 text-sm text-red-600">
+                      {couponError}
+                    </div>
+                  )}
+
+                  {couponSuccess && (
+                    <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                      {couponSuccess}
+                    </div>
+                  )}
+
+                  {appliedCoupon?.first_purchase_only && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      Este cupom será revalidado como primeira compra antes do pagamento.
+                    </div>
+                  )}
+                </div>
 
                 <div className="my-6 h-px bg-[#eee5d8]" />
 
@@ -555,9 +871,22 @@ export default function Checkout() {
                     <span className="font-semibold">{moneyBRL(subtotal)}</span>
                   </div>
 
+                  {discountCents > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">
+                        Desconto ({appliedCoupon?.code})
+                      </span>
+
+                      <span className="font-semibold text-emerald-700">
+                        - {moneyBRL(discountValue)}
+                      </span>
+                    </div>
+                  )}
+
                   {giftWrap && (
                     <div className="flex items-center justify-between">
                       <span className="text-gray-600">Embalagem presente</span>
+
                       <span className="font-semibold">
                         {moneyBRL(giftWrapPrice)}
                       </span>
@@ -569,6 +898,7 @@ export default function Checkout() {
                       <span className="text-gray-600">
                         Frete ({selectedShipping.name})
                       </span>
+
                       <span className="font-semibold">
                         {moneyBRL(shippingPrice)}
                       </span>
@@ -585,6 +915,7 @@ export default function Checkout() {
                   >
                     Total
                   </span>
+
                   <span
                     className="text-2xl font-semibold"
                     style={{ color: CALEA.primary }}
@@ -599,7 +930,9 @@ export default function Checkout() {
                   onClick={handleContinue}
                   type="button"
                   disabled={items.length === 0 || !selectedShipping}
-                  title={!selectedShipping ? "Selecione o frete para continuar" : ""}
+                  title={
+                    !selectedShipping ? "Selecione o frete para continuar" : ""
+                  }
                 >
                   FINALIZAR COMPRA
                 </button>
@@ -610,6 +943,7 @@ export default function Checkout() {
                       className="mt-0.5 h-5 w-5 shrink-0"
                       style={{ color: CALEA.primary }}
                     />
+
                     <p className="text-xs leading-5 text-gray-500">
                       Ambiente seguro. Seus dados são protegidos durante toda a
                       compra.

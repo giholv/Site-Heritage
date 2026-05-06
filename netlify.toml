@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+[functions]
+  directory = "netlify/functions"
+
+[functions."release-expired-pix-orders"]
+  schedule = "*/5 * * * *"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

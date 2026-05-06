@@ -17,6 +17,12 @@ type OrderStatus =
   | "refunded"
   | "chargedback";
 
+type UpdateOrderResult = {
+  updated: boolean;
+  matchedBy: string | null;
+  orderId: string | null;
+};
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return {
@@ -72,11 +78,20 @@ export const handler: Handler = async (event) => {
       payload?.order?.metadata?.local_order_id ||
       null;
 
+    const orderNumber =
+      order?.metadata?.order_number ||
+      order?.metadata?.local_order_number ||
+      charge?.metadata?.order_number ||
+      payload?.metadata?.order_number ||
+      payload?.order?.metadata?.order_number ||
+      null;
+
     const orderCode =
       order?.code ||
       charge?.code ||
       payload?.code ||
       payload?.order?.code ||
+      orderNumber ||
       localOrderId ||
       null;
 
@@ -88,7 +103,6 @@ export const handler: Handler = async (event) => {
       null;
 
     const newStatus = mapStatus(eventType, order?.status || charge?.status);
-
     const now = new Date().toISOString();
 
     const updateData: Record<string, any> = {
@@ -105,14 +119,19 @@ export const handler: Handler = async (event) => {
 
     if (newStatus === "paid") {
       updateData.paid_at = now;
+      updateData.stock_reserved = false;
+      updateData.stock_released_at = null;
+      updateData.canceled_reason = null;
     }
 
     if (newStatus === "payment_failed") {
       updateData.payment_failed_at = now;
+      updateData.canceled_reason = eventType;
     }
 
     if (newStatus === "canceled") {
       updateData.canceled_at = now;
+      updateData.canceled_reason = eventType;
     }
 
     const updateResult = await updateOrderSafely({
@@ -120,11 +139,12 @@ export const handler: Handler = async (event) => {
       updateData,
       localOrderId,
       orderCode,
+      orderNumber,
       providerOrderId,
       providerChargeId,
     });
 
-    if (!updateResult.updated) {
+    if (!updateResult.updated || !updateResult.orderId) {
       return json(200, {
         ok: true,
         received: true,
@@ -132,6 +152,7 @@ export const handler: Handler = async (event) => {
         warning: "Webhook recebido, mas nenhum pedido local foi encontrado.",
         eventType,
         localOrderId,
+        orderNumber,
         orderCode,
         providerOrderId,
         providerChargeId,
@@ -139,18 +160,41 @@ export const handler: Handler = async (event) => {
       });
     }
 
+    let stockReleased = false;
+    let stockReleaseWarning: string | null = null;
+
+    if (newStatus === "payment_failed" || newStatus === "canceled") {
+      const releaseResult = await releaseReservedStock({
+        supabase,
+        orderId: updateResult.orderId,
+        reason:
+          newStatus === "canceled"
+            ? "Pagamento cancelado pela Pagar.me"
+            : "Pagamento recusado pela Pagar.me",
+      });
+
+      stockReleased = releaseResult.released;
+      stockReleaseWarning = releaseResult.warning;
+    }
+
     return json(200, {
       ok: true,
       received: true,
       updated: true,
+      matchedBy: updateResult.matchedBy,
       eventType,
-      localOrderId,
+      localOrderId: updateResult.orderId,
+      orderNumber,
       orderCode,
       providerOrderId,
       providerChargeId,
       status: newStatus,
+      stockReleased,
+      stockReleaseWarning,
     });
   } catch (error: any) {
+    console.error("Erro ao processar webhook:", error);
+
     return json(500, {
       ok: false,
       error: "Erro ao processar webhook",
@@ -161,7 +205,12 @@ export const handler: Handler = async (event) => {
 
 function safeJson(raw: string | null) {
   if (!raw) return {};
-  return JSON.parse(raw);
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
 }
 
 function getEventType(body: any) {
@@ -172,7 +221,6 @@ function extractOrder(payload: any) {
   if (payload?.object === "order") return payload;
   if (payload?.order) return payload.order;
   if (payload?.data?.order) return payload.data.order;
-
   if (payload?.charges?.length) return payload;
 
   return null;
@@ -195,7 +243,6 @@ function extractCharge(payload: any) {
 function extractTransaction(charge: any, payload: any) {
   if (charge?.last_transaction) return charge.last_transaction;
   if (charge?.transactions?.length) return charge.transactions[0];
-
   if (payload?.last_transaction) return payload.last_transaction;
   if (payload?.transaction) return payload.transaction;
 
@@ -218,6 +265,7 @@ function mapStatus(eventType: string, providerStatus?: string): OrderStatus {
   if (
     event.includes("payment_failed") ||
     event.includes("failed") ||
+    event.includes("refused") ||
     status === "failed" ||
     status === "refused" ||
     status === "denied"
@@ -258,14 +306,16 @@ async function updateOrderSafely(params: {
   updateData: Record<string, any>;
   localOrderId?: string | null;
   orderCode?: string | null;
+  orderNumber?: string | null;
   providerOrderId?: string | null;
   providerChargeId?: string | null;
-}) {
+}): Promise<UpdateOrderResult> {
   const {
     supabase,
     updateData,
     localOrderId,
     orderCode,
+    orderNumber,
     providerOrderId,
     providerChargeId,
   } = params;
@@ -279,6 +329,16 @@ async function updateOrderSafely(params: {
       column: "id",
       value: localOrderId,
       enabled: isUuid(localOrderId),
+    },
+    {
+      column: "order_number",
+      value: orderNumber,
+      enabled: !!orderNumber,
+    },
+    {
+      column: "order_number",
+      value: orderCode,
+      enabled: !!orderCode && !isUuid(orderCode),
     },
     {
       column: "order_code",
@@ -330,6 +390,7 @@ async function updateOrderSafely(params: {
       return {
         updated: true,
         matchedBy: attempt.column,
+        orderId: data[0].id,
       };
     }
   }
@@ -337,6 +398,93 @@ async function updateOrderSafely(params: {
   return {
     updated: false,
     matchedBy: null,
+    orderId: null,
+  };
+}
+
+async function releaseReservedStock(params: {
+  supabase: any;
+  orderId: string;
+  reason: string;
+}) {
+  const { supabase, orderId, reason } = params;
+
+  const { data: localOrder, error: orderError } = await supabase
+    .from("orders")
+    .select("id, stock_reserved, stock_released_at")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (orderError) {
+    throw orderError;
+  }
+
+  if (!localOrder) {
+    return {
+      released: false,
+      warning: "Pedido local não encontrado para liberar estoque.",
+    };
+  }
+
+  if (!localOrder.stock_reserved) {
+    return {
+      released: false,
+      warning: "Pedido não estava com estoque reservado.",
+    };
+  }
+
+  if (localOrder.stock_released_at) {
+    return {
+      released: false,
+      warning: "Estoque já havia sido liberado anteriormente.",
+    };
+  }
+
+  const { data: orderItems, error: itemsError } = await supabase
+    .from("order_items")
+    .select("sku_id, quantity")
+    .eq("order_id", orderId);
+
+  if (itemsError) {
+    throw itemsError;
+  }
+
+  for (const item of orderItems || []) {
+    if (!item.sku_id || !item.quantity) continue;
+
+    const { error: movementError } = await supabase
+      .from("inventory_movements")
+      .insert({
+        sku_id: item.sku_id,
+        movement_type: "release",
+        quantity: Number(item.quantity),
+        reason,
+        reference_type: "order",
+        reference_id: orderId,
+        created_at: new Date().toISOString(),
+      });
+
+    if (movementError) {
+      throw movementError;
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({
+      stock_reserved: false,
+      stock_released_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId);
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  return {
+    released: true,
+    warning: null,
   };
 }
 

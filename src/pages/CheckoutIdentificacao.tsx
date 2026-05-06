@@ -342,6 +342,7 @@ export default function CheckoutIdentificacao() {
     let customerId = sessionStorage.getItem(CUSTOMER_ID_KEY);
     let addressId = sessionStorage.getItem(ADDRESS_ID_KEY);
     let orderId = sessionStorage.getItem(ORDER_ID_KEY);
+    let orderNumber = sessionStorage.getItem("calea_order_number");
 
     // CUSTOMER
     const customerPayload = {
@@ -489,6 +490,21 @@ export default function CheckoutIdentificacao() {
         .eq("id", orderId);
 
       if (error) throw error;
+
+      if (!orderNumber) {
+        const { data: existingOrder, error: orderNumberError } = await supabase
+          .from("orders")
+          .select("order_number")
+          .eq("id", orderId)
+          .maybeSingle();
+
+        if (orderNumberError) throw orderNumberError;
+
+        if (existingOrder?.order_number) {
+          orderNumber = existingOrder.order_number;
+          sessionStorage.setItem("calea_order_number", existingOrder.order_number);
+        }
+      }
     } else {
       const { data, error } = await supabase
         .from("orders")
@@ -496,11 +512,16 @@ export default function CheckoutIdentificacao() {
           ...orderPayload,
           created_at: now,
         })
-        .select("id")
+        .select("id, order_number")
         .single();
 
       if (error) throw error;
       orderId = data.id;
+
+      if (data.order_number) {
+        orderNumber = data.order_number;
+        sessionStorage.setItem("calea_order_number", data.order_number);
+      }
     }
 
     if (!orderId) {
@@ -540,6 +561,7 @@ export default function CheckoutIdentificacao() {
       customer_id: customerId,
       address_id: addressId,
       order_id: orderId,
+      order_number: orderNumber || sessionStorage.getItem("calea_order_number") || null,
       updatedAt: now,
     };
 
