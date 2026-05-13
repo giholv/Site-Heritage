@@ -85,7 +85,8 @@ type BoletoInput = {
 };
 
 type CreateOrderBody = {
-  orderId?: string;
+  orderId?: string; // UUID interno do pedido local
+  orderNumber?: string; // PED-000015
   paymentMethod: PaymentMethod;
   customer: CustomerInput;
   items: ItemInput[];
@@ -154,9 +155,19 @@ export const handler: Handler = async (event) => {
       });
     }
 
+    const orderNumber = getLocalOrderNumber(body);
+
     return json(200, {
       ok: true,
       order: data,
+      local_order_id: body.orderId || null,
+      local_order_number: orderNumber || null,
+      order_number: orderNumber || null,
+      paymentMethod: body.paymentMethod,
+      pix_expires_at:
+        body.paymentMethod === "pix"
+          ? payload?.metadata?.pix_expires_at || null
+          : null,
     });
   } catch (error: any) {
     return json(500, {
@@ -170,21 +181,51 @@ function buildOrderPayload(body: CreateOrderBody) {
   const customer = mapCustomer(body.customer);
   const items = body.items.map(mapItem);
   const shipping = body.shipping ? mapShipping(body.shipping) : undefined;
-  const metadata = {
+
+  const orderNumber = getLocalOrderNumber(body);
+
+  const pixExpiresAt =
+    body.paymentMethod === "pix"
+      ? String(
+          body.metadata?.pix_expires_at ||
+            new Date(Date.now() + 10 * 60 * 1000).toISOString()
+        )
+      : undefined;
+
+  const metadata = removeUndefined({
     ...(body.metadata || {}),
-    ...(body.orderId ? { local_order_id: String(body.orderId) } : {}),
-  };
+    ...(body.orderId ? { local_order_id: String(getLocalOrderNumber(body) || body.orderId) } : {}),
+    ...(orderNumber
+      ? {
+          order_number: orderNumber,
+          local_order_number: orderNumber,
+        }
+      : {}),
+    ...(pixExpiresAt ? { pix_expires_at: pixExpiresAt } : {}),
+  });
 
   const payment = buildPayment(body);
 
   return removeUndefined({
-    code: body.orderId ? String(body.orderId) : undefined,
+    // Na Pagar.me, o code deve ser o número amigável do pedido, não o UUID.
+    code: orderNumber || body.orderId || undefined,
     customer,
     items,
     shipping,
     payments: [payment],
     metadata,
   });
+}
+
+
+function getLocalOrderNumber(body: CreateOrderBody) {
+  return (
+    body.orderNumber ||
+    stringOrNull(body.metadata?.order_number) ||
+    stringOrNull(body.metadata?.local_order_number) ||
+    stringOrNull(body.metadata?.orderNumber) ||
+    null
+  );
 }
 
 function buildPayment(body: CreateOrderBody) {
@@ -206,7 +247,7 @@ function buildPixPayment(body: CreateOrderBody) {
   return removeUndefined({
     payment_method: "pix",
     pix: {
-      expires_in: body.pix?.expiresIn ?? 1800,
+      expires_in: body.pix?.expiresIn ?? 600,
       additional_information:
         body.pix?.additionalInformation ??
         (body.orderId
@@ -225,7 +266,7 @@ function buildBoletoPayment(body: CreateOrderBody) {
       bank: boleto.bank,
       instructions: boleto.instructions || "Pagar até o vencimento",
       due_at: boleto.dueAt,
-      document_number: boleto.documentNumber || body.orderId,
+      document_number: boleto.documentNumber || getLocalOrderNumber(body) || body.orderId,
       type: boleto.type || "DM",
       statement_descriptor: boleto.statementDescriptor,
       interest: boleto.interest,
@@ -239,16 +280,20 @@ function buildCreditCardPayment(body: CreateOrderBody) {
   const c = body.creditCard;
   if (!c) throw new Error("creditCard é obrigatório para paymentMethod=credit_card");
 
+  const billingAddress = c.billingAddress || body.customer.address;
+
   return removeUndefined({
     payment_method: "credit_card",
     credit_card: removeUndefined({
       installments: c.installments ?? 1,
-      statement_descriptor: c.statementDescriptor,
+      statement_descriptor: sanitizeStatementDescriptor(
+        c.statementDescriptor || "CALEA"
+      ),
       operation_type: c.operationType ?? "auth_and_capture",
       recurrence_cycle: c.recurrenceCycle,
       authentication: c.authentication,
       metadata: c.metadata,
-      ...resolveCardSource(c),
+      ...resolveCardSource(c, billingAddress),
     }),
   });
 }
@@ -257,20 +302,24 @@ function buildDebitCardPayment(body: CreateOrderBody) {
   const d = body.debitCard;
   if (!d) throw new Error("debitCard é obrigatório para paymentMethod=debit_card");
 
+  const billingAddress = d.billingAddress || body.customer.address;
+
   return removeUndefined({
     payment_method: "debit_card",
     debit_card: removeUndefined({
       installments: d.installments ?? 1,
-      statement_descriptor: d.statementDescriptor,
+      statement_descriptor: sanitizeStatementDescriptor(
+        d.statementDescriptor || "CALEA"
+      ),
       recurrence: d.recurrence ?? false,
       authentication: d.authentication,
       metadata: d.metadata,
-      ...resolveCardSource(d),
+      ...resolveCardSource(d, billingAddress),
     }),
   });
 }
 
-function resolveCardSource(input: CardPaymentInput) {
+function resolveCardSource(input: CardPaymentInput, billingAddress?: AddressInput) {
   const hasCardId = !!input.cardId;
   const hasCardToken = !!input.cardToken;
   const hasRawCard = !!input.card;
@@ -286,12 +335,17 @@ function resolveCardSource(input: CardPaymentInput) {
     return { card_id: input.cardId };
   }
 
+  if (!billingAddress) {
+    throw new Error("billingAddress é obrigatório para pagamento com cartão.");
+  }
+
   if (input.cardToken) {
-    // Observação prática:
-    // a doc diz que billing address não é tokenizado.
-    // Se a sua conta exigir ajuste extra nesse ponto, você verá o erro
-    // retornado pela Pagar.me em `details`.
-    return { card_token: input.cardToken };
+    return {
+      card: removeUndefined({
+        token: input.cardToken,
+        billing_address: mapAddress(billingAddress),
+      }),
+    };
   }
 
   return {
@@ -301,9 +355,7 @@ function resolveCardSource(input: CardPaymentInput) {
       exp_month: Number(input.card!.expMonth),
       exp_year: Number(input.card!.expYear),
       cvv: String(input.card!.cvv),
-      billing_address: input.billingAddress
-        ? mapAddress(input.billingAddress)
-        : undefined,
+      billing_address: mapAddress(billingAddress),
     }),
   };
 }
@@ -377,6 +429,15 @@ function validateBaseBody(body: CreateOrderBody) {
   if (!Array.isArray(body.items) || body.items.length === 0) {
     throw new Error("items é obrigatório");
   }
+
+  if (
+    (body.paymentMethod === "credit_card" || body.paymentMethod === "debit_card") &&
+    !body.customer.address
+  ) {
+    throw new Error(
+      "customer.address é obrigatório para pagamento com cartão, pois será usado como billing_address."
+    );
+  }
 }
 
 function safeJson<T>(raw: string | null): T {
@@ -386,6 +447,21 @@ function safeJson<T>(raw: string | null): T {
 
 function onlyDigits(value: string) {
   return String(value || "").replace(/\D/g, "");
+}
+
+function stringOrNull(value: unknown) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
+function sanitizeStatementDescriptor(value: string) {
+  return String(value || "CALEA")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .slice(0, 13)
+    .toUpperCase();
 }
 
 function slugify(value: string) {
