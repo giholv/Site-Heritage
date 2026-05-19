@@ -103,11 +103,13 @@ export const handler: Handler = async (event) => {
       null;
 
     const newStatus = mapStatus(eventType, order?.status || charge?.status);
+    const orderStatus = mapOrderStatus(newStatus);
+    const paymentStatus = mapPaymentStatus(newStatus);
     const now = new Date().toISOString();
 
     const updateData: Record<string, any> = {
-      status: newStatus,
-      payment_status: newStatus,
+      status: orderStatus,
+      payment_status: paymentStatus,
       payment_method: paymentMethod,
       pagarme_order_id: providerOrderId,
       pagarme_charge_id: providerChargeId,
@@ -117,20 +119,21 @@ export const handler: Handler = async (event) => {
       updated_at: now,
     };
 
-    if (newStatus === "paid") {
+    if (orderStatus === "paid") {
       updateData.paid_at = now;
       updateData.stock_reserved = false;
       updateData.stock_released_at = null;
       updateData.canceled_reason = null;
     }
 
-    if (newStatus === "payment_failed") {
+    if (paymentStatus === "failed") {
       updateData.payment_failed_at = now;
       updateData.canceled_reason = eventType;
     }
 
-    if (newStatus === "canceled") {
+    if (orderStatus === "canceled") {
       updateData.canceled_at = now;
+      updateData.cancelled_at = now;
       updateData.canceled_reason = eventType;
     }
 
@@ -292,7 +295,19 @@ function mapStatus(eventType: string, providerStatus?: string): OrderStatus {
 
   return "pending_payment";
 }
+function mapOrderStatus(status: OrderStatus) {
+  if (status === "payment_failed") return "pending_payment";
+  if (status === "chargedback") return "canceled";
+  return status;
+}
 
+function mapPaymentStatus(status: OrderStatus) {
+  if (status === "pending_payment") return "pending";
+  if (status === "payment_failed") return "failed";
+  if (status === "canceled") return "cancelled";
+  if (status === "chargedback") return "chargeback";
+  return status;
+}
 function isUuid(value?: string | null) {
   if (!value) return false;
 
@@ -325,42 +340,42 @@ async function updateOrderSafely(params: {
     value?: string | null;
     enabled: boolean;
   }> = [
-    {
-      column: "id",
-      value: localOrderId,
-      enabled: isUuid(localOrderId),
-    },
-    {
-      column: "order_number",
-      value: orderNumber,
-      enabled: !!orderNumber,
-    },
-    {
-      column: "order_number",
-      value: orderCode,
-      enabled: !!orderCode && !isUuid(orderCode),
-    },
-    {
-      column: "order_code",
-      value: orderCode,
-      enabled: !!orderCode,
-    },
-    {
-      column: "code",
-      value: orderCode,
-      enabled: !!orderCode,
-    },
-    {
-      column: "pagarme_order_id",
-      value: providerOrderId,
-      enabled: !!providerOrderId,
-    },
-    {
-      column: "pagarme_charge_id",
-      value: providerChargeId,
-      enabled: !!providerChargeId,
-    },
-  ];
+      {
+        column: "id",
+        value: localOrderId,
+        enabled: isUuid(localOrderId),
+      },
+      {
+        column: "order_number",
+        value: orderNumber,
+        enabled: !!orderNumber,
+      },
+      {
+        column: "order_number",
+        value: orderCode,
+        enabled: !!orderCode && !isUuid(orderCode),
+      },
+      {
+        column: "order_code",
+        value: orderCode,
+        enabled: !!orderCode,
+      },
+      {
+        column: "code",
+        value: orderCode,
+        enabled: !!orderCode,
+      },
+      {
+        column: "pagarme_order_id",
+        value: providerOrderId,
+        enabled: !!providerOrderId,
+      },
+      {
+        column: "pagarme_charge_id",
+        value: providerChargeId,
+        enabled: !!providerChargeId,
+      },
+    ];
 
   for (const attempt of attempts) {
     if (!attempt.enabled || !attempt.value) continue;
@@ -453,14 +468,15 @@ async function releaseReservedStock(params: {
     if (!item.sku_id || !item.quantity) continue;
 
     const { error: movementError } = await supabase
-      .from("inventory_movements")
+
+      .from("stock_movements")
       .insert({
         sku_id: item.sku_id,
-        movement_type: "release",
+        type: "unreserve",
         quantity: Number(item.quantity),
         reason,
-        reference_type: "order",
-        reference_id: orderId,
+        note: "Liberação automática por falha/cancelamento de pagamento",
+        order_id: orderId,
         created_at: new Date().toISOString(),
       });
 

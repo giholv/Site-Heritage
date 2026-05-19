@@ -830,6 +830,8 @@ export default function CheckoutPagamento() {
 
         metadata: {
           source: "calea-web",
+          local_order_id: orderId,
+          order_number: identification?.order_number || null,
           original_subtotal_cents: Math.round(Number(checkoutDraft?.subtotal || 0) * 100),
           original_shipping_cents: Math.round(Number(checkoutDraft.shippingPrice || 0) * 100),
           pagarme_shipping_cents: shippingAmountCents,
