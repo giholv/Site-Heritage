@@ -490,6 +490,79 @@ function Step({
   );
 }
 
+function buildPagarmeItemsWithDiscount(params: {
+  items: any[];
+  discountCents: number;
+}) {
+  const { items, discountCents } = params;
+
+  const baseItems = items.map((item: any) => {
+    const quantity = Number(item.qty || item.quantity || 1);
+    const unitAmountCents = Math.round(Number(item.price || 0) * 100);
+    const totalAmountCents = unitAmountCents * quantity;
+
+    return {
+      originalItem: item,
+      quantity,
+      unitAmountCents,
+      totalAmountCents,
+    };
+  });
+
+  const itemsSubtotalCents = baseItems.reduce(
+    (acc, item) => acc + item.totalAmountCents,
+    0
+  );
+
+  if (!discountCents || discountCents <= 0 || itemsSubtotalCents <= 0) {
+    return baseItems.map((item) => ({
+      code: String(
+        item.originalItem.id ||
+        item.originalItem.sku_id ||
+        item.originalItem.slug ||
+        item.originalItem.name
+      ),
+      description: item.originalItem.name,
+      amount: item.unitAmountCents,
+      quantity: item.quantity,
+    }));
+  }
+
+  let remainingDiscount = Math.min(discountCents, itemsSubtotalCents);
+
+  return baseItems.map((item, index) => {
+    const isLast = index === baseItems.length - 1;
+
+    const itemDiscount = isLast
+      ? remainingDiscount
+      : Math.round((item.totalAmountCents / itemsSubtotalCents) * discountCents);
+
+    const safeItemDiscount = Math.min(itemDiscount, remainingDiscount);
+    remainingDiscount -= safeItemDiscount;
+
+    const discountedTotal = Math.max(item.totalAmountCents - safeItemDiscount, 1);
+    const discountedUnitAmount = Math.max(
+      Math.round(discountedTotal / item.quantity),
+      1
+    );
+
+    return {
+      code: String(
+        item.originalItem.id ||
+        item.originalItem.sku_id ||
+        item.originalItem.slug ||
+        item.originalItem.name
+      ),
+      description:
+        discountCents > 0
+          ? `${item.originalItem.name} - cupom aplicado`
+          : item.originalItem.name,
+      amount: discountedUnitAmount,
+      quantity: item.quantity,
+    };
+  });
+}
+
 export default function CheckoutPagamento() {
   const navigate = useNavigate();
 
@@ -714,7 +787,10 @@ export default function CheckoutPagamento() {
         paymentMethod === "credit_card"
           ? selectedInstallment?.totalAmountCents || totalCents
           : totalCents;
-
+      const pagarmeItems = buildPagarmeItemsWithDiscount({
+        items: checkoutDraft.items,
+        discountCents,
+      });
       const payload: any = {
         orderId,
         paymentMethod,
@@ -725,12 +801,7 @@ export default function CheckoutPagamento() {
           phone: identification.phone,
           address,
         },
-        items: checkoutDraft.items.map((item: any) => ({
-          code: String(item.id || item.sku_id || item.slug || item.name),
-          description: item.name,
-          amount: Math.round(Number(item.price || 0) * 100),
-          quantity: Number(item.qty || item.quantity || 1),
-        })),
+        items: pagarmeItems,
         shipping: {
           amount: Math.round(Number(checkoutDraft.shippingPrice || 0) * 100),
           description: checkoutDraft.shipping.name || "Frete",
@@ -740,10 +811,12 @@ export default function CheckoutPagamento() {
         },
         metadata: {
           source: "calea-web",
+          original_subtotal_cents: Math.round(Number(checkoutDraft?.subtotal || 0) * 100),
           original_total_cents: totalCents,
           payment_total_cents: paymentTotalCents,
           coupon_code: couponCode,
           discount_cents: discountCents,
+          discount_applied_to_items: discountCents > 0,
           pix_expires_at:
             paymentMethod === "pix"
               ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
@@ -1213,7 +1286,7 @@ export default function CheckoutPagamento() {
                       </div>
                     )}
                 </div>
-
+            
                 <div className="my-5 h-px bg-[#eee5d8]" />
 
                 <div className="flex items-center justify-between text-base">
