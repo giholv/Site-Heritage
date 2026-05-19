@@ -110,6 +110,7 @@ export const handler: Handler = async (event) => {
     const updateData: Record<string, any> = {
       status: orderStatus,
       payment_status: paymentStatus,
+      order_status: orderStatus,
       payment_method: paymentMethod,
       pagarme_order_id: providerOrderId,
       pagarme_charge_id: providerChargeId,
