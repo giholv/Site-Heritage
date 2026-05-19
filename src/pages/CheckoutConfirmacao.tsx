@@ -286,6 +286,9 @@ export default function CheckoutConfirmacao() {
   const charge = getCharge(order);
   const transaction = getTransaction(charge);
 
+  const [dbOrderStatus, setDbOrderStatus] = useState<string | null>(null);
+  const [dbPaymentStatus, setDbPaymentStatus] = useState<string | null>(null);
+
   const paymentMethod =
     charge?.payment_method ||
     transaction?.payment_method ||
@@ -293,6 +296,8 @@ export default function CheckoutConfirmacao() {
     paymentResponse?.paymentMethod;
 
   const rawStatus =
+    dbPaymentStatus ||
+    dbOrderStatus ||
     charge?.status ||
     transaction?.status ||
     order?.status ||
@@ -318,56 +323,56 @@ export default function CheckoutConfirmacao() {
       ? initialOrderNumber
       : resolvedOrderNumber || "Pedido em processamento";
 
-  const internalOrderId =
-    paymentResponse?.local_order_id ||
-    paymentResponse?.orderId ||
-    sessionStorage.getItem("calea_order_id") ||
-    order?.id ||
-    null;
-
+ const internalOrderId =
+  paymentResponse?.local_order_id ||
+  paymentResponse?.metadata?.local_order_id ||
+  paymentResponse?.order?.metadata?.local_order_id ||
+  order?.metadata?.local_order_id ||
+  sessionStorage.getItem("calea_order_id") ||
+  null;
+  
   useEffect(() => {
     let mounted = true;
+    let intervalId: number | null = null;
 
-    async function loadOrderNumberFromDatabase() {
-      if (initialOrderNumber && !isUuid(initialOrderNumber)) {
-        setResolvedOrderNumber(initialOrderNumber);
-        return;
-      }
-
-      if (!internalOrderId || !isUuid(internalOrderId)) {
-        setResolvedOrderNumber("Pedido em processamento");
-        return;
-      }
+    async function loadOrderStatusFromDatabase() {
+      if (!internalOrderId || !isUuid(internalOrderId)) return;
 
       const { data, error } = await supabase
         .from("orders")
-        .select("order_number")
+        .select("status, payment_status")
         .eq("id", internalOrderId)
         .maybeSingle();
 
       if (!mounted) return;
 
       if (error) {
-        console.error("Erro ao buscar order_number:", error);
-        setResolvedOrderNumber("Pedido em processamento");
+        console.error("Erro ao buscar status do pedido:", error);
         return;
       }
 
-      if (data?.order_number) {
-        sessionStorage.setItem("calea_order_number", data.order_number);
-        setResolvedOrderNumber(data.order_number);
-        return;
-      }
+      if (data) {
+        setDbOrderStatus(data.status || null);
+        setDbPaymentStatus(data.payment_status || null);
 
-      setResolvedOrderNumber("Pedido em processamento");
+        if (data.status === "paid" || data.payment_status === "paid") {
+          if (intervalId) window.clearInterval(intervalId);
+        }
+      }
     }
 
-    loadOrderNumberFromDatabase();
+    loadOrderStatusFromDatabase();
+
+    intervalId = window.setInterval(loadOrderStatusFromDatabase, 5000);
 
     return () => {
       mounted = false;
+
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
     };
-  }, [initialOrderNumber, internalOrderId]);
+  }, [internalOrderId]);
 
   const pixQrCode =
     transaction?.qr_code ||
