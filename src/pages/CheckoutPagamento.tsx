@@ -787,10 +787,24 @@ export default function CheckoutPagamento() {
         paymentMethod === "credit_card"
           ? selectedInstallment?.totalAmountCents || totalCents
           : totalCents;
+
+      const isFreeShippingCoupon =
+        checkoutDraft?.coupon?.discount_type === "free_shipping";
+
+
+      const itemDiscountCents = isFreeShippingCoupon ? 0 : discountCents;
+
+
+
+
       const pagarmeItems = buildPagarmeItemsWithDiscount({
         items: checkoutDraft.items,
-        discountCents,
+        discountCents: itemDiscountCents,
       });
+
+      const shippingAmountCents = isFreeShippingCoupon
+        ? 0
+        : Math.round(Number(checkoutDraft.shippingPrice || 0) * 100);
       const payload: any = {
         orderId,
         paymentMethod,
@@ -801,22 +815,31 @@ export default function CheckoutPagamento() {
           phone: identification.phone,
           address,
         },
+
         items: pagarmeItems,
+
         shipping: {
-          amount: Math.round(Number(checkoutDraft.shippingPrice || 0) * 100),
-          description: checkoutDraft.shipping.name || "Frete",
+          amount: shippingAmountCents,
+          description: isFreeShippingCoupon
+            ? `${checkoutDraft.shipping.name || "Frete"} - cupom frete grátis`
+            : checkoutDraft.shipping.name || "Frete",
           recipientName: identification.name,
           recipientPhone: identification.phone,
           address,
         },
+
         metadata: {
           source: "calea-web",
           original_subtotal_cents: Math.round(Number(checkoutDraft?.subtotal || 0) * 100),
+          original_shipping_cents: Math.round(Number(checkoutDraft.shippingPrice || 0) * 100),
+          pagarme_shipping_cents: shippingAmountCents,
           original_total_cents: totalCents,
           payment_total_cents: paymentTotalCents,
           coupon_code: couponCode,
+          coupon_type: checkoutDraft?.coupon?.discount_type || null,
           discount_cents: discountCents,
-          discount_applied_to_items: discountCents > 0,
+          discount_applied_to_items: itemDiscountCents > 0,
+          free_shipping_applied: isFreeShippingCoupon,
           pix_expires_at:
             paymentMethod === "pix"
               ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
@@ -1286,7 +1309,7 @@ export default function CheckoutPagamento() {
                       </div>
                     )}
                 </div>
-            
+
                 <div className="my-5 h-px bg-[#eee5d8]" />
 
                 <div className="flex items-center justify-between text-base">
