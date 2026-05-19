@@ -44,7 +44,20 @@ type Form = {
 };
 
 type CheckoutDraft = {
-  coupon?: string | null;
+  couponCode?: string | null;
+  coupon_id?: string | null;
+  coupon?: {
+    id: string;
+    code: string;
+    discount_type: "percent" | "fixed" | "free_shipping";
+    percent: number | null;
+    amount_cents: number | null;
+    max_discount_cents: number | null;
+    min_subtotal_cents: number;
+    first_purchase_only: boolean;
+  } | null;
+  discount?: number;
+  discount_cents?: number;
   cep?: string;
   giftWrap?: boolean;
   giftWrapPrice?: number;
@@ -325,36 +338,72 @@ export default function CheckoutIdentificacao() {
     return e;
   }
 
-  async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
-    const now = new Date().toISOString();
+async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
+  const now = new Date().toISOString();
 
-    const cleanEmail = currentForm.email.trim().toLowerCase();
-    const cleanPhone = onlyDigits(currentForm.phone);
-    const cleanDocument = onlyDigits(currentForm.document);
-    const cleanCep = onlyDigits(currentForm.cep);
+  const cleanEmail = currentForm.email.trim().toLowerCase();
+  const cleanPhone = onlyDigits(currentForm.phone);
+  const cleanDocument = onlyDigits(currentForm.document);
+  const cleanCep = onlyDigits(currentForm.cep);
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    const user = session?.user ?? null;
+  const user = session?.user ?? null;
 
-    let customerId = sessionStorage.getItem(CUSTOMER_ID_KEY);
-    let addressId = sessionStorage.getItem(ADDRESS_ID_KEY);
-    let orderId = sessionStorage.getItem(ORDER_ID_KEY);
-    let orderNumber = sessionStorage.getItem("calea_order_number");
+  let customerId = sessionStorage.getItem(CUSTOMER_ID_KEY);
+  let addressId = sessionStorage.getItem(ADDRESS_ID_KEY);
+  let orderId = sessionStorage.getItem(ORDER_ID_KEY);
+  let orderNumber = sessionStorage.getItem("calea_order_number");
 
-    // CUSTOMER
-    const customerPayload = {
-      user_id: user?.id ?? null,
-      email: cleanEmail,
-      full_name: currentForm.name.trim(),
-      phone: cleanPhone,
-      document: cleanDocument,
-      updated_at: now,
-    };
+  const customerPayload = {
+    user_id: user?.id ?? null,
+    email: cleanEmail,
+    full_name: currentForm.name.trim(),
+    phone: cleanPhone,
+    document: cleanDocument,
+    updated_at: now,
+  };
 
-    if (customerId) {
+  if (customerId) {
+    const { error } = await supabase
+      .from("customers")
+      .update(customerPayload)
+      .eq("id", customerId);
+
+    if (error) throw error;
+  } else {
+    let existingCustomerId: string | null = null;
+
+    if (user?.id) {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      existingCustomerId = data?.id ?? null;
+    } else {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("email", cleanEmail)
+        .eq("document", cleanDocument)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      existingCustomerId = data?.id ?? null;
+    }
+
+    if (existingCustomerId) {
+      customerId = existingCustomerId;
+
       const { error } = await supabase
         .from("customers")
         .update(customerPayload)
@@ -362,235 +411,221 @@ export default function CheckoutIdentificacao() {
 
       if (error) throw error;
     } else {
-      let existingCustomerId: string | null = null;
-
-      if (user?.id) {
-        const { data, error } = await supabase
-          .from("customers")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (error) throw error;
-        existingCustomerId = data?.id ?? null;
-      } else {
-        const { data, error } = await supabase
-          .from("customers")
-          .select("id")
-          .eq("email", cleanEmail)
-          .eq("document", cleanDocument)
-          .maybeSingle();
-
-        if (error) throw error;
-        existingCustomerId = data?.id ?? null;
-      }
-
-      if (existingCustomerId) {
-        customerId = existingCustomerId;
-
-        const { error } = await supabase
-          .from("customers")
-          .update(customerPayload)
-          .eq("id", customerId);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("customers")
-          .insert({
-            ...customerPayload,
-            created_at: now,
-          })
-          .select("id")
-          .single();
-
-        if (error) throw error;
-        customerId = data.id;
-      }
-    }
-
-    if (!customerId) {
-      throw new Error("Não foi possível salvar o cliente.");
-    }
-
-    sessionStorage.setItem(CUSTOMER_ID_KEY, customerId);
-
-    // ADDRESS
-    const addressPayload = {
-      customer_id: customerId,
-      label: "Entrega",
-      recipient_name: currentForm.name.trim(),
-      phone: cleanPhone,
-      cep: cleanCep,
-      street: currentForm.street.trim(),
-      number: currentForm.number.trim(),
-      complement: currentForm.complement.trim() || null,
-      neighborhood: currentForm.neighborhood.trim() || null,
-      city: currentForm.city.trim(),
-      state: currentForm.state.trim().toUpperCase(),
-      country: "BR",
-      is_default: true,
-      updated_at: now,
-    };
-
-    if (addressId) {
-      const { error } = await supabase
-        .from("addresses")
-        .update(addressPayload)
-        .eq("id", addressId);
-
-      if (error) throw error;
-    } else {
       const { data, error } = await supabase
-        .from("addresses")
+        .from("customers")
         .insert({
-          ...addressPayload,
+          ...customerPayload,
           created_at: now,
         })
         .select("id")
         .single();
 
       if (error) throw error;
-      addressId = data.id;
+      customerId = data.id;
     }
+  }
 
-    if (!addressId) {
-      throw new Error("Não foi possível salvar o endereço.");
-    }
+  if (!customerId) {
+    throw new Error("Não foi possível salvar o cliente.");
+  }
 
-    sessionStorage.setItem(ADDRESS_ID_KEY, addressId);
+  sessionStorage.setItem(CUSTOMER_ID_KEY, customerId);
 
-    // ORDER
-    // ORDER
-    const merchandiseSubtotalCents = cartItems.reduce((acc: number, it: any) => {
-      return acc + toCents(getItemPrice(it)) * getItemQty(it);
-    }, 0);
+  const addressPayload = {
+    customer_id: customerId,
+    label: "Entrega",
+    recipient_name: currentForm.name.trim(),
+    phone: cleanPhone,
+    cep: cleanCep,
+    street: currentForm.street.trim(),
+    number: currentForm.number.trim(),
+    complement: currentForm.complement.trim() || null,
+    neighborhood: currentForm.neighborhood.trim() || null,
+    city: currentForm.city.trim(),
+    state: currentForm.state.trim().toUpperCase(),
+    country: "BR",
+    is_default: true,
+    updated_at: now,
+  };
 
-    const shippingCents = toCents(shippingPrice);
-    const giftWrapCents = giftWrap ? toCents(giftWrapPrice) : 0;
-    const totalCents = merchandiseSubtotalCents + shippingCents + giftWrapCents;
+  if (addressId) {
+    const { error } = await supabase
+      .from("addresses")
+      .update(addressPayload)
+      .eq("id", addressId);
 
-    const orderPayload = {
-      customer_id: customerId,
-      shipping_address_id: addressId,
-      status: "draft",
-      subtotal_cents: merchandiseSubtotalCents,
-      shipping_cents: shippingCents,
-      gift_wrap_cents: giftWrapCents,
-      total_cents: totalCents,
-      coupon_code: checkoutDraft?.coupon?.trim() || null,
-      discount_cents: 0,
-      updated_at: now,
-    };
+    if (error) throw error;
+  } else {
+    const { data, error } = await supabase
+      .from("addresses")
+      .insert({
+        ...addressPayload,
+        created_at: now,
+      })
+      .select("id")
+      .single();
 
-    if (orderId) {
-      const { error } = await supabase
+    if (error) throw error;
+    addressId = data.id;
+  }
+
+  if (!addressId) {
+    throw new Error("Não foi possível salvar o endereço.");
+  }
+
+  sessionStorage.setItem(ADDRESS_ID_KEY, addressId);
+
+  const merchandiseSubtotalCents = cartItems.reduce((acc: number, it: any) => {
+    return acc + toCents(getItemPrice(it)) * getItemQty(it);
+  }, 0);
+
+  const shippingCents = toCents(shippingPrice);
+  const giftWrapCents = giftWrap ? toCents(giftWrapPrice) : 0;
+  const discountCents = Number(checkoutDraft?.discount_cents || 0);
+
+  const totalCents = Math.max(
+    merchandiseSubtotalCents + shippingCents + giftWrapCents - discountCents,
+    0
+  );
+
+  const couponCode =
+    checkoutDraft?.couponCode ||
+    checkoutDraft?.coupon?.code ||
+    null;
+
+  const orderPayload = {
+    customer_id: customerId,
+    shipping_address_id: addressId,
+    status: "draft",
+    subtotal_cents: merchandiseSubtotalCents,
+    shipping_cents: shippingCents,
+    gift_wrap_cents: giftWrapCents,
+    total_cents: totalCents,
+    coupon_code: couponCode,
+    discount_cents: discountCents,
+    updated_at: now,
+  };
+
+  if (orderId) {
+    const { error } = await supabase
+      .from("orders")
+      .update(orderPayload)
+      .eq("id", orderId);
+
+    if (error) throw error;
+
+    if (!orderNumber) {
+      const { data: existingOrder, error: orderNumberError } = await supabase
         .from("orders")
-        .update(orderPayload)
-        .eq("id", orderId);
+        .select("order_number")
+        .eq("id", orderId)
+        .limit(1)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (orderNumberError) throw orderNumberError;
 
-      if (!orderNumber) {
-        const { data: existingOrder, error: orderNumberError } = await supabase
-          .from("orders")
-          .select("order_number")
-          .eq("id", orderId)
-          .maybeSingle();
-
-        if (orderNumberError) throw orderNumberError;
-
-        if (existingOrder?.order_number) {
-          orderNumber = existingOrder.order_number;
-          sessionStorage.setItem("calea_order_number", existingOrder.order_number);
-        }
-      }
-    } else {
-      const { data, error } = await supabase
-        .from("orders")
-        .insert({
-          ...orderPayload,
-          created_at: now,
-        })
-        .select("id, order_number")
-        .single();
-
-      if (error) throw error;
-      orderId = data.id;
-
-      if (data.order_number) {
-        orderNumber = data.order_number;
-        sessionStorage.setItem("calea_order_number", data.order_number);
+      if (existingOrder?.order_number) {
+        orderNumber = existingOrder.order_number;
+        sessionStorage.setItem("calea_order_number", existingOrder.order_number);
       }
     }
+  } else {
+    const { data, error } = await supabase
+      .from("orders")
+      .insert({
+        ...orderPayload,
+        created_at: now,
+      })
+      .select("id, order_number")
+      .single();
 
-    if (!orderId) {
-      throw new Error("Não foi possível criar o pedido.");
+    if (error) throw error;
+
+    orderId = data.id;
+
+    if (data.order_number) {
+      orderNumber = data.order_number;
+      sessionStorage.setItem("calea_order_number", data.order_number);
     }
+  }
 
-    sessionStorage.setItem(ORDER_ID_KEY, orderId);
+  if (!orderId) {
+    throw new Error("Não foi possível criar o pedido.");
+  }
 
-    // ORDER ITEMS
-    const { error: deleteItemsError } = await supabase
-      .from("order_items")
-      .delete()
-      .eq("order_id", orderId);
+  sessionStorage.setItem(ORDER_ID_KEY, orderId);
 
-    if (deleteItemsError) throw deleteItemsError;
+  const { error: deleteItemsError } = await supabase
+    .from("order_items")
+    .delete()
+    .eq("order_id", orderId);
 
-    const orderItemsPayload = cartItems.map((it: any) => ({
+  if (deleteItemsError) throw deleteItemsError;
+
+  const orderItemsPayload = cartItems
+    .map((it: any) => ({
       order_id: orderId,
       sku_id: getItemSkuId(it),
       unit_price_cents: toCents(getItemPrice(it)),
       quantity: getItemQty(it),
-    }));
+    }))
+    .filter((item: any) => item.sku_id);
 
-    if (orderItemsPayload.length > 0) {
-      const { error: insertItemsError } = await supabase
-        .from("order_items")
-        .insert(orderItemsPayload);
+  if (orderItemsPayload.length > 0) {
+    const { error: insertItemsError } = await supabase
+      .from("order_items")
+      .insert(orderItemsPayload);
 
-      if (insertItemsError) throw insertItemsError;
-    }
-
-    const identificationPayload = {
-      ...currentForm,
-      phone: cleanPhone,
-      document: cleanDocument,
-      cep: cleanCep,
-      customer_id: customerId,
-      address_id: addressId,
-      order_id: orderId,
-      order_number: orderNumber || sessionStorage.getItem("calea_order_number") || null,
-      updatedAt: now,
-    };
-
-    localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(currentForm));
-    sessionStorage.setItem(
-      CHECKOUT_IDENTIFICACAO_KEY,
-      JSON.stringify(identificationPayload)
-    );
-
-    return { customerId, addressId, orderId };
+    if (insertItemsError) throw insertItemsError;
   }
+
+  const identificationPayload = {
+    ...currentForm,
+    phone: cleanPhone,
+    document: cleanDocument,
+    cep: cleanCep,
+    customer_id: customerId,
+    address_id: addressId,
+    order_id: orderId,
+    order_number:
+      orderNumber || sessionStorage.getItem("calea_order_number") || null,
+    coupon_code: couponCode,
+    discount_cents: discountCents,
+    total_cents: totalCents,
+    updatedAt: now,
+  };
+
+  localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(currentForm));
+
+  sessionStorage.setItem(
+    CHECKOUT_IDENTIFICACAO_KEY,
+    JSON.stringify(identificationPayload)
+  );
+
+  return { customerId, addressId, orderId };
+}
 
   async function handleContinue() {
-    const e = validate();
-    setErrors(e);
-    if (Object.keys(e).length) return;
+  const e = validate();
+  setErrors(e);
 
-    setSaving(true);
+  if (Object.keys(e).length) return;
 
-    try {
-      await persistCheckoutInDatabase(form, items);
-      navigate("/checkout/pagamento");
-    } catch (error: any) {
-      console.error(error);
-      alert(error?.message ?? "Erro ao salvar seus dados.");
-    } finally {
-      setSaving(false);
-    }
+  setSaving(true);
+
+  try {
+    await persistCheckoutInDatabase(form, items);
+    navigate("/checkout/pagamento");
+  } catch (error: any) {
+    console.error("Erro ao salvar checkout:", error);
+
+    alert(
+      "Não foi possível continuar com o pedido. Confira os dados e tente novamente."
+    );
+  } finally {
+    setSaving(false);
   }
+}
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>

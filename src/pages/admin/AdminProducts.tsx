@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { useNavigate } from "react-router-dom";
 
 type ProductStatus = "draft" | "active";
+type StatusFilter = "all" | "active" | "draft";
 
 type Product = {
   id: string;
@@ -62,7 +63,26 @@ export default function AdminProducts() {
   const [err, setErr] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
 
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
   const hasItems = useMemo(() => items.length > 0, [items]);
+
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return items.filter((product) => {
+      const matchesSearch =
+        !term ||
+        product.name.toLowerCase().includes(term) ||
+        product.slug.toLowerCase().includes(term);
+
+      const matchesStatus =
+        statusFilter === "all" ? true : product.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [items, search, statusFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,6 +253,47 @@ export default function AdminProducts() {
         </div>
       )}
 
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border bg-white p-4 md:flex-row md:items-center md:justify-between">
+        <div className="w-full md:max-w-md">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome ou slug..."
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-[#2b554e] focus:ring-2 focus:ring-[#2b554e]/10"
+          />
+        </div>
+
+        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-[#2b554e] focus:ring-2 focus:ring-[#2b554e]/10 md:w-44"
+          >
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="draft">Rascunhos</option>
+          </select>
+
+          {(search || statusFilter !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+              }}
+              className="rounded-xl border px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-3 text-sm text-gray-500">
+        Exibindo {filteredItems.length} de {items.length} produtos
+      </div>
+
       <div className="overflow-hidden rounded-2xl border bg-white">
         <div className="grid grid-cols-12 gap-3 border-b px-4 py-3 text-sm text-gray-500">
           <div className="col-span-2">Foto</div>
@@ -248,8 +309,12 @@ export default function AdminProducts() {
           <div className="p-6 text-sm text-gray-600">
             Nenhum produto cadastrado.
           </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="p-6 text-sm text-gray-600">
+            Nenhum produto encontrado com os filtros aplicados.
+          </div>
         ) : (
-          items.map((p) => {
+          filteredItems.map((p) => {
             const busy = actingId === p.id;
 
             return (
@@ -294,7 +359,7 @@ export default function AdminProducts() {
                 <div className="col-span-2 flex items-center justify-end gap-2">
                   <button
                     onClick={() => nav(`/admin/produtos/${p.id}`)}
-                    className="text-sm underline text-[#2b554e]"
+                    className="text-sm text-[#2b554e] underline"
                   >
                     Editar
                   </button>

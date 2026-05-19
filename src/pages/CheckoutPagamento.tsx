@@ -23,7 +23,7 @@ const CALEA = {
   line: "#e9e2d6",
 };
 
-type PaymentMethod = "pix" | "boleto" | "credit_card" | "debit_card";
+type PaymentMethod = "pix" | "boleto" | "credit_card";
 
 type CardForm = {
   number: string;
@@ -41,7 +41,6 @@ type PaymentSettings = {
   pix_enabled: boolean;
   boleto_enabled: boolean;
   credit_card_enabled: boolean;
-  debit_card_enabled: boolean;
 };
 
 type InstallmentOption = {
@@ -62,7 +61,6 @@ const fallbackPaymentSettings: PaymentSettings = {
   pix_enabled: true,
   boleto_enabled: true,
   credit_card_enabled: true,
-  debit_card_enabled: true,
 };
 
 const initialCardForm: CardForm = {
@@ -513,8 +511,7 @@ export default function CheckoutPagamento() {
     return raw ? JSON.parse(raw) : null;
   }, []);
 
-  const isCard =
-    paymentMethod === "credit_card" || paymentMethod === "debit_card";
+  const isCard = paymentMethod === "credit_card";
 
   const cardBrand = useMemo(
     () => detectCardBrand(cardForm.number),
@@ -574,7 +571,7 @@ export default function CheckoutPagamento() {
       const { data, error } = await supabase
         .from("payment_settings")
         .select(
-          "max_installments, interest_free_installments, monthly_interest_rate, min_installment_cents, pix_enabled, boleto_enabled, credit_card_enabled, debit_card_enabled"
+          "max_installments, interest_free_installments, monthly_interest_rate, min_installment_cents, pix_enabled, boleto_enabled, credit_card_enabled"
         )
         .eq("active", true)
         .order("created_at", { ascending: false })
@@ -599,7 +596,6 @@ export default function CheckoutPagamento() {
           pix_enabled: Boolean(data.pix_enabled),
           boleto_enabled: Boolean(data.boleto_enabled),
           credit_card_enabled: Boolean(data.credit_card_enabled),
-          debit_card_enabled: Boolean(data.debit_card_enabled),
         });
       }
 
@@ -625,16 +621,14 @@ export default function CheckoutPagamento() {
     if (paymentMethod === "pix" && !paymentSettings.pix_enabled) {
       if (paymentSettings.credit_card_enabled) setPaymentMethod("credit_card");
       else if (paymentSettings.boleto_enabled) setPaymentMethod("boleto");
-      else if (paymentSettings.debit_card_enabled)
-        setPaymentMethod("debit_card");
+      else setPaymentMethod("pix");
     }
 
     if (paymentMethod === "boleto" && !paymentSettings.boleto_enabled) {
       if (paymentSettings.pix_enabled) setPaymentMethod("pix");
       else if (paymentSettings.credit_card_enabled)
         setPaymentMethod("credit_card");
-      else if (paymentSettings.debit_card_enabled)
-        setPaymentMethod("debit_card");
+      else setPaymentMethod("pix");
     }
 
     if (
@@ -643,15 +637,7 @@ export default function CheckoutPagamento() {
     ) {
       if (paymentSettings.pix_enabled) setPaymentMethod("pix");
       else if (paymentSettings.boleto_enabled) setPaymentMethod("boleto");
-      else if (paymentSettings.debit_card_enabled)
-        setPaymentMethod("debit_card");
-    }
-
-    if (paymentMethod === "debit_card" && !paymentSettings.debit_card_enabled) {
-      if (paymentSettings.pix_enabled) setPaymentMethod("pix");
-      else if (paymentSettings.credit_card_enabled)
-        setPaymentMethod("credit_card");
-      else if (paymentSettings.boleto_enabled) setPaymentMethod("boleto");
+      else setPaymentMethod("pix");
     }
   }, [paymentSettings, paymentMethod]);
 
@@ -688,11 +674,6 @@ export default function CheckoutPagamento() {
       !paymentSettings.credit_card_enabled
     ) {
       setError("Cartão de crédito indisponível no momento.");
-      return;
-    }
-
-    if (paymentMethod === "debit_card" && !paymentSettings.debit_card_enabled) {
-      setError("Cartão de débito indisponível no momento.");
       return;
     }
 
@@ -803,16 +784,6 @@ export default function CheckoutPagamento() {
           interest_cents: selectedInstallment?.interestCents || 0,
           payment_total_cents:
             selectedInstallment?.totalAmountCents || totalCents,
-        };
-      }
-
-      if (paymentMethod === "debit_card") {
-        const cardToken = await createPagarmeCardToken(cardForm);
-
-        payload.debitCard = {
-          cardToken,
-          statementDescriptor: "CALEA",
-          recurrence: false,
         };
       }
 
@@ -984,19 +955,6 @@ export default function CheckoutPagamento() {
                       <span className="font-medium">Cartão de crédito</span>
                     </label>
                   )}
-
-                  {paymentSettings.debit_card_enabled && (
-                    <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-[#e7dccb] bg-white p-4 transition hover:bg-[#fcfaf6]">
-                      <input
-                        type="radio"
-                        checked={paymentMethod === "debit_card"}
-                        onChange={() => setPaymentMethod("debit_card")}
-                        style={{ accentColor: CALEA.primary }}
-                      />
-                      <CreditCard className="h-5 w-5" />
-                      <span className="font-medium">Cartão de débito</span>
-                    </label>
-                  )}
                 </div>
 
                 {isCard && (
@@ -1005,9 +963,7 @@ export default function CheckoutPagamento() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-xs uppercase tracking-[0.18em] text-white/70">
-                            {paymentMethod === "credit_card"
-                              ? "Cartão de crédito"
-                              : "Cartão de débito"}
+                            Cartão de crédito
                           </p>
 
                           <p className="mt-5 text-lg tracking-[0.16em]">

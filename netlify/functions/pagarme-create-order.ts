@@ -1,7 +1,7 @@
 // netlify/functions/pagarme-create-order.ts
 import type { Handler } from "@netlify/functions";
 
-type PaymentMethod = "pix" | "boleto" | "credit_card" | "debit_card";
+type PaymentMethod = "pix" | "boleto" | "credit_card";
 
 type AddressInput = {
   line1?: string;
@@ -95,7 +95,6 @@ type CreateOrderBody = {
   pix?: PixInput;
   boleto?: BoletoInput;
   creditCard?: CardPaymentInput;
-  debitCard?: CardPaymentInput;
 };
 
 const defaultHeaders = {
@@ -236,8 +235,7 @@ function buildPayment(body: CreateOrderBody) {
       return buildBoletoPayment(body);
     case "credit_card":
       return buildCreditCardPayment(body);
-    case "debit_card":
-      return buildDebitCardPayment(body);
+
     default:
       throw new Error("paymentMethod inválido");
   }
@@ -298,26 +296,6 @@ function buildCreditCardPayment(body: CreateOrderBody) {
   });
 }
 
-function buildDebitCardPayment(body: CreateOrderBody) {
-  const d = body.debitCard;
-  if (!d) throw new Error("debitCard é obrigatório para paymentMethod=debit_card");
-
-  const billingAddress = d.billingAddress || body.customer.address;
-
-  return removeUndefined({
-    payment_method: "debit_card",
-    debit_card: removeUndefined({
-      installments: d.installments ?? 1,
-      statement_descriptor: sanitizeStatementDescriptor(
-        d.statementDescriptor || "CALEA"
-      ),
-      recurrence: d.recurrence ?? false,
-      authentication: d.authentication,
-      metadata: d.metadata,
-      ...resolveCardSource(d, billingAddress),
-    }),
-  });
-}
 
 function resolveCardSource(input: CardPaymentInput, billingAddress?: AddressInput) {
   const hasCardId = !!input.cardId;
@@ -431,7 +409,7 @@ function validateBaseBody(body: CreateOrderBody) {
   }
 
   if (
-    (body.paymentMethod === "credit_card" || body.paymentMethod === "debit_card") &&
+    body.paymentMethod === "credit_card" &&
     !body.customer.address
   ) {
     throw new Error(
