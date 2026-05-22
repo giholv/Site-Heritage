@@ -1,5 +1,5 @@
 // src/pages/CheckoutIdentificacao.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ShoppingBag,
@@ -9,6 +9,13 @@ import {
   ArrowLeft,
   ShieldCheck,
   MapPin,
+  AlertCircle,
+  Loader2,
+  Lock,
+  Truck,
+  Sparkles,
+  Home,
+  ChevronRight,
 } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -20,6 +27,9 @@ const CALEA = {
   accent: "#b08d57",
   bg: "#fcfaf6",
   line: "#e9e2d6",
+  soft: "#f6f3ee",
+  muted: "#8a8175",
+  danger: "#dc2626",
 };
 
 const FORM_STORAGE_KEY = "checkout_identificacao_v2";
@@ -184,14 +194,90 @@ function Step({
   );
 }
 
+function ErrorText({ children }: { children?: string }) {
+  if (!children) return null;
+
+  return (
+    <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-red-600">
+      <AlertCircle className="h-3.5 w-3.5" />
+      {children}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  required,
+  error,
+  children,
+  hint,
+  className = "",
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: React.ReactNode;
+  hint?: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label className="flex items-center gap-1 text-sm font-semibold text-[#3f3a34]">
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </label>
+      <div className="mt-2">{children}</div>
+      {hint && !error && <p className="mt-1.5 text-xs text-[#8a8175]">{hint}</p>}
+      <ErrorText>{error}</ErrorText>
+    </div>
+  );
+}
+
+function inputClass(error?: string) {
+  return [
+    "h-12 w-full rounded-2xl border bg-[#fffdf9] px-4 text-sm text-[#2f2a24] outline-none transition",
+    "placeholder:text-[#b5aea5] focus:bg-white focus:ring-4",
+    error
+      ? "border-red-300 focus:border-red-500 focus:ring-red-100"
+      : "border-[#ddd5c9] focus:border-[#2b554e] focus:ring-[#2b554e]/10",
+  ].join(" ");
+}
+
+function InfoBadge({
+  Icon,
+  title,
+  text,
+}: {
+  Icon: React.ElementType;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-[#e9e2d6]">
+        <Icon className="h-4 w-4 text-[#2b554e]" />
+      </span>
+      <div>
+        <p className="text-sm font-semibold text-[#2b554e]">{title}</p>
+        <p className="mt-0.5 text-xs leading-5 text-[#8a8175]">{text}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function CheckoutIdentificacao() {
   const navigate = useNavigate();
+  const topRef = useRef<HTMLDivElement | null>(null);
   const { state } = useCart();
 
   const items = state.items ?? [];
 
   useEffect(() => {
-    if (!items.length) navigate("/checkout");
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, []);
+
+  useEffect(() => {
+    if (!items.length) navigate("/checkout", { replace: true });
   }, [items.length, navigate]);
 
   const [form, setForm] = useState<Form>(() => {
@@ -233,6 +319,8 @@ export default function CheckoutIdentificacao() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepAutoFilled, setCepAutoFilled] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(form));
@@ -256,6 +344,75 @@ export default function CheckoutIdentificacao() {
       }));
     }
   }, [checkoutDraft, form.cep]);
+
+  useEffect(() => {
+    const cep = onlyDigits(form.cep);
+
+    if (cep.length !== 8) {
+      setCepAutoFilled(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function fetchAddressByCep() {
+      setCepLoading(true);
+
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+          signal: controller.signal,
+        });
+
+        const data = await response.json();
+
+        if (cancelled) return;
+
+        if (data?.erro) {
+          setErrors((prev) => ({
+            ...prev,
+            cep: "CEP não encontrado.",
+          }));
+          setCepAutoFilled(false);
+          return;
+        }
+
+        setForm((prev) => ({
+          ...prev,
+          street: prev.street || data.logradouro || "",
+          neighborhood: prev.neighborhood || data.bairro || "",
+          city: prev.city || data.localidade || "",
+          state: prev.state || data.uf || "",
+        }));
+
+        setErrors((prev) => {
+          const copy = { ...prev };
+          delete copy.cep;
+          delete copy.street;
+          delete copy.neighborhood;
+          delete copy.city;
+          delete copy.state;
+          return copy;
+        });
+
+        setCepAutoFilled(true);
+      } catch (error: any) {
+        if (error?.name !== "AbortError") {
+          setCepAutoFilled(false);
+        }
+      } finally {
+        if (!cancelled) setCepLoading(false);
+      }
+    }
+
+    const timer = window.setTimeout(fetchAddressByCep, 350);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [form.cep]);
 
   const getItemName = (it: any) => it?.name ?? it?.title ?? "Item";
   const getItemImage = (it: any) => it?.image ?? it?.img ?? it?.thumbnail ?? "";
@@ -609,7 +766,10 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
   const e = validate();
   setErrors(e);
 
-  if (Object.keys(e).length) return;
+  if (Object.keys(e).length) {
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
 
   setSaving(true);
 
@@ -628,129 +788,141 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
 }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
+    <div ref={topRef} className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
       <Header />
 
-      <main className="pt-[160px] md:pt-[180px]">
-        <section className="border-b" style={{ borderColor: CALEA.line }}>
-          <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-            <div className="text-center">
-              <p
-                className="text-[11px] uppercase tracking-[0.28em]"
-                style={{ color: CALEA.accent }}
-              >
-                Checkout
-              </p>
+      <main className="pt-[128px] md:pt-[156px]">
+        <section className="relative overflow-hidden border-b" style={{ borderColor: CALEA.line }}>
+          <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#b08d57]/10 blur-3xl" />
+          <div className="pointer-events-none absolute -right-24 top-10 h-72 w-72 rounded-full bg-[#2b554e]/10 blur-3xl" />
 
-              <h1
-                className="mt-2 text-2xl font-medium sm:text-3xl"
-                style={{ color: CALEA.primary }}
-              >
-                Seus dados para entrega
-              </h1>
+          <div className="relative mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+            <button
+              type="button"
+              onClick={() => navigate("/checkout")}
+              className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-[#6f675d] ring-1 ring-[#e9e2d6] transition hover:bg-white hover:text-[#2b554e]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para a sacola
+            </button>
 
-              <p className="mt-2 text-sm text-gray-500">
-                Preencha suas informações para seguir ao pagamento.
-              </p>
-            </div>
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+              <div>
+                <p
+                  className="text-[11px] uppercase tracking-[0.32em]"
+                  style={{ color: CALEA.accent }}
+                >
+                  Checkout seguro
+                </p>
 
-            <div className="mx-auto mt-8 max-w-3xl">
-              <div className="flex items-center gap-6 overflow-x-auto px-2 pb-2 [-webkit-overflow-scrolling:touch] sm:justify-between sm:overflow-visible sm:px-0">
-                <Step
-                  label="Sacola"
-                  Icon={ShoppingBag}
-                  onClick={() => navigate("/checkout")}
-                />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
-                <Step label="Identificação" active Icon={User} />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
-                <Step label="Pagamento" Icon={CreditCard} />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
-                <Step label="Confirmação" Icon={CheckCircle} />
+                <h1
+                  className="mt-3 text-3xl font-medium leading-tight sm:text-4xl"
+                  style={{ color: CALEA.primary }}
+                >
+                  Dados de entrega
+                </h1>
+
+                <p className="mt-3 max-w-xl text-sm leading-6 text-[#7c7469]">
+                  Complete seus dados para criarmos o pedido e seguir para o pagamento com segurança.
+                </p>
+              </div>
+
+              <div className="rounded-[28px] bg-white/80 p-3 shadow-sm ring-1 ring-[#e9e2d6] backdrop-blur">
+                <div className="grid grid-cols-4 gap-2">
+                  <Step
+                    label="Sacola"
+                    Icon={ShoppingBag}
+                    onClick={() => navigate("/checkout")}
+                  />
+                  <Step label="Dados" active Icon={User} />
+                  <Step label="Pagamento" Icon={CreditCard} />
+                  <Step label="Confirmação" Icon={CheckCircle} />
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
-                <div className="mb-6 flex items-center justify-between gap-4">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="space-y-6">
+              <div className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
+                    <div className="inline-flex items-center gap-2 rounded-full bg-[#fcfaf6] px-3 py-1 text-xs font-semibold text-[#2b554e] ring-1 ring-[#e9e2d6]">
+                      <User className="h-3.5 w-3.5" />
+                      Identificação
+                    </div>
+
                     <h2
-                      className="text-lg font-semibold"
+                      className="mt-3 text-xl font-semibold"
                       style={{ color: CALEA.primary }}
                     >
-                      Identificação
+                      Quem vai receber a compra?
                     </h2>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Use os dados do destinatário da compra.
+
+                    <p className="mt-1 text-sm leading-6 text-[#8a8175]">
+                      Os campos com asterisco são obrigatórios.
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => navigate("/checkout")}
-                    className="inline-flex items-center gap-2 text-sm text-gray-600 transition hover:text-black"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Voltar
-                  </button>
+                  <div className="rounded-2xl bg-[#fcfaf6] px-4 py-3 text-xs leading-5 text-[#8a8175] ring-1 ring-[#e9e2d6]">
+                    <strong className="block text-[#2b554e]">Dica</strong>
+                    Use o WhatsApp do comprador para receber atualizações do pedido.
+                  </div>
                 </div>
 
+                {Object.keys(errors).length > 0 && (
+                  <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    Revise os campos destacados antes de continuar.
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <label className="text-sm font-semibold text-gray-700">
-                      Nome completo
-                    </label>
+                  <Field
+                    label="Nome completo"
+                    required
+                    error={errors.name}
+                    className="sm:col-span-2"
+                  >
                     <input
                       value={form.name}
                       onChange={(e) => setField("name", e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
-                      placeholder="Seu nome"
+                      className={inputClass(errors.name)}
+                      placeholder="Digite o nome completo"
+                      autoComplete="name"
                     />
-                    {errors.name && (
-                      <div className="mt-1 text-sm text-red-600">{errors.name}</div>
-                    )}
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">
-                      E-mail
-                    </label>
+                  <Field label="E-mail" required error={errors.email}>
                     <input
                       value={form.email}
                       onChange={(e) => setField("email", e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
+                      className={inputClass(errors.email)}
                       placeholder="voce@exemplo.com"
                       inputMode="email"
+                      autoComplete="email"
                     />
-                    {errors.email && (
-                      <div className="mt-1 text-sm text-red-600">{errors.email}</div>
-                    )}
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">
-                      WhatsApp
-                    </label>
+                  <Field label="WhatsApp" required error={errors.phone}>
                     <input
                       value={form.phone}
                       onChange={(e) => setField("phone", formatPhone(e.target.value))}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
+                      className={inputClass(errors.phone)}
                       placeholder="(11) 99999-9999"
                       inputMode="numeric"
+                      autoComplete="tel"
                     />
-                    {errors.phone && (
-                      <div className="mt-1 text-sm text-red-600">{errors.phone}</div>
-                    )}
-                  </div>
+                  </Field>
 
-                  <div className="sm:col-span-2">
-                    <label className="text-sm font-semibold text-gray-700">
-                      CPF
-                    </label>
+                  <Field
+                    label="CPF"
+                    required
+                    error={errors.document}
+                    hint="Usado apenas para emissão e identificação do pedido."
+                    className="sm:col-span-2"
+                  >
                     <input
                       value={form.document}
                       onChange={(e) => setField("document", formatCPF(e.target.value))}
@@ -762,145 +934,161 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                           }));
                         }
                       }}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
+                      className={inputClass(errors.document)}
                       placeholder="000.000.000-00"
                       inputMode="numeric"
+                      autoComplete="off"
                     />
-                    {errors.document && (
-                      <div className="mt-1 text-sm text-red-600">
-                        {errors.document}
-                      </div>
-                    )}
-                  </div>
+                  </Field>
                 </div>
+              </div>
 
-                <div className="my-6 h-px bg-[#eee5d8]" />
-
-                <div className="mb-4 flex items-center gap-2">
-                  <MapPin className="h-4 w-4" style={{ color: CALEA.accent }} />
-                  <h3 className="font-semibold" style={{ color: CALEA.primary }}>
-                    Endereço de entrega
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <label className="text-sm font-semibold text-gray-700">
-                      CEP
-                    </label>
+                    <div className="inline-flex items-center gap-2 rounded-full bg-[#fcfaf6] px-3 py-1 text-xs font-semibold text-[#2b554e] ring-1 ring-[#e9e2d6]">
+                      <MapPin className="h-3.5 w-3.5" />
+                      Endereço
+                    </div>
+
+                    <h2
+                      className="mt-3 text-xl font-semibold"
+                      style={{ color: CALEA.primary }}
+                    >
+                      Endereço de entrega
+                    </h2>
+
+                    <p className="mt-1 text-sm leading-6 text-[#8a8175]">
+                      Ao informar o CEP, tentamos preencher o endereço automaticamente.
+                    </p>
+                  </div>
+
+                  {cepLoading && (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-[#fcfaf6] px-3 py-2 text-xs font-semibold text-[#2b554e] ring-1 ring-[#e9e2d6]">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Buscando CEP
+                    </div>
+                  )}
+
+                  {cepAutoFilled && !cepLoading && (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Endereço encontrado
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                  <Field label="CEP" required error={errors.cep} className="sm:col-span-2">
                     <input
                       value={form.cep}
                       onChange={(e) => setField("cep", formatCEP(e.target.value))}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
+                      className={inputClass(errors.cep)}
                       placeholder="00000-000"
                       inputMode="numeric"
                       maxLength={9}
+                      autoComplete="postal-code"
                     />
-                    {errors.cep && (
-                      <div className="mt-1 text-sm text-red-600">{errors.cep}</div>
-                    )}
-                  </div>
+                  </Field>
 
-                  <div className="sm:col-span-2">
-                    <label className="text-sm font-semibold text-gray-700">
-                      Rua / Avenida
-                    </label>
+                  <Field
+                    label="Rua / Avenida"
+                    required
+                    error={errors.street}
+                    className="sm:col-span-4"
+                  >
                     <input
                       value={form.street}
                       onChange={(e) => setField("street", e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
-                      placeholder="Rua Exemplo"
+                      className={inputClass(errors.street)}
+                      placeholder="Rua, avenida ou travessa"
+                      autoComplete="address-line1"
                     />
-                    {errors.street && (
-                      <div className="mt-1 text-sm text-red-600">{errors.street}</div>
-                    )}
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">
-                      Número
-                    </label>
+                  <Field label="Número" required error={errors.number} className="sm:col-span-2">
                     <input
                       value={form.number}
                       onChange={(e) => setField("number", e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
+                      className={inputClass(errors.number)}
                       placeholder="123"
+                      autoComplete="address-line2"
                     />
-                    {errors.number && (
-                      <div className="mt-1 text-sm text-red-600">{errors.number}</div>
-                    )}
-                  </div>
+                  </Field>
 
-                  <div className="sm:col-span-2">
-                    <label className="text-sm font-semibold text-gray-700">
-                      Complemento
-                    </label>
+                  <Field label="Complemento" className="sm:col-span-4">
                     <input
                       value={form.complement}
                       onChange={(e) => setField("complement", e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
+                      className={inputClass()}
                       placeholder="Apto, bloco, casa..."
                     />
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">
-                      Bairro
-                    </label>
+                  <Field
+                    label="Bairro"
+                    required
+                    error={errors.neighborhood}
+                    className="sm:col-span-2"
+                  >
                     <input
                       value={form.neighborhood}
                       onChange={(e) => setField("neighborhood", e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
-                      placeholder="Centro"
+                      className={inputClass(errors.neighborhood)}
+                      placeholder="Bairro"
                     />
-                    {errors.neighborhood && (
-                      <div className="mt-1 text-sm text-red-600">
-                        {errors.neighborhood}
-                      </div>
-                    )}
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">
-                      Cidade
-                    </label>
+                  <Field label="Cidade" required error={errors.city} className="sm:col-span-3">
                     <input
                       value={form.city}
                       onChange={(e) => setField("city", e.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
-                      placeholder="São Paulo"
+                      className={inputClass(errors.city)}
+                      placeholder="Cidade"
+                      autoComplete="address-level2"
                     />
-                    {errors.city && (
-                      <div className="mt-1 text-sm text-red-600">{errors.city}</div>
-                    )}
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">
-                      UF
-                    </label>
+                  <Field label="UF" required error={errors.state} className="sm:col-span-1">
                     <input
                       value={form.state}
                       onChange={(e) =>
                         setField("state", e.target.value.toUpperCase().slice(0, 2))
                       }
-                      className="mt-2 h-11 w-full rounded-xl border border-[#d8d1c6] px-3 outline-none transition focus:border-[#2b554e]"
+                      className={inputClass(errors.state)}
                       placeholder="SP"
                       maxLength={2}
+                      autoComplete="address-level1"
                     />
-                    {errors.state && (
-                      <div className="mt-1 text-sm text-red-600">{errors.state}</div>
-                    )}
-                  </div>
+                  </Field>
                 </div>
 
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <InfoBadge
+                    Icon={Lock}
+                    title="Compra segura"
+                    text="Seus dados são usados apenas para processar o pedido."
+                  />
+                  <InfoBadge
+                    Icon={Truck}
+                    title="Entrega"
+                    text="O pedido segue com o frete selecionado na etapa anterior."
+                  />
+                  <InfoBadge
+                    Icon={Sparkles}
+                    title="Experiência Caléa"
+                    text="Checkout limpo, rápido e com menos atrito."
+                  />
+                </div>
+
+                <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <button
                     type="button"
                     onClick={() => navigate("/")}
-                    className="text-xs text-gray-500 underline transition hover:text-black"
+                    className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium text-[#766e64] transition hover:bg-[#fcfaf6] hover:text-[#2b554e]"
                     title="Voltar para a loja"
                   >
+                    <Home className="h-4 w-4" />
                     Voltar para a loja
                   </button>
 
@@ -908,36 +1096,54 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                     type="button"
                     onClick={handleContinue}
                     disabled={!requiredOk || saving}
-                    className="h-12 w-full rounded-full px-5 font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
+                    className="inline-flex h-12 min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[260px]"
                     style={{ backgroundColor: CALEA.accent }}
                     title={!requiredOk ? "Preencha os campos obrigatórios" : ""}
                   >
-                    {saving ? "Salvando..." : "Continuar para pagamento"}
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        Continuar para pagamento
+                        <ChevronRight className="h-4 w-4" />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
             </div>
 
-            <aside className="h-fit space-y-6 lg:sticky lg:top-24">
-              <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <div
-                    className="text-sm font-semibold"
-                    style={{ color: CALEA.primary }}
-                  >
-                    Resumo do pedido
+            <aside className="h-fit space-y-6 lg:sticky lg:top-28">
+              <div className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div>
+                    <p
+                      className="text-[11px] uppercase tracking-[0.24em]"
+                      style={{ color: CALEA.accent }}
+                    >
+                      Resumo
+                    </p>
+                    <h2
+                      className="mt-2 text-lg font-semibold"
+                      style={{ color: CALEA.primary }}
+                    >
+                      Seu pedido
+                    </h2>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => navigate("/checkout")}
-                    className="text-xs text-gray-500 underline transition hover:text-black"
+                    className="rounded-full px-3 py-1.5 text-xs font-medium text-[#8a8175] ring-1 ring-[#e9e2d6] transition hover:bg-[#fcfaf6] hover:text-[#2b554e]"
                   >
-                    Voltar
+                    Editar
                   </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
                   {items.map((it: any) => {
                     const name = getItemName(it);
                     const img = getItemImage(it);
@@ -945,7 +1151,10 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                     const price = getItemPrice(it);
 
                     return (
-                      <div key={it.id ?? `${name}-${qty}`} className="flex items-center gap-3">
+                      <div
+                        key={it.id ?? `${name}-${qty}`}
+                        className="flex items-center gap-3 rounded-2xl bg-[#fcfaf6] p-3 ring-1 ring-[#e9e2d6]"
+                      >
                         {img ? (
                           <img
                             src={img}
@@ -963,13 +1172,10 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                           >
                             {name}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            Qtd: {qty}
-                            {shippingDeadline ? ` • ${shippingDeadline}` : ""}
-                          </p>
+                          <p className="mt-1 text-xs text-[#8a8175]">Quantidade: {qty}</p>
                         </div>
 
-                        <p className="text-sm font-semibold">
+                        <p className="text-sm font-semibold text-[#3f3a34]">
                           {moneyBRL(price * qty)}
                         </p>
                       </div>
@@ -981,14 +1187,14 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
 
                 <div className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Subtotal</span>
-                    <span className="font-semibold">{moneyBRL(subtotal)}</span>
+                    <span className="text-[#766e64]">Subtotal</span>
+                    <span className="font-semibold text-[#3f3a34]">{moneyBRL(subtotal)}</span>
                   </div>
 
                   {giftWrap && (
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Embalagem presente</span>
-                      <span className="font-semibold">
+                      <span className="text-[#766e64]">Embalagem presente</span>
+                      <span className="font-semibold text-[#3f3a34]">
                         {moneyBRL(giftWrapPrice)}
                       </span>
                     </div>
@@ -996,41 +1202,48 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
 
                   {shippingPrice > 0 && (
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">
+                      <span className="text-[#766e64]">
                         Frete{shippingName ? ` (${shippingName})` : ""}
                       </span>
-                      <span className="font-semibold">
+                      <span className="font-semibold text-[#3f3a34]">
                         {moneyBRL(shippingPrice)}
                       </span>
                     </div>
                   )}
+
+                  {checkoutDraft?.discount_cents ? (
+                    <div className="flex items-center justify-between text-emerald-700">
+                      <span>Desconto</span>
+                      <span className="font-semibold">
+                        -{moneyBRL(Number(checkoutDraft.discount_cents) / 100)}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="my-5 h-px bg-[#eee5d8]" />
 
-                <div className="flex items-center justify-between text-base">
-                  <span
-                    className="font-semibold"
-                    style={{ color: CALEA.primary }}
-                  >
-                    Total
-                  </span>
-                  <span
-                    className="text-xl font-semibold"
-                    style={{ color: CALEA.primary }}
-                  >
-                    {moneyBRL(total)}
-                  </span>
+                <div className="rounded-3xl bg-[#2b554e] p-5 text-white">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm opacity-80">Total</span>
+                    <span className="text-2xl font-semibold">{moneyBRL(total)}</span>
+                  </div>
+
+                  {shippingDeadline && (
+                    <p className="mt-2 text-xs opacity-80">
+                      Prazo estimado: {shippingDeadline}
+                    </p>
+                  )}
                 </div>
 
-                <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4">
+                <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
                   <div className="flex items-start gap-3">
                     <ShieldCheck
                       className="mt-0.5 h-5 w-5 shrink-0"
                       style={{ color: CALEA.primary }}
                     />
-                    <p className="text-xs leading-5 text-gray-500">
-                      Seus dados ficam salvos para continuar a compra com segurança.
+                    <p className="text-xs leading-5 text-[#8a8175]">
+                      Ao continuar, o pedido fica salvo como rascunho para finalizar o pagamento.
                     </p>
                   </div>
                 </div>

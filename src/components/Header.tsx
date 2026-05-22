@@ -134,7 +134,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
         >
           <div className="container mx-auto px-3 md:px-6 h-9 md:h-10 flex items-center justify-center">
             <span className="text-[12px] md:text-[14px] lg:text-[15px] opacity-95 text-center leading-none">
-              Frete grátis a partir de <strong>R$699</strong> • 5% OFF no PIX • Troca fácil
+              Frete grátis a partir de <strong>R$299</strong> • 5% OFF no PIX • Troca fácil
             </span>
           </div>
         </div>

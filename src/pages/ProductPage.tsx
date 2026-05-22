@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+
 import { supabase } from "../lib/supabase";
 import ProductHero, { ProductImage } from "../components/ProductHero";
 import Header from "../components/Header";
@@ -71,8 +73,8 @@ function resolveImageUrl(path: string) {
   return data.publicUrl || FALLBACK_IMAGE;
 }
 
-function onlyDigits(v: string) {
-  return String(v ?? "").replace(/\D/g, "");
+function onlyDigits(value: string) {
+  return String(value ?? "").replace(/\D/g, "");
 }
 
 function formatCep(value: string) {
@@ -108,10 +110,6 @@ export default function ProductPage() {
     return skus.find((sku) => sku.id === selectedSkuId) ?? skus[0] ?? null;
   }, [skus, selectedSkuId]);
 
-  const selectedShipping = useMemo(() => {
-    return shippingOptions.find((op) => op.id === selectedShippingId) ?? null;
-  }, [shippingOptions, selectedShippingId]);
-
   const variants = useMemo(() => {
     return skus.map((sku, index) => ({
       id: sku.id,
@@ -123,6 +121,7 @@ export default function ProductPage() {
   }, [skus]);
 
   const price = selectedSku ? selectedSku.price_cents / 100 : 0;
+  const isAvailable = Boolean(product?.status === "active" && selectedSku?.active);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,12 +168,11 @@ export default function ProductPage() {
         setSkus(safeSkus);
         setSelectedSkuId(safeSkus[0]?.id ?? "");
       } catch (err: any) {
-        if (cancelled) return;
-        setError(err?.message || "Erro ao carregar produto.");
-      } finally {
         if (!cancelled) {
-          setLoading(false);
+          setError(err?.message || "Erro ao carregar produto.");
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
 
@@ -221,12 +219,12 @@ export default function ProductPage() {
         normalizedImages.length > 0
           ? normalizedImages
           : [
-            {
-              id: "fallback",
-              src: FALLBACK_IMAGE,
-              alt: product.name || "Produto",
-            },
-          ]
+              {
+                id: "fallback",
+                src: FALLBACK_IMAGE,
+                alt: product.name || "Produto",
+              },
+            ]
       );
     }
 
@@ -251,19 +249,21 @@ export default function ProductPage() {
   }, [postalCode, quantity]);
 
   function addCurrentItemToCart() {
-    if (!product || !selectedSku) return;
+    if (!product || !selectedSku || !isAvailable) return;
 
     add({
       id: selectedSku.id,
+      sku_id: selectedSku.id,
       name: product.name,
-      price: selectedSku.price_cents / 100,
+      price,
       image: images[0]?.src || FALLBACK_IMAGE,
       variant:
         selectedSku.title?.trim() ||
         selectedSku.variant_name?.trim() ||
         "Variação",
       qty: quantity,
-    });
+      available: true,
+    } as any);
   }
 
   function handleAddToCart() {
@@ -298,12 +298,10 @@ export default function ProductPage() {
     setSelectedShippingId("");
 
     try {
-      const totalWeight = Math.max(0.03, 0.03 * quantity);
-
       const payload = {
         to_postcode: cleanCep,
         insurance_value: 0,
-        weight: Number(totalWeight.toFixed(2)),
+        weight: Number(Math.max(0.03, 0.03 * quantity).toFixed(2)),
         services: "1,2,17,3",
       };
 
@@ -314,21 +312,14 @@ export default function ProductPage() {
       });
 
       const text = await res.text();
-      let data: any = {};
-
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = {};
-      }
+      const data = text ? JSON.parse(text) : {};
 
       if (!res.ok) {
-        const msg =
+        throw new Error(
           data?.error ||
-          data?.details?.error ||
-          `Falha ao calcular frete (${res.status})`;
-
-        throw new Error(msg);
+            data?.details?.error ||
+            `Falha ao calcular frete (${res.status})`
+        );
       }
 
       const opts: ShippingOption[] = Array.isArray(data?.options)
@@ -351,33 +342,73 @@ export default function ProductPage() {
   }
 
   if (loading) {
-    return <div className="px-4 py-10">Carregando...</div>;
+    return (
+      <div className="min-h-screen bg-[#fcfaf6]">
+        <Header />
+        <main className="mx-auto max-w-7xl px-5 pt-[130px] md:pt-[160px]">
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div className="aspect-[4/5] animate-pulse rounded-[32px] bg-[#eee7dc]" />
+            <div className="space-y-5">
+              <div className="h-5 w-32 animate-pulse rounded-full bg-[#eee7dc]" />
+              <div className="h-14 w-4/5 animate-pulse rounded-2xl bg-[#eee7dc]" />
+              <div className="h-12 w-52 animate-pulse rounded-2xl bg-[#eee7dc]" />
+              <div className="h-14 w-full animate-pulse rounded-full bg-[#eee7dc]" />
+            </div>
+          </div>
+        </main>
+      </div>
+    );
   }
 
-  if (error) {
-    return <div className="px-4 py-10">{error}</div>;
-  }
-
-  if (!product) {
-    return <div className="px-4 py-10">Produto não encontrado.</div>;
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-[#fcfaf6]">
+        <Header />
+        <main className="mx-auto max-w-3xl px-5 pt-[140px] text-center">
+          <p className="text-sm uppercase tracking-[0.24em] text-[#b08d57]">
+            Produto
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold text-[#2b554e]">
+            {error || "Produto não encontrado."}
+          </h1>
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="mt-6 rounded-full bg-[#2b554e] px-7 py-3 text-sm font-semibold text-white"
+          >
+            Voltar para a loja
+          </button>
+        </main>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f6f3ee]">
-      <div className="mb-6">
-        <Header />
-      </div>
+    <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
+      <Header />
 
-      <main className="pt-[160px] md:pt-[180px]">
-        <section
-          className="mx-auto max-w-7xl px-4 pb-8 md:px-6 lg:px-8"
-          style={{ marginTop: "20px" }}
-        >
+      <main className="pt-[112px] md:pt-[145px]">
+        <section className="mx-auto w-full max-w-[1440px] px-0 pb-16 md:px-6 lg:px-8">
+          <div className="mb-4 hidden items-center gap-2 px-1 text-[12px] text-[#8b8175] md:flex">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-1 transition hover:text-[#2b554e]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Voltar
+            </button>
+
+            <span>/</span>
+
+            <span className="truncate text-[#2b554e]">{product.name}</span>
+          </div>
+
           <ProductHero
             name={product.name}
             description={product.description || ""}
             price={price}
-            installmentText=""
+            installmentText="em até 3x sem juros"
             variants={variants}
             selectedVariant={selectedSku?.id ?? ""}
             onSelectVariant={setSelectedSkuId}
@@ -390,7 +421,7 @@ export default function ProductPage() {
             }
             onAddToCart={handleAddToCart}
             onBuyNow={handleBuyNow}
-            images={images ?? []}
+            images={images}
             postalCode={postalCode}
             onPostalCodeChange={(value) => setPostalCode(formatCep(value))}
             onCalculateShipping={handleCalculateShipping}

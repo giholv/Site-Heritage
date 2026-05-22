@@ -99,7 +99,7 @@ export default function CartDrawer({
           {/* faixa frete */}
           <div className="mt-4 rounded-md bg-[#f3f0e0] px-4 py-3 text-sm text-[#2b554e] border border-[#2b554e]/10">
             <span>
-              Compre a partir de <strong>R$699</strong> e ganhe <strong>FRETE GRÁTIS</strong>!
+              Compre a partir de <strong>R$299</strong> e ganhe <strong>FRETE GRÁTIS</strong>!
             </span>
 
             <div className="mt-3 h-1.5 w-full bg-[#2b554e]/10 rounded-full overflow-hidden">

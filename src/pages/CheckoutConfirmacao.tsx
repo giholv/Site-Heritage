@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   User,
   XCircle,
+  ArrowLeft,
 } from "lucide-react";
 
 import Header from "../components/Header";
@@ -35,7 +36,6 @@ function moneyBRL(value: number) {
 
 function safeJsonParse(raw: string | null) {
   if (!raw) return null;
-
   try {
     return JSON.parse(raw);
   } catch {
@@ -65,26 +65,11 @@ function getCheckoutCouponCode(checkoutDraft: any) {
 }
 
 function getCheckoutDiscountCents(checkoutDraft: any) {
-  if (typeof checkoutDraft?.discount_cents === "number") {
-    return checkoutDraft.discount_cents;
-  }
-
-  if (typeof checkoutDraft?.discountCents === "number") {
-    return checkoutDraft.discountCents;
-  }
-
-  if (typeof checkoutDraft?.coupon?.discount_cents === "number") {
-    return checkoutDraft.coupon.discount_cents;
-  }
-
-  if (typeof checkoutDraft?.coupon?.discountCents === "number") {
-    return checkoutDraft.coupon.discountCents;
-  }
-
-  if (typeof checkoutDraft?.discount === "number") {
-    return Math.round(checkoutDraft.discount * 100);
-  }
-
+  if (typeof checkoutDraft?.discount_cents === "number") return checkoutDraft.discount_cents;
+  if (typeof checkoutDraft?.discountCents === "number") return checkoutDraft.discountCents;
+  if (typeof checkoutDraft?.coupon?.discount_cents === "number") return checkoutDraft.coupon.discount_cents;
+  if (typeof checkoutDraft?.coupon?.discountCents === "number") return checkoutDraft.coupon.discountCents;
+  if (typeof checkoutDraft?.discount === "number") return Math.round(checkoutDraft.discount * 100);
   return 0;
 }
 
@@ -104,9 +89,7 @@ function normalizeStatus(status?: string) {
   const value = String(status || "").toLowerCase();
 
   if (["paid", "approved", "captured"].includes(value)) return "paid";
-  if (["failed", "refused", "denied", "not_authorized"].includes(value)) {
-    return "failed";
-  }
+  if (["failed", "refused", "denied", "not_authorized"].includes(value)) return "failed";
   if (["canceled", "cancelled"].includes(value)) return "canceled";
   if (["processing", "authorized"].includes(value)) return "processing";
 
@@ -148,63 +131,43 @@ function getMessage(status?: string) {
     case "paid":
       return "Seu pagamento foi aprovado. Agora vamos preparar seu pedido com todo cuidado.";
     case "failed":
-      return "Não conseguimos aprovar o pagamento. Você pode tentar novamente com outro cartão ou escolher outra forma de pagamento.";
+      return "Não conseguimos aprovar o pagamento. Você pode tentar novamente.";
     case "canceled":
-      return "Este pedido foi cancelado. Você pode refazer a compra quando desejar.";
+      return "Este pedido foi cancelado.";
     case "processing":
-      return "Seu pagamento foi enviado para análise. A confirmação será atualizada assim que a Pagar.me retornar o status oficial.";
+      return "Seu pagamento está em análise. A atualização acontecerá automaticamente.";
     default:
-      return "Obrigado pela sua compra. A confirmação do pagamento será atualizada automaticamente assim que a Pagar.me retornar o status oficial.";
+      return "Recebemos seu pedido. Aguardando a confirmação oficial do pagamento.";
   }
 }
 
 function getStatusIcon(status?: string) {
   switch (normalizeStatus(status)) {
     case "paid":
-      return <CheckCircle size={28} />;
+      return <CheckCircle size={30} />;
     case "failed":
-      return <XCircle size={28} />;
+      return <XCircle size={30} />;
     case "canceled":
-      return <AlertCircle size={28} />;
+      return <AlertCircle size={30} />;
     case "processing":
-      return <Clock size={28} />;
+      return <Clock size={30} />;
     default:
-      return <CheckCircle size={28} />;
+      return <Clock size={30} />;
   }
 }
 
 function getStatusColors(status?: string) {
   switch (normalizeStatus(status)) {
     case "paid":
-      return {
-        bg: "#edf5f2",
-        color: "#2b554e",
-        border: "#cfe3dc",
-      };
+      return { bg: "#edf5f2", color: "#2b554e", border: "#cfe3dc" };
     case "failed":
-      return {
-        bg: "#fff1f2",
-        color: "#b42318",
-        border: "#fecdd3",
-      };
+      return { bg: "#fff1f2", color: "#b42318", border: "#fecdd3" };
     case "canceled":
-      return {
-        bg: "#fff7ed",
-        color: "#c2410c",
-        border: "#fed7aa",
-      };
+      return { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" };
     case "processing":
-      return {
-        bg: "#fffbeb",
-        color: "#a16207",
-        border: "#fde68a",
-      };
+      return { bg: "#fffbeb", color: "#a16207", border: "#fde68a" };
     default:
-      return {
-        bg: "#edf5f2",
-        color: "#2b554e",
-        border: "#cfe3dc",
-      };
+      return { bg: "#edf5f2", color: "#2b554e", border: "#cfe3dc" };
   }
 }
 
@@ -223,43 +186,6 @@ function getPaymentMethodLabel(method?: string) {
   }
 }
 
-function Step({
-  label,
-  active,
-  Icon,
-}: {
-  label: string;
-  active?: boolean;
-  Icon: React.ElementType;
-}) {
-  return (
-    <div className="flex shrink-0 flex-col items-center gap-2">
-      <span
-        className={[
-          "inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors",
-          active ? "text-white" : "border-[#d8d1c6] text-[#b3aca2]",
-        ].join(" ")}
-        style={{
-          backgroundColor: active ? CALEA.primary : "white",
-          borderColor: active ? CALEA.primary : "#d8d1c6",
-        }}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-
-      <span
-        className={[
-          "whitespace-nowrap text-xs sm:text-sm",
-          active ? "font-semibold" : "text-gray-400",
-        ].join(" ")}
-        style={{ color: active ? CALEA.primary : undefined }}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
-
 function isUuid(value?: string | null) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     String(value || "")
@@ -268,15 +194,58 @@ function isUuid(value?: string | null) {
 
 async function copyToClipboard(value?: string, onCopied?: () => void) {
   if (!value) return;
-
   await navigator.clipboard.writeText(value);
   onCopied?.();
+}
+
+function Step({
+  label,
+  active,
+  done,
+  Icon,
+}: {
+  label: string;
+  active?: boolean;
+  done?: boolean;
+  Icon: React.ElementType;
+}) {
+  return (
+    <div className="flex min-w-[82px] flex-col items-center gap-2">
+      <span
+        className={[
+          "inline-flex h-10 w-10 items-center justify-center rounded-full border transition",
+          active
+            ? "border-[#2b554e] bg-[#2b554e] text-white shadow-[0_10px_22px_rgba(43,85,78,0.18)]"
+            : done
+              ? "border-[#b08d57] bg-[#fff8ed] text-[#b08d57]"
+              : "border-[#ddd5ca] bg-white text-[#aaa197]",
+        ].join(" ")}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+
+      <span
+        className={[
+          "whitespace-nowrap text-[11px] sm:text-xs",
+          active ? "font-semibold text-[#2b554e]" : "text-[#9a9187]",
+        ].join(" ")}
+      >
+        {label}
+      </span>
+    </div>
+  );
 }
 
 export default function CheckoutConfirmacao() {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
-  const [resolvedOrderNumber, setResolvedOrderNumber] = useState<string | null>(null);
+  const [resolvedOrderNumber] = useState<string | null>(null);
+  const [dbOrderStatus, setDbOrderStatus] = useState<string | null>(null);
+  const [dbPaymentStatus, setDbPaymentStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, []);
 
   const paymentResponse = useMemo(() => getPaymentResponse(), []);
   const checkoutDraft = useMemo(() => getCheckoutDraft(), []);
@@ -285,9 +254,6 @@ export default function CheckoutConfirmacao() {
   const order = getOrder(paymentResponse);
   const charge = getCharge(order);
   const transaction = getTransaction(charge);
-
-  const [dbOrderStatus, setDbOrderStatus] = useState<string | null>(null);
-  const [dbPaymentStatus, setDbPaymentStatus] = useState<string | null>(null);
 
   const paymentMethod =
     charge?.payment_method ||
@@ -323,14 +289,14 @@ export default function CheckoutConfirmacao() {
       ? initialOrderNumber
       : resolvedOrderNumber || "Pedido em processamento";
 
- const internalOrderId =
-  paymentResponse?.local_order_id ||
-  paymentResponse?.metadata?.local_order_id ||
-  paymentResponse?.order?.metadata?.local_order_id ||
-  order?.metadata?.local_order_id ||
-  sessionStorage.getItem("calea_order_id") ||
-  null;
-  
+  const internalOrderId =
+    paymentResponse?.local_order_id ||
+    paymentResponse?.metadata?.local_order_id ||
+    paymentResponse?.order?.metadata?.local_order_id ||
+    order?.metadata?.local_order_id ||
+    sessionStorage.getItem("calea_order_id") ||
+    null;
+
   useEffect(() => {
     let mounted = true;
     let intervalId: number | null = null;
@@ -362,15 +328,11 @@ export default function CheckoutConfirmacao() {
     }
 
     loadOrderStatusFromDatabase();
-
     intervalId = window.setInterval(loadOrderStatusFromDatabase, 5000);
 
     return () => {
       mounted = false;
-
-      if (intervalId) {
-        window.clearInterval(intervalId);
-      }
+      if (intervalId) window.clearInterval(intervalId);
     };
   }, [internalOrderId]);
 
@@ -409,64 +371,73 @@ export default function CheckoutConfirmacao() {
 
   const isPix = paymentMethod === "pix";
   const isBoleto = paymentMethod === "boleto";
-  const isCard =
-    paymentMethod === "credit_card" || paymentMethod === "debit_card";
+  const isCard = paymentMethod === "credit_card" || paymentMethod === "debit_card";
 
   function handleTryAgain() {
     navigate("/checkout/pagamento");
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
+    <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
       <Header />
 
-      <main className="pt-[160px] md:pt-[180px]">
-        <section className="border-b" style={{ borderColor: CALEA.line }}>
-          <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-            <div className="text-center">
-              <p
-                className="text-[11px] uppercase tracking-[0.28em]"
-                style={{ color: CALEA.accent }}
-              >
-                Checkout
-              </p>
+      <main className="pt-[112px] md:pt-[145px]">
+        <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="mb-5 inline-flex items-center gap-2 text-sm text-[#756d63] transition hover:text-[#2b554e]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para a loja
+            </button>
 
-              <h1
-                className="mt-2 text-2xl font-medium sm:text-3xl"
-                style={{ color: CALEA.primary }}
-              >
-                Confirmação do pedido
-              </h1>
+            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[#b08d57]">
+                  Checkout
+                </p>
 
-              <p className="mt-2 text-sm text-gray-500">
-                Acompanhe o status do pagamento e os dados da compra.
-              </p>
+                <h1 className="mt-2 text-[30px] font-light leading-tight tracking-[-0.04em] text-[#2b554e] sm:text-[40px]">
+                  Confirmação do pedido
+                </h1>
+
+                <p className="mt-2 max-w-xl text-sm leading-6 text-[#7a746c]">
+                  Acompanhe o status do pagamento e os detalhes da sua compra.
+                </p>
+              </div>
+
+              <div className="rounded-full border border-[#e5dbce] bg-white px-4 py-2 text-sm text-[#2b554e] shadow-sm">
+                {getStatusLabel(status)}
+              </div>
             </div>
 
-            <div className="mx-auto mt-8 max-w-3xl">
-              <div className="flex items-center gap-6 overflow-x-auto px-2 pb-2 [-webkit-overflow-scrolling:touch] sm:justify-between sm:overflow-visible sm:px-0">
-                <Step label="Sacola" Icon={ShoppingBag} />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
-                <Step label="Identificação" Icon={User} />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
-                <Step label="Pagamento" Icon={CreditCard} />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
+            <div className="mt-8 overflow-x-auto pb-2">
+              <div className="flex min-w-max items-center gap-4 sm:min-w-0 sm:justify-between">
+                <Step label="Sacola" done Icon={ShoppingBag} />
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
+                <Step label="Identificação" done Icon={User} />
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
+                <Step label="Pagamento" done Icon={CreditCard} />
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
                 <Step label="Confirmação" active Icon={CheckCircle} />
               </div>
             </div>
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+        <section className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_390px] lg:items-start">
+            <div className="space-y-5">
+              <section className="rounded-[28px] border border-[#eee5d8] bg-white p-5 shadow-[0_18px_50px_rgba(43,85,78,0.06)] sm:p-7">
                 <div className="flex items-start gap-4">
                   <div
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
+                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border"
                     style={{
                       backgroundColor: statusColors.bg,
                       color: statusColors.color,
+                      borderColor: statusColors.border,
                     }}
                   >
                     {getStatusIcon(status)}
@@ -474,98 +445,64 @@ export default function CheckoutConfirmacao() {
 
                   <div>
                     <h2
-                      className="text-2xl font-semibold"
+                      className="text-[28px] font-light leading-tight tracking-[-0.04em] sm:text-[36px]"
                       style={{ color: statusColors.color }}
                     >
                       {getTitle(status)}
                     </h2>
 
-                    <p className="mt-2 text-sm leading-6 text-gray-500">
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-[#6f675e]">
                       {getMessage(status)}
                     </p>
                   </div>
                 </div>
 
                 <div
-                  className="mt-6 rounded-2xl border bg-[#fcfaf6] p-5"
+                  className="mt-7 rounded-[24px] border bg-[#fcfaf6] p-5"
                   style={{ borderColor: statusColors.border }}
                 >
-                  <p className="text-xs uppercase tracking-[0.18em] text-gray-400">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#9a9187]">
                     Número do pedido
                   </p>
 
-                  <p
-                    className="mt-1 break-all text-xl font-semibold"
-                    style={{ color: CALEA.primary }}
-                  >
+                  <p className="mt-2 break-all text-2xl font-semibold tracking-[-0.03em] text-[#2b554e]">
                     {isUuid(orderNumber) ? "Pedido em processamento" : orderNumber}
                   </p>
 
-                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div>
-                      <p className="text-xs text-gray-400">Status</p>
-                      <p
-                        className="font-medium"
-                        style={{ color: statusColors.color }}
-                      >
-                        {getStatusLabel(status)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-gray-400">Pagamento</p>
-                      <p className="font-medium text-gray-800">
-                        {getPaymentMethodLabel(paymentMethod)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-gray-400">Total</p>
-                      <p className="font-medium text-gray-800">
-                        {moneyBRL(total)}
-                      </p>
-                    </div>
+                  <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <InfoBox label="Status" value={getStatusLabel(status)} color={statusColors.color} />
+                    <InfoBox label="Pagamento" value={getPaymentMethodLabel(paymentMethod)} />
+                    <InfoBox label="Total" value={moneyBRL(total)} />
                   </div>
                 </div>
 
                 {isPix && status !== "failed" && (
-                  <div className="mt-6 rounded-2xl border border-[#e9e2d6] bg-white p-5">
-                    <div className="flex items-center gap-3">
-                      <QrCode style={{ color: CALEA.primary }} />
-
-                      <h3
-                        className="text-lg font-semibold"
-                        style={{ color: CALEA.primary }}
-                      >
-                        Pagamento via Pix
-                      </h3>
-                    </div>
-
-                    <p className="mt-2 text-sm text-gray-500">
-                      Escaneie o QR Code ou copie o código Pix abaixo.
-                    </p>
-
+                  <PaymentBox
+                    icon={<QrCode />}
+                    title="Pagamento via Pix"
+                    description="Escaneie o QR Code ou copie o código Pix abaixo."
+                  >
                     {pixQrCodeUrl && (
                       <div className="mt-5 flex justify-center">
                         <img
                           src={pixQrCodeUrl}
                           alt="QR Code Pix"
-                          className="h-56 w-56 rounded-2xl border border-[#e9e2d6] bg-white p-3"
+                          className="h-56 w-56 rounded-3xl border border-[#e9e2d6] bg-white p-3"
                         />
                       </div>
                     )}
 
                     {pixQrCode && (
                       <div className="mt-5">
-                        <label className="text-sm font-medium text-gray-700">
+                        <label className="text-sm font-medium text-[#5f5850]">
                           Pix copia e cola
                         </label>
 
-                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_130px]">
                           <textarea
                             readOnly
                             value={pixQrCode}
-                            className="h-24 flex-1 resize-none rounded-2xl border border-[#e9e2d6] bg-[#fcfaf6] p-3 text-xs text-gray-600 outline-none"
+                            className="h-24 resize-none rounded-2xl border border-[#e9e2d6] bg-[#fcfaf6] p-3 text-xs text-[#5f5850] outline-none"
                           />
 
                           <button
@@ -576,53 +513,34 @@ export default function CheckoutConfirmacao() {
                                 setTimeout(() => setCopied(false), 1800);
                               })
                             }
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white"
-                            style={{ backgroundColor: CALEA.primary }}
+                            className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#2b554e] px-4 text-sm font-semibold text-white"
                           >
-                            <Copy size={18} />
+                            <Copy size={17} />
                             {copied ? "Copiado" : "Copiar"}
                           </button>
                         </div>
                       </div>
                     )}
-
-                    {!pixQrCode && !pixQrCodeUrl && (
-                      <p className="mt-4 rounded-2xl bg-[#fcfaf6] p-4 text-sm text-gray-500">
-                        O pedido foi criado, mas o QR Code Pix ainda não retornou.
-                        Verifique o retorno da Pagar.me.
-                      </p>
-                    )}
-                  </div>
+                  </PaymentBox>
                 )}
 
                 {isBoleto && status !== "failed" && (
-                  <div className="mt-6 rounded-2xl border border-[#e9e2d6] bg-white p-5">
-                    <div className="flex items-center gap-3">
-                      <Landmark style={{ color: CALEA.primary }} />
-
-                      <h3
-                        className="text-lg font-semibold"
-                        style={{ color: CALEA.primary }}
-                      >
-                        Pagamento via boleto
-                      </h3>
-                    </div>
-
-                    <p className="mt-2 text-sm text-gray-500">
-                      Use a linha digitável ou abra o boleto para pagamento.
-                    </p>
-
+                  <PaymentBox
+                    icon={<Landmark />}
+                    title="Pagamento via boleto"
+                    description="Use a linha digitável ou abra o boleto para pagamento."
+                  >
                     {boletoBarcode && (
                       <div className="mt-5">
-                        <label className="text-sm font-medium text-gray-700">
+                        <label className="text-sm font-medium text-[#5f5850]">
                           Linha digitável
                         </label>
 
-                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_130px]">
                           <input
                             readOnly
                             value={boletoBarcode}
-                            className="flex-1 rounded-2xl border border-[#e9e2d6] bg-[#fcfaf6] p-3 text-sm text-gray-600 outline-none"
+                            className="h-12 rounded-full border border-[#e9e2d6] bg-[#fcfaf6] px-4 text-sm text-[#5f5850] outline-none"
                           />
 
                           <button
@@ -633,10 +551,9 @@ export default function CheckoutConfirmacao() {
                                 setTimeout(() => setCopied(false), 1800);
                               })
                             }
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white"
-                            style={{ backgroundColor: CALEA.primary }}
+                            className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#2b554e] px-4 text-sm font-semibold text-white"
                           >
-                            <Copy size={18} />
+                            <Copy size={17} />
                             {copied ? "Copiado" : "Copiar"}
                           </button>
                         </div>
@@ -648,45 +565,34 @@ export default function CheckoutConfirmacao() {
                         href={boletoUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-5 inline-flex rounded-full px-5 py-3 text-sm font-semibold text-white"
-                        style={{ backgroundColor: CALEA.accent }}
+                        className="mt-5 inline-flex rounded-full bg-[#b08d57] px-6 py-3 text-sm font-semibold text-white"
                       >
                         Abrir boleto
                       </a>
                     )}
-                  </div>
+                  </PaymentBox>
                 )}
 
                 {isCard && (
-                  <div className="mt-6 rounded-2xl border border-[#e9e2d6] bg-white p-5">
-                    <div className="flex items-center gap-3">
-                      <CreditCard style={{ color: CALEA.primary }} />
-
-                      <h3
-                        className="text-lg font-semibold"
-                        style={{ color: CALEA.primary }}
-                      >
-                        Pagamento com cartão
-                      </h3>
-                    </div>
-
-                    <p className="mt-2 text-sm leading-6 text-gray-500">
-                      {status === "failed"
-                        ? "O pagamento foi recusado pela operadora ou pela análise da Pagar.me. Confira os dados do cartão ou tente outra forma de pagamento."
+                  <PaymentBox
+                    icon={<CreditCard />}
+                    title="Pagamento com cartão"
+                    description={
+                      status === "failed"
+                        ? "O pagamento foi recusado. Confira os dados do cartão ou tente outra forma de pagamento."
                         : status === "paid"
                           ? "Pagamento aprovado com sucesso."
-                          : "Seu pagamento foi enviado para processamento. Em alguns casos, a aprovação pode levar alguns instantes."}
-                    </p>
-                  </div>
+                          : "Seu pagamento foi enviado para processamento."
+                    }
+                  />
                 )}
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                   {status === "failed" && (
                     <button
                       type="button"
                       onClick={handleTryAgain}
-                      className="rounded-full px-6 py-3 text-center text-sm font-semibold text-white"
-                      style={{ backgroundColor: CALEA.accent }}
+                      className="rounded-full bg-[#b08d57] px-6 py-3 text-center text-sm font-semibold text-white"
                     >
                       Tentar novamente
                     </button>
@@ -694,16 +600,14 @@ export default function CheckoutConfirmacao() {
 
                   <Link
                     to="/"
-                    className="rounded-full border border-[#e9e2d6] px-6 py-3 text-center text-sm font-semibold"
-                    style={{ color: CALEA.primary }}
+                    className="rounded-full border border-[#e9e2d6] px-6 py-3 text-center text-sm font-semibold text-[#2b554e]"
                   >
                     Voltar para início
                   </Link>
 
                   <Link
                     to="/joias"
-                    className="rounded-full px-6 py-3 text-center text-sm font-semibold text-white"
-                    style={{ backgroundColor: CALEA.primary }}
+                    className="rounded-full bg-[#2b554e] px-6 py-3 text-center text-sm font-semibold text-white"
                   >
                     Continuar comprando
                   </Link>
@@ -711,49 +615,32 @@ export default function CheckoutConfirmacao() {
               </section>
             </div>
 
-            <aside className="h-fit space-y-6 lg:sticky lg:top-24">
-              <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
-                <h2
-                  className="text-sm font-semibold"
-                  style={{ color: CALEA.primary }}
-                >
+            <aside className="h-fit space-y-5 lg:sticky lg:top-[120px]">
+              <div className="rounded-[28px] border border-[#eee5d8] bg-white p-5 shadow-[0_18px_50px_rgba(43,85,78,0.07)] sm:p-6">
+                <h2 className="text-base font-semibold text-[#2b554e]">
                   Resumo do pedido
                 </h2>
 
-                <div className="mt-5 space-y-4 text-sm">
-                  <div>
-                    <p className="text-xs text-gray-400">Cliente</p>
-                    <p className="font-medium text-gray-800">
-                      {identification?.name || "-"}
-                    </p>
-                    <p className="text-gray-500">
-                      {identification?.email || "-"}
-                    </p>
-                  </div>
+                <div className="mt-5 space-y-5 text-sm">
+                  <SummaryBlock title="Cliente">
+                    <p className="font-medium text-[#2b554e]">{identification?.name || "-"}</p>
+                    <p className="text-[#7a746c]">{identification?.email || "-"}</p>
+                  </SummaryBlock>
 
-                  <div className="h-px bg-[#eee5d8]" />
-
-                  <div>
-                    <p className="text-xs text-gray-400">Entrega</p>
-                    <p className="text-gray-700">
-                      {identification?.street || "-"},{" "}
-                      {identification?.number || "-"}
+                  <SummaryBlock title="Entrega">
+                    <p className="text-[#5f5850]">
+                      {identification?.street || "-"}, {identification?.number || "-"}
                     </p>
-                    <p className="text-gray-500">
-                      {identification?.neighborhood || "-"} -{" "}
-                      {identification?.city || "-"}/{identification?.state || "-"}
+                    <p className="text-[#7a746c]">
+                      {identification?.neighborhood || "-"} - {identification?.city || "-"}/{identification?.state || "-"}
                     </p>
-                    <p className="text-gray-500">
+                    <p className="text-[#7a746c]">
                       CEP: {identification?.zipCode || identification?.cep || "-"}
                     </p>
-                  </div>
+                  </SummaryBlock>
 
-                  <div className="h-px bg-[#eee5d8]" />
-
-                  <div>
-                    <p className="text-xs text-gray-400">Itens</p>
-
-                    <div className="mt-3 space-y-3">
+                  <SummaryBlock title="Itens">
+                    <div className="space-y-3">
                       {checkoutDraft?.items?.length ? (
                         checkoutDraft.items.map((item: any) => (
                           <div
@@ -761,75 +648,50 @@ export default function CheckoutConfirmacao() {
                             className="flex justify-between gap-3"
                           >
                             <div>
-                              <p className="font-medium text-gray-800">
-                                {item.name}
-                              </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="font-medium text-[#2b554e]">{item.name}</p>
+                              <p className="text-xs text-[#8a8175]">
                                 Qtd: {item.qty || item.quantity || 1}
                               </p>
                             </div>
 
-                            <p className="font-medium text-gray-800">
+                            <p className="font-medium text-[#2b554e]">
                               {moneyBRL(Number(item.price || 0))}
                             </p>
                           </div>
                         ))
                       ) : (
-                        <p className="text-gray-500">Nenhum item encontrado.</p>
+                        <p className="text-[#7a746c]">Nenhum item encontrado.</p>
                       )}
                     </div>
+                  </SummaryBlock>
+
+                  <div className="space-y-3">
+                    <SummaryLine label="Subtotal" value={moneyBRL(checkoutDraft?.subtotal || 0)} />
+
+                    {discountCents > 0 && (
+                      <SummaryLine
+                        label={`Desconto${couponCode ? ` (${couponCode})` : ""}`}
+                        value={`- ${moneyBRL(discountValue)}`}
+                        success
+                      />
+                    )}
+
+                    <SummaryLine label="Frete" value={moneyBRL(checkoutDraft?.shippingPrice || 0)} />
+
+                    {!!checkoutDraft?.giftWrapPrice && (
+                      <SummaryLine label="Presente" value={moneyBRL(checkoutDraft.giftWrapPrice)} />
+                    )}
                   </div>
 
                   <div className="h-px bg-[#eee5d8]" />
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Subtotal</span>
-                    <span className="font-medium">
-                      {moneyBRL(checkoutDraft?.subtotal || 0)}
-                    </span>
-                  </div>
-
-                  {discountCents > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-500">
-                        Desconto{couponCode ? ` (${couponCode})` : ""}
-                      </span>
-
-                      <span className="font-medium text-emerald-700">
-                        - {moneyBRL(discountValue)}
-                      </span>
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-sm text-[#8a8175]">Total</p>
+                      <p className="text-xs text-[#9a9187]">Pedido finalizado</p>
                     </div>
-                  )}
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Frete</span>
-                    <span className="font-medium">
-                      {moneyBRL(checkoutDraft?.shippingPrice || 0)}
-                    </span>
-                  </div>
-
-                  {!!checkoutDraft?.giftWrapPrice && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-500">Presente</span>
-                      <span className="font-medium">
-                        {moneyBRL(checkoutDraft.giftWrapPrice)}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="h-px bg-[#eee5d8]" />
-
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="text-lg font-semibold"
-                      style={{ color: CALEA.primary }}
-                    >
-                      Total
-                    </span>
-                    <span
-                      className="text-xl font-semibold"
-                      style={{ color: CALEA.primary }}
-                    >
+                    <span className="text-[26px] font-semibold tracking-[-0.04em] text-[#2b554e]">
                       {moneyBRL(total)}
                     </span>
                   </div>
@@ -837,14 +699,9 @@ export default function CheckoutConfirmacao() {
 
                 <div className="mt-6 rounded-2xl bg-[#fcfaf6] p-4">
                   <div className="flex items-start gap-3">
-                    <PackageCheck
-                      className="mt-0.5 h-5 w-5 shrink-0"
-                      style={{ color: CALEA.primary }}
-                    />
-
-                    <p className="text-xs leading-5 text-gray-500">
-                      Você receberá atualizações sobre o pedido pelo e-mail
-                      informado na compra.
+                    <PackageCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#2b554e]" />
+                    <p className="text-xs leading-5 text-[#7a746c]">
+                      Você receberá atualizações pelo e-mail informado na compra.
                     </p>
                   </div>
                 </div>
@@ -855,6 +712,87 @@ export default function CheckoutConfirmacao() {
       </main>
 
       <Footer />
+    </div>
+  );
+}
+
+function InfoBox({
+  label,
+  value,
+  color = "#2b554e",
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-white p-4">
+      <p className="text-xs text-[#9a9187]">{label}</p>
+      <p className="mt-1 font-semibold" style={{ color }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function PaymentBox({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="mt-6 rounded-[24px] border border-[#e9e2d6] bg-white p-5">
+      <div className="flex items-center gap-3 text-[#2b554e]">
+        {icon}
+        <h3 className="text-lg font-semibold">{title}</h3>
+      </div>
+
+      <p className="mt-2 text-sm leading-6 text-[#7a746c]">{description}</p>
+
+      {children}
+    </div>
+  );
+}
+
+function SummaryBlock({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs uppercase tracking-[0.16em] text-[#9a9187]">
+        {title}
+      </p>
+      {children}
+      <div className="mt-5 h-px bg-[#eee5d8]" />
+    </div>
+  );
+}
+
+function SummaryLine({
+  label,
+  value,
+  success,
+}: {
+  label: string;
+  value: string;
+  success?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-[#6f675e]">{label}</span>
+      <span className={success ? "font-semibold text-emerald-700" : "font-semibold text-[#2b554e]"}>
+        {value}
+      </span>
     </div>
   );
 }
