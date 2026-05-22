@@ -1,5 +1,6 @@
 // netlify/functions/pagarme-create-order.ts
 import type { Handler } from "@netlify/functions";
+import { createClient } from "@supabase/supabase-js";
 
 type PaymentMethod = "pix" | "boleto" | "credit_card";
 
@@ -95,6 +96,14 @@ type CreateOrderBody = {
   pix?: PixInput;
   boleto?: BoletoInput;
   creditCard?: CardPaymentInput;
+  orderItems?: LocalOrderItemInput[];
+};
+
+type LocalOrderItemInput = {
+  sku_id: string;
+  quantity: number;
+  unit_price_cents: number;
+  line_total_cents: number;
 };
 
 const defaultHeaders = {
@@ -130,6 +139,8 @@ export const handler: Handler = async (event) => {
     validateBaseBody(body);
 
     const payload = buildOrderPayload(body);
+    
+    await ensureLocalOrderItems(body);
 
     const auth = Buffer.from(`${secretKey}:`).toString("base64");
 
@@ -477,4 +488,66 @@ function json(statusCode: number, body: unknown) {
     headers: defaultHeaders,
     body: JSON.stringify(body),
   };
+}
+
+async function ensureLocalOrderItems(body: CreateOrderBody) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Supabase service role não configurado.");
+  }
+
+  if (!body.orderId) {
+    throw new Error("orderId interno é obrigatório para salvar os itens.");
+  }
+
+  if (!Array.isArray(body.orderItems) || body.orderItems.length === 0) {
+    throw new Error("orderItems é obrigatório para salvar o pedido local.");
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("id, order_number")
+    .eq("id", body.orderId)
+    .maybeSingle();
+
+  if (orderError) throw orderError;
+
+  if (!order) {
+    throw new Error(`Pedido local não encontrado: ${body.orderId}`);
+  }
+
+  const { count, error: countError } = await supabase
+    .from("order_items")
+    .select("id", { count: "exact", head: true })
+    .eq("order_id", body.orderId);
+
+  if (countError) throw countError;
+
+  if ((count || 0) > 0) {
+    return;
+  }
+
+  const itemsPayload = body.orderItems.map((item) => {
+    if (!item.sku_id) {
+      throw new Error("Item sem sku_id.");
+    }
+
+    return {
+      order_id: body.orderId,
+      sku_id: item.sku_id,
+      quantity: Number(item.quantity || 1),
+      unit_price_cents: Number(item.unit_price_cents || 0),
+      line_total_cents: Number(item.line_total_cents || 0),
+    };
+  });
+
+  const { error: insertError } = await supabase
+    .from("order_items")
+    .insert(itemsPayload);
+
+  if (insertError) throw insertError;
 }

@@ -805,9 +805,32 @@ export default function CheckoutPagamento() {
       const shippingAmountCents = isFreeShippingCoupon
         ? 0
         : Math.round(Number(checkoutDraft.shippingPrice || 0) * 100);
+
+
+      const localOrderItems = checkoutDraft.items.map((item: any) => {
+        const skuId = item.sku_id || item.skuId || item.id;
+
+        if (!skuId) {
+          throw new Error(`Produto ${item.name} sem SKU. Não é possível finalizar.`);
+        }
+
+        const quantity = Number(item.qty || item.quantity || 1);
+        const unitPriceCents = Math.round(Number(item.price || 0) * 100);
+
+        return {
+          sku_id: skuId,
+          quantity,
+          unit_price_cents: unitPriceCents,
+          line_total_cents: unitPriceCents * quantity,
+        };
+      });
+
+
+
       const payload: any = {
         orderId,
         paymentMethod,
+
         customer: {
           name: identification.name,
           email: identification.email,
@@ -816,7 +839,11 @@ export default function CheckoutPagamento() {
           address,
         },
 
+        // itens para Pagar.me
         items: pagarmeItems,
+
+        // itens reais para salvar em order_items
+        orderItems: localOrderItems,
 
         shipping: {
           amount: shippingAmountCents,
@@ -848,7 +875,7 @@ export default function CheckoutPagamento() {
               : null,
         },
       };
-
+      
       if (paymentMethod === "pix") {
         payload.pix = {
           expiresIn: 600,
