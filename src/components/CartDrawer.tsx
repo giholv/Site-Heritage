@@ -1,5 +1,5 @@
 // src/components/CartDrawer.tsx
-import React, { useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { X, Trash2, Minus, Plus } from "lucide-react";
 import type { CartItem } from "../context/CartContext";
 
@@ -8,7 +8,7 @@ type Props = {
   onClose: () => void;
   items?: CartItem[];
   subtotal: number;
-  freeShippingThreshold?: number; // 699
+  freeShippingThreshold?: number;
   onContinueShopping: () => void;
   onCheckout?: () => void;
   onRemove: (id: string) => void;
@@ -24,7 +24,7 @@ export default function CartDrawer({
   onClose,
   items,
   subtotal,
-  freeShippingThreshold = 699,
+  freeShippingThreshold = 299,
   onContinueShopping,
   onCheckout,
   onRemove,

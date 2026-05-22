@@ -85,8 +85,15 @@ function validateForm(form: FormState): FieldErrors {
 function mapAuthErrorMessage(message?: string) {
   const m = (message || "").toLowerCase();
 
-  if (m.includes("user already registered") || m.includes("already registered")) {
-    return "Esse e-mail já está cadastrado.";
+  if (
+    m.includes("user already registered") ||
+    m.includes("already registered") ||
+    m.includes("already exists") ||
+    m.includes("email address already") ||
+    m.includes("conflict") ||
+    m.includes("duplicate")
+  ) {
+    return "Esse e-mail já está cadastrado. Faça login ou recupere sua senha.";
   }
 
   if (m.includes("password") && m.includes("should be at least")) {
@@ -226,10 +233,24 @@ export default function CadastroUsuariosPage() {
 
       const { error: profileError } = await supabase
         .from("profiles")
-        .upsert({ user_id: userId, role: "customer" }, { onConflict: "user_id" });
+        .upsert(
+          {
+            user_id: userId,
+            role: "customer",
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+          }
+        );
 
       if (profileError) {
-        setServerError("Usuário criado, mas falhou ao salvar perfil no banco.");
+        console.error("Erro ao salvar profile:", profileError);
+
+        setServerError(
+          profileError.message || "Usuário criado, mas falhou ao salvar perfil no banco."
+        );
+
         return;
       }
 
