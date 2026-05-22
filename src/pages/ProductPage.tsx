@@ -122,7 +122,11 @@ export default function ProductPage() {
   }, [skus]);
 
   const price = selectedSku ? selectedSku.price_cents / 100 : 0;
-  const isAvailable = Boolean(product?.status === "active" && selectedSku?.active);
+  const isAvailable = Boolean(
+  product?.status === "active" &&
+  selectedSku?.active &&
+  Number(selectedSku?.available_qty ?? 0) > 0
+);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,33 +159,44 @@ export default function ProductPage() {
         setProduct(productData as ProductRow);
 
         const { data: skuData, error: skuError } = await supabase
-          .from("sku_availability")
+          .from("skus")
           .select(`
-    sku_id,
-    available_qty,
-    skus!inner (
-      id,
-      product_id,
-      variant_name,
-      title,
-      price_cents,
-      active
-    )
+    id,
+    product_id,
+    variant_name,
+    title,
+    price_cents,
+    active,
+    created_at
   `)
-          .eq("skus.product_id", productData.id)
-          .eq("skus.active", true);
-
+          .eq("product_id", productData.id)
+          .eq("active", true)
+          .order("created_at", { ascending: true });
 
         if (skuError) throw skuError;
 
-        const safeSkus: SkuRow[] = (skuData ?? []).map((item: any) => ({
-          id: item.skus.id,
-          product_id: item.skus.product_id,
-          variant_name: item.skus.variant_name,
-          title: item.skus.title,
-          price_cents: item.skus.price_cents,
-          active: item.skus.active,
-          available_qty: item.available_qty ?? 0,
+        const baseSkus = (skuData ?? []) as SkuRow[];
+
+        const skuIds = baseSkus.map((sku) => sku.id);
+
+        const { data: availabilityData, error: availabilityError } =
+          await supabase
+            .from("sku_availability")
+            .select("sku_id, available_qty")
+            .in("sku_id", skuIds);
+
+        if (availabilityError) throw availabilityError;
+
+        const availabilityMap = new Map(
+          (availabilityData ?? []).map((item: any) => [
+            item.sku_id,
+            Number(item.available_qty ?? 0),
+          ])
+        );
+
+        const safeSkus: SkuRow[] = baseSkus.map((sku) => ({
+          ...sku,
+          available_qty: availabilityMap.get(sku.id) ?? 0,
         }));
 
         if (cancelled) return;
