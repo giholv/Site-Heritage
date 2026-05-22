@@ -44,6 +44,7 @@ type ProductHeroProps = {
   onIncreaseQuantity: () => void;
   onAddToCart: () => void;
   onBuyNow: () => void;
+  availableQty?: number;
   images?: ProductImage[];
   postalCode: string;
   onPostalCodeChange: (value: string) => void;
@@ -87,6 +88,7 @@ export default function ProductHero({
   onIncreaseQuantity,
   onAddToCart,
   onBuyNow,
+  availableQty = 0,
   images = [],
   postalCode,
   onPostalCodeChange,
@@ -103,12 +105,12 @@ export default function ProductHero({
     Array.isArray(images) && images.length > 0
       ? images
       : [
-          {
-            id: "fallback",
-            src: FALLBACK_IMAGE,
-            alt: name || "Produto",
-          },
-        ];
+        {
+          id: "fallback",
+          src: FALLBACK_IMAGE,
+          alt: name || "Produto",
+        },
+      ];
 
   useEffect(() => {
     setActiveImage(0);
@@ -123,6 +125,8 @@ export default function ProductHero({
   const currentImage = useMemo(() => {
     return displayImages[activeImage] ?? displayImages[0];
   }, [displayImages, activeImage]);
+
+  const isAvailable = availableQty > 0;
 
   function prevImage() {
     if (displayImages.length <= 1) return;
@@ -343,21 +347,33 @@ export default function ProductHero({
                 </div>
 
                 <div className="mt-6 hidden gap-3 lg:grid lg:grid-cols-[1fr_0.85fr]">
-                  <button
-                    type="button"
-                    onClick={onAddToCart}
-                    className="h-[58px] rounded-full bg-[#2b554e] px-6 text-[13px] font-semibold uppercase tracking-[0.14em] text-white shadow-[0_14px_35px_rgba(43,85,78,0.22)] transition-all duration-300 hover:-translate-y-[1px] hover:shadow-[0_18px_40px_rgba(43,85,78,0.28)]"
-                  >
-                    Adicionar à sacola
-                  </button>
+                  {isAvailable ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={onAddToCart}
+                        className="h-[58px] rounded-full bg-[#2b554e] px-6 text-[13px] font-semibold uppercase tracking-[0.14em] text-white shadow-[0_14px_35px_rgba(43,85,78,0.22)] transition-all duration-300 hover:-translate-y-[1px] hover:shadow-[0_18px_40px_rgba(43,85,78,0.28)]"
+                      >
+                        Adicionar ao carrinho
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={onBuyNow}
-                    className="h-[58px] rounded-full border border-[#2b554e] bg-white px-6 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#2b554e] transition hover:bg-[#f4f8f7]"
-                  >
-                    Comprar agora
-                  </button>
+                      <button
+                        type="button"
+                        onClick={onBuyNow}
+                        className="h-[58px] rounded-full border border-[#2b554e] bg-white px-6 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#2b554e] transition hover:bg-[#f4f8f7]"
+                      >
+                        Comprar agora
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="col-span-2 h-[58px] rounded-full bg-[#d8d1c6] px-6 text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7b746b]"
+                    >
+                      Produto indisponível
+                    </button>
+                  )}
                 </div>
 
                 {/* Benefícios no mobile */}
@@ -477,7 +493,7 @@ export default function ProductHero({
                                 </p>
 
                                 {option.original_price &&
-                                option.original_price > option.price ? (
+                                  option.original_price > option.price ? (
                                   <p className="mt-1 text-xs text-gray-400 line-through">
                                     {formatBRL(option.original_price)}
                                   </p>
@@ -535,10 +551,18 @@ export default function ProductHero({
 
         <button
           type="button"
-          onClick={onAddToCart}
-          className="h-[56px] w-full rounded-full bg-[#2b554e] text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.22)]"
+          onClick={isAvailable ? onAddToCart : undefined}
+          disabled={!isAvailable}
+          className={[
+            "h-[56px] w-full rounded-full text-sm font-semibold uppercase tracking-[0.12em] transition-all duration-300",
+            isAvailable
+              ? "bg-[#2b554e] text-white shadow-[0_12px_28px_rgba(43,85,78,0.22)]"
+              : "bg-[#d8d1c6] text-[#7b746b]",
+          ].join(" ")}
         >
-          Adicionar à sacola
+          {isAvailable
+            ? "Adicionar ao carrinho"
+            : "Produto indisponível"}
         </button>
       </div>
     </>

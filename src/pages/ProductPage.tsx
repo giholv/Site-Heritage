@@ -37,6 +37,7 @@ type SkuRow = {
   title: string | null;
   price_cents: number;
   active: boolean;
+  available_qty?: number;
 };
 
 type SkuImageRow = {
@@ -154,15 +155,34 @@ export default function ProductPage() {
         setProduct(productData as ProductRow);
 
         const { data: skuData, error: skuError } = await supabase
-          .from("skus")
-          .select("id, product_id, variant_name, title, price_cents, active")
-          .eq("product_id", productData.id)
-          .eq("active", true)
-          .order("created_at", { ascending: true });
+          .from("sku_availability")
+          .select(`
+    sku_id,
+    available_qty,
+    skus!inner (
+      id,
+      product_id,
+      variant_name,
+      title,
+      price_cents,
+      active
+    )
+  `)
+          .eq("skus.product_id", productData.id)
+          .eq("skus.active", true);
+
 
         if (skuError) throw skuError;
 
-        const safeSkus = (skuData ?? []) as SkuRow[];
+        const safeSkus: SkuRow[] = (skuData ?? []).map((item: any) => ({
+          id: item.skus.id,
+          product_id: item.skus.product_id,
+          variant_name: item.skus.variant_name,
+          title: item.skus.title,
+          price_cents: item.skus.price_cents,
+          active: item.skus.active,
+          available_qty: item.available_qty ?? 0,
+        }));
 
         if (cancelled) return;
         setSkus(safeSkus);
@@ -219,12 +239,12 @@ export default function ProductPage() {
         normalizedImages.length > 0
           ? normalizedImages
           : [
-              {
-                id: "fallback",
-                src: FALLBACK_IMAGE,
-                alt: product.name || "Produto",
-              },
-            ]
+            {
+              id: "fallback",
+              src: FALLBACK_IMAGE,
+              alt: product.name || "Produto",
+            },
+          ]
       );
     }
 
@@ -317,8 +337,8 @@ export default function ProductPage() {
       if (!res.ok) {
         throw new Error(
           data?.error ||
-            data?.details?.error ||
-            `Falha ao calcular frete (${res.status})`
+          data?.details?.error ||
+          `Falha ao calcular frete (${res.status})`
         );
       }
 
@@ -421,6 +441,7 @@ export default function ProductPage() {
             }
             onAddToCart={handleAddToCart}
             onBuyNow={handleBuyNow}
+            availableQty={selectedSku?.available_qty ?? 0}
             images={images}
             postalCode={postalCode}
             onPostalCodeChange={(value) => setPostalCode(formatCep(value))}
