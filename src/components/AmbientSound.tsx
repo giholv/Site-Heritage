@@ -61,7 +61,7 @@ export default function AmbientSound() {
   }
 
   return (
-    <div className="fixed bottom-24 left-5 z-40 lg:bottom-6 lg:left-6">
+    <div className="fixed bottom-5 left-5 z-[9998] lg:bottom-6 lg:left-6">
       <audio
         ref={audioRef}
         src={currentTrack.src}
