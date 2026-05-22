@@ -148,49 +148,58 @@ function toCents(value: number | string | null | undefined) {
 function Step({
   label,
   active,
+  done,
   Icon,
   onClick,
 }: {
   label: string;
   active?: boolean;
+  done?: boolean;
   Icon: React.ElementType;
-  onClick?: () => void;
+  onClick?: () => void | Promise<void>;
 }) {
-  const clickable = Boolean(onClick);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!clickable}
-      className={[
-        "flex shrink-0 flex-col items-center gap-2",
-        clickable ? "cursor-pointer" : "cursor-default",
-      ].join(" ")}
-      aria-current={active ? "step" : undefined}
-      title={clickable ? `Ir para ${label}` : label}
-    >
+  const content = (
+    <>
       <span
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors"
-        style={{
-          backgroundColor: active ? CALEA.primary : "white",
-          borderColor: active ? CALEA.primary : "#d8d1c6",
-          color: active ? "white" : clickable ? "#8f897f" : "#b3aca2",
-        }}
+        className={[
+          "inline-flex h-10 w-10 items-center justify-center rounded-full border transition",
+          active
+            ? "border-[#2b554e] bg-[#2b554e] text-white shadow-[0_10px_22px_rgba(43,85,78,0.18)]"
+            : done
+              ? "border-[#b08d57] bg-[#fff8ed] text-[#b08d57]"
+              : "border-[#ddd5ca] bg-white text-[#aaa197]",
+        ].join(" ")}
       >
         <Icon className="h-5 w-5" />
       </span>
 
       <span
         className={[
-          "whitespace-nowrap text-xs sm:text-sm",
-          active ? "font-semibold" : "text-gray-400",
+          "whitespace-nowrap text-[11px] sm:text-xs",
+          active ? "font-semibold text-[#2b554e]" : "text-[#9a9187]",
         ].join(" ")}
-        style={{ color: active ? CALEA.primary : undefined }}
       >
         {label}
       </span>
-    </button>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-w-[82px] flex-col items-center gap-2"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex min-w-[82px] flex-col items-center gap-2">
+      {content}
+    </div>
   );
 }
 
@@ -495,72 +504,35 @@ export default function CheckoutIdentificacao() {
     return e;
   }
 
-async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
-  const now = new Date().toISOString();
+  async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
+    const now = new Date().toISOString();
 
-  const cleanEmail = currentForm.email.trim().toLowerCase();
-  const cleanPhone = onlyDigits(currentForm.phone);
-  const cleanDocument = onlyDigits(currentForm.document);
-  const cleanCep = onlyDigits(currentForm.cep);
+    const cleanEmail = currentForm.email.trim().toLowerCase();
+    const cleanPhone = onlyDigits(currentForm.phone);
+    const cleanDocument = onlyDigits(currentForm.document);
+    const cleanCep = onlyDigits(currentForm.cep);
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-  const user = session?.user ?? null;
+    const user = session?.user ?? null;
 
-  let customerId = sessionStorage.getItem(CUSTOMER_ID_KEY);
-  let addressId = sessionStorage.getItem(ADDRESS_ID_KEY);
-  let orderId = sessionStorage.getItem(ORDER_ID_KEY);
-  let orderNumber = sessionStorage.getItem("calea_order_number");
+    let customerId = sessionStorage.getItem(CUSTOMER_ID_KEY);
+    let addressId = sessionStorage.getItem(ADDRESS_ID_KEY);
+    let orderId = sessionStorage.getItem(ORDER_ID_KEY);
+    let orderNumber = sessionStorage.getItem("calea_order_number");
 
-  const customerPayload = {
-    user_id: user?.id ?? null,
-    email: cleanEmail,
-    full_name: currentForm.name.trim(),
-    phone: cleanPhone,
-    document: cleanDocument,
-    updated_at: now,
-  };
+    const customerPayload = {
+      user_id: user?.id ?? null,
+      email: cleanEmail,
+      full_name: currentForm.name.trim(),
+      phone: cleanPhone,
+      document: cleanDocument,
+      updated_at: now,
+    };
 
-  if (customerId) {
-    const { error } = await supabase
-      .from("customers")
-      .update(customerPayload)
-      .eq("id", customerId);
-
-    if (error) throw error;
-  } else {
-    let existingCustomerId: string | null = null;
-
-    if (user?.id) {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      existingCustomerId = data?.id ?? null;
-    } else {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("email", cleanEmail)
-        .eq("document", cleanDocument)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      existingCustomerId = data?.id ?? null;
-    }
-
-    if (existingCustomerId) {
-      customerId = existingCustomerId;
-
+    if (customerId) {
       const { error } = await supabase
         .from("customers")
         .update(customerPayload)
@@ -568,276 +540,318 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
 
       if (error) throw error;
     } else {
+      let existingCustomerId: string | null = null;
+
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        existingCustomerId = data?.id ?? null;
+      } else {
+        const { data, error } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("email", cleanEmail)
+          .eq("document", cleanDocument)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        existingCustomerId = data?.id ?? null;
+      }
+
+      if (existingCustomerId) {
+        customerId = existingCustomerId;
+
+        const { error } = await supabase
+          .from("customers")
+          .update(customerPayload)
+          .eq("id", customerId);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("customers")
+          .insert({
+            ...customerPayload,
+            created_at: now,
+          })
+          .select("id")
+          .single();
+
+        if (error) throw error;
+        customerId = data.id;
+      }
+    }
+
+    if (!customerId) {
+      throw new Error("Não foi possível salvar o cliente.");
+    }
+
+    sessionStorage.setItem(CUSTOMER_ID_KEY, customerId);
+
+    const addressPayload = {
+      customer_id: customerId,
+      label: "Entrega",
+      recipient_name: currentForm.name.trim(),
+      phone: cleanPhone,
+      cep: cleanCep,
+      street: currentForm.street.trim(),
+      number: currentForm.number.trim(),
+      complement: currentForm.complement.trim() || null,
+      neighborhood: currentForm.neighborhood.trim() || null,
+      city: currentForm.city.trim(),
+      state: currentForm.state.trim().toUpperCase(),
+      country: "BR",
+      is_default: true,
+      updated_at: now,
+    };
+
+    if (addressId) {
+      const { error } = await supabase
+        .from("addresses")
+        .update(addressPayload)
+        .eq("id", addressId);
+
+      if (error) throw error;
+    } else {
       const { data, error } = await supabase
-        .from("customers")
+        .from("addresses")
         .insert({
-          ...customerPayload,
+          ...addressPayload,
           created_at: now,
         })
         .select("id")
         .single();
 
       if (error) throw error;
-      customerId = data.id;
+      addressId = data.id;
     }
-  }
 
-  if (!customerId) {
-    throw new Error("Não foi possível salvar o cliente.");
-  }
+    if (!addressId) {
+      throw new Error("Não foi possível salvar o endereço.");
+    }
 
-  sessionStorage.setItem(CUSTOMER_ID_KEY, customerId);
+    sessionStorage.setItem(ADDRESS_ID_KEY, addressId);
 
-  const addressPayload = {
-    customer_id: customerId,
-    label: "Entrega",
-    recipient_name: currentForm.name.trim(),
-    phone: cleanPhone,
-    cep: cleanCep,
-    street: currentForm.street.trim(),
-    number: currentForm.number.trim(),
-    complement: currentForm.complement.trim() || null,
-    neighborhood: currentForm.neighborhood.trim() || null,
-    city: currentForm.city.trim(),
-    state: currentForm.state.trim().toUpperCase(),
-    country: "BR",
-    is_default: true,
-    updated_at: now,
-  };
+    const merchandiseSubtotalCents = cartItems.reduce((acc: number, it: any) => {
+      return acc + toCents(getItemPrice(it)) * getItemQty(it);
+    }, 0);
 
-  if (addressId) {
-    const { error } = await supabase
-      .from("addresses")
-      .update(addressPayload)
-      .eq("id", addressId);
+    const shippingCents = toCents(shippingPrice);
+    const giftWrapCents = giftWrap ? toCents(giftWrapPrice) : 0;
+    const discountCents = Number(checkoutDraft?.discount_cents || 0);
 
-    if (error) throw error;
-  } else {
-    const { data, error } = await supabase
-      .from("addresses")
-      .insert({
-        ...addressPayload,
-        created_at: now,
-      })
-      .select("id")
-      .single();
+    const totalCents = Math.max(
+      merchandiseSubtotalCents + shippingCents + giftWrapCents - discountCents,
+      0
+    );
 
-    if (error) throw error;
-    addressId = data.id;
-  }
+    const couponCode =
+      checkoutDraft?.couponCode ||
+      checkoutDraft?.coupon?.code ||
+      null;
 
-  if (!addressId) {
-    throw new Error("Não foi possível salvar o endereço.");
-  }
+    const orderPayload = {
+      customer_id: customerId,
+      shipping_address_id: addressId,
+      status: "draft",
+      subtotal_cents: merchandiseSubtotalCents,
+      shipping_cents: shippingCents,
+      gift_wrap_cents: giftWrapCents,
+      total_cents: totalCents,
+      coupon_code: couponCode,
+      discount_cents: discountCents,
+      updated_at: now,
+    };
 
-  sessionStorage.setItem(ADDRESS_ID_KEY, addressId);
-
-  const merchandiseSubtotalCents = cartItems.reduce((acc: number, it: any) => {
-    return acc + toCents(getItemPrice(it)) * getItemQty(it);
-  }, 0);
-
-  const shippingCents = toCents(shippingPrice);
-  const giftWrapCents = giftWrap ? toCents(giftWrapPrice) : 0;
-  const discountCents = Number(checkoutDraft?.discount_cents || 0);
-
-  const totalCents = Math.max(
-    merchandiseSubtotalCents + shippingCents + giftWrapCents - discountCents,
-    0
-  );
-
-  const couponCode =
-    checkoutDraft?.couponCode ||
-    checkoutDraft?.coupon?.code ||
-    null;
-
-  const orderPayload = {
-    customer_id: customerId,
-    shipping_address_id: addressId,
-    status: "draft",
-    subtotal_cents: merchandiseSubtotalCents,
-    shipping_cents: shippingCents,
-    gift_wrap_cents: giftWrapCents,
-    total_cents: totalCents,
-    coupon_code: couponCode,
-    discount_cents: discountCents,
-    updated_at: now,
-  };
-
-  if (orderId) {
-    const { error } = await supabase
-      .from("orders")
-      .update(orderPayload)
-      .eq("id", orderId);
-
-    if (error) throw error;
-
-    if (!orderNumber) {
-      const { data: existingOrder, error: orderNumberError } = await supabase
+    if (orderId) {
+      const { error } = await supabase
         .from("orders")
-        .select("order_number")
-        .eq("id", orderId)
-        .limit(1)
-        .maybeSingle();
+        .update(orderPayload)
+        .eq("id", orderId);
 
-      if (orderNumberError) throw orderNumberError;
+      if (error) throw error;
 
-      if (existingOrder?.order_number) {
-        orderNumber = existingOrder.order_number;
-        sessionStorage.setItem("calea_order_number", existingOrder.order_number);
+      if (!orderNumber) {
+        const { data: existingOrder, error: orderNumberError } = await supabase
+          .from("orders")
+          .select("order_number")
+          .eq("id", orderId)
+          .limit(1)
+          .maybeSingle();
+
+        if (orderNumberError) throw orderNumberError;
+
+        if (existingOrder?.order_number) {
+          orderNumber = existingOrder.order_number;
+          sessionStorage.setItem("calea_order_number", existingOrder.order_number);
+        }
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("orders")
+        .insert({
+          ...orderPayload,
+          created_at: now,
+        })
+        .select("id, order_number")
+        .single();
+
+      if (error) throw error;
+
+      orderId = data.id;
+
+      if (data.order_number) {
+        orderNumber = data.order_number;
+        sessionStorage.setItem("calea_order_number", data.order_number);
       }
     }
-  } else {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert({
-        ...orderPayload,
-        created_at: now,
-      })
-      .select("id, order_number")
-      .single();
 
-    if (error) throw error;
-
-    orderId = data.id;
-
-    if (data.order_number) {
-      orderNumber = data.order_number;
-      sessionStorage.setItem("calea_order_number", data.order_number);
+    if (!orderId) {
+      throw new Error("Não foi possível criar o pedido.");
     }
-  }
 
-  if (!orderId) {
-    throw new Error("Não foi possível criar o pedido.");
-  }
+    sessionStorage.setItem(ORDER_ID_KEY, orderId);
 
-  sessionStorage.setItem(ORDER_ID_KEY, orderId);
-
-  const { error: deleteItemsError } = await supabase
-    .from("order_items")
-    .delete()
-    .eq("order_id", orderId);
-
-  if (deleteItemsError) throw deleteItemsError;
-
-  const orderItemsPayload = cartItems
-    .map((it: any) => ({
-      order_id: orderId,
-      sku_id: getItemSkuId(it),
-      unit_price_cents: toCents(getItemPrice(it)),
-      quantity: getItemQty(it),
-    }))
-    .filter((item: any) => item.sku_id);
-
-  if (orderItemsPayload.length > 0) {
-    const { error: insertItemsError } = await supabase
+    const { error: deleteItemsError } = await supabase
       .from("order_items")
-      .insert(orderItemsPayload);
+      .delete()
+      .eq("order_id", orderId);
 
-    if (insertItemsError) throw insertItemsError;
+    if (deleteItemsError) throw deleteItemsError;
+
+    const orderItemsPayload = cartItems
+      .map((it: any) => ({
+        order_id: orderId,
+        sku_id: getItemSkuId(it),
+        unit_price_cents: toCents(getItemPrice(it)),
+        quantity: getItemQty(it),
+      }))
+      .filter((item: any) => item.sku_id);
+
+    if (orderItemsPayload.length > 0) {
+      const { error: insertItemsError } = await supabase
+        .from("order_items")
+        .insert(orderItemsPayload);
+
+      if (insertItemsError) throw insertItemsError;
+    }
+
+    const identificationPayload = {
+      ...currentForm,
+      phone: cleanPhone,
+      document: cleanDocument,
+      cep: cleanCep,
+      customer_id: customerId,
+      address_id: addressId,
+      order_id: orderId,
+      order_number:
+        orderNumber || sessionStorage.getItem("calea_order_number") || null,
+      coupon_code: couponCode,
+      discount_cents: discountCents,
+      total_cents: totalCents,
+      updatedAt: now,
+    };
+
+    localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(currentForm));
+
+    sessionStorage.setItem(
+      CHECKOUT_IDENTIFICACAO_KEY,
+      JSON.stringify(identificationPayload)
+    );
+
+    return { customerId, addressId, orderId };
   }
-
-  const identificationPayload = {
-    ...currentForm,
-    phone: cleanPhone,
-    document: cleanDocument,
-    cep: cleanCep,
-    customer_id: customerId,
-    address_id: addressId,
-    order_id: orderId,
-    order_number:
-      orderNumber || sessionStorage.getItem("calea_order_number") || null,
-    coupon_code: couponCode,
-    discount_cents: discountCents,
-    total_cents: totalCents,
-    updatedAt: now,
-  };
-
-  localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(currentForm));
-
-  sessionStorage.setItem(
-    CHECKOUT_IDENTIFICACAO_KEY,
-    JSON.stringify(identificationPayload)
-  );
-
-  return { customerId, addressId, orderId };
-}
 
   async function handleContinue() {
-  const e = validate();
-  setErrors(e);
+    const e = validate();
+    setErrors(e);
 
-  if (Object.keys(e).length) {
-    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    return;
+    if (Object.keys(e).length) {
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await persistCheckoutInDatabase(form, items);
+      navigate("/checkout/pagamento");
+    } catch (error: any) {
+      console.error("Erro ao salvar checkout:", error);
+
+      alert(
+        "Não foi possível continuar com o pedido. Confira os dados e tente novamente."
+      );
+    } finally {
+      setSaving(false);
+    }
   }
-
-  setSaving(true);
-
-  try {
-    await persistCheckoutInDatabase(form, items);
-    navigate("/checkout/pagamento");
-  } catch (error: any) {
-    console.error("Erro ao salvar checkout:", error);
-
-    alert(
-      "Não foi possível continuar com o pedido. Confira os dados e tente novamente."
-    );
-  } finally {
-    setSaving(false);
-  }
-}
 
   return (
     <div ref={topRef} className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
       <Header />
 
       <main className="pt-[128px] md:pt-[156px]">
-        <section className="relative overflow-hidden border-b" style={{ borderColor: CALEA.line }}>
-          <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#b08d57]/10 blur-3xl" />
-          <div className="pointer-events-none absolute -right-24 top-10 h-72 w-72 rounded-full bg-[#2b554e]/10 blur-3xl" />
-
-          <div className="relative mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
             <button
               type="button"
               onClick={() => navigate("/checkout")}
-              className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-[#6f675d] ring-1 ring-[#e9e2d6] transition hover:bg-white hover:text-[#2b554e]"
+              className="mb-5 inline-flex items-center gap-2 text-sm text-[#756d63] transition hover:text-[#2b554e]"
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar para a sacola
             </button>
 
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
               <div>
-                <p
-                  className="text-[11px] uppercase tracking-[0.32em]"
-                  style={{ color: CALEA.accent }}
-                >
-                  Checkout seguro
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[#b08d57]">
+                  Checkout
                 </p>
 
-                <h1
-                  className="mt-3 text-3xl font-medium leading-tight sm:text-4xl"
-                  style={{ color: CALEA.primary }}
-                >
+                <h1 className="mt-2 text-[30px] font-light leading-tight tracking-[-0.04em] text-[#2b554e] sm:text-[40px]">
                   Dados de entrega
                 </h1>
 
-                <p className="mt-3 max-w-xl text-sm leading-6 text-[#7c7469]">
+                <p className="mt-2 max-w-xl text-sm leading-6 text-[#7a746c]">
                   Complete seus dados para criarmos o pedido e seguir para o pagamento com segurança.
                 </p>
               </div>
 
-              <div className="rounded-[28px] bg-white/80 p-3 shadow-sm ring-1 ring-[#e9e2d6] backdrop-blur">
-                <div className="grid grid-cols-4 gap-2">
-                  <Step
-                    label="Sacola"
-                    Icon={ShoppingBag}
-                    onClick={() => navigate("/checkout")}
-                  />
-                  <Step label="Dados" active Icon={User} />
-                  <Step label="Pagamento" Icon={CreditCard} />
-                  <Step label="Confirmação" Icon={CheckCircle} />
-                </div>
+              <div className="rounded-full border border-[#e5dbce] bg-white px-4 py-2 text-sm text-[#2b554e] shadow-sm">
+                Identificação
+              </div>
+            </div>
+
+            <div className="mt-8 overflow-x-auto pb-2">
+              <div className="flex min-w-max items-center gap-4 sm:min-w-0 sm:justify-between">
+                <Step
+                  label="Sacola"
+                  done
+                  Icon={ShoppingBag}
+                  onClick={() => navigate("/checkout")}
+                />
+
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
+
+                <Step label="Identificação" active Icon={User} />
+
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
+
+                <Step label="Pagamento" Icon={CreditCard} />
+
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
+
+                <Step label="Confirmação" Icon={CheckCircle} />
               </div>
             </div>
           </div>

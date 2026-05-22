@@ -9,7 +9,15 @@ export function WhatsAppFloatingButton({ orderCode }: { orderCode?: string }) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Falar no WhatsApp"
-      className="fixed bottom-5 right-5 z-[9999] h-14 w-14 rounded-full bg-[#25D366] shadow-lg flex items-center justify-center hover:scale-105 transition"
+      className="
+        fixed bottom-5 right-5 z-[9999]
+        flex h-14 w-14 items-center justify-center
+        rounded-full
+        bg-[#2b554e]
+        text-white
+        shadow-[0_10px_30px_rgba(43,85,78,0.22)]
+        transition hover:scale-105 hover:brightness-95
+      "
     >
       <svg
         viewBox="0 0 32 32"

@@ -61,7 +61,7 @@ export default function AmbientSound() {
   }
 
   return (
-    <div className="fixed bottom-5 left-5 z-[9998] lg:bottom-6 lg:left-6">
+    <>
       <audio
         ref={audioRef}
         src={currentTrack.src}
@@ -75,16 +75,20 @@ export default function AmbientSound() {
         aria-label={playing ? "Desligar som ambiente" : "Ligar som ambiente"}
         title={playing ? "Desligar som ambiente" : "Ligar som ambiente"}
         className={[
-          "flex h-14 w-14 items-center justify-center rounded-full",
-          "border border-white/40 shadow-[0_12px_30px_rgba(43,85,78,0.22)]",
-          "backdrop-blur-md transition active:scale-95",
-          playing
-            ? "bg-[#2b554e] text-white"
-            : "bg-white/92 text-[#2b554e]",
+          "fixed bottom-6 left-5 z-[9998]",
+          "flex h-12 w-12 items-center justify-center rounded-full",
+          "border border-white/50 bg-white/45 text-[#2b554e]",
+          "backdrop-blur-xl shadow-[0_10px_30px_rgba(43,85,78,0.16)]",
+          "transition hover:bg-white/65 active:scale-95",
+          playing ? "bg-[#2b554e]/90 text-white" : "",
         ].join(" ")}
       >
-        {playing ? <Music size={24} /> : <VolumeX size={23} />}
+        {playing ? (
+          <Music size={20} strokeWidth={1.8} />
+        ) : (
+          <VolumeX size={20} strokeWidth={1.8} />
+        )}
       </button>
-    </div>
+    </>
   );
 }

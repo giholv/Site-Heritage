@@ -146,7 +146,7 @@ export default function Checkout() {
   const items = state.items ?? [];
 
   const [giftWrap, setGiftWrap] = useState(false);
-  const giftWrapPrice = 32;
+  const giftWrapPrice = 25.0;
 
   const [cep, setCep] = useState("");
   const [shippingLoading, setShippingLoading] = useState(false);
