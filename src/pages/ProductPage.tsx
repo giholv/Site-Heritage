@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
@@ -37,7 +37,8 @@ type SkuRow = {
   title: string | null;
   price_cents: number;
   active: boolean;
-  available_qty?: number;
+  created_at?: string;
+  available_qty: number;
 };
 
 type SkuImageRow = {
@@ -60,17 +61,10 @@ export type ShippingOption = {
 
 function resolveImageUrl(path: string) {
   if (!path) return FALLBACK_IMAGE;
-
-  if (path.startsWith("http://") || path.startsWith("https://")) {
-    return path;
-  }
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
   const cleanedPath = path.replace(/^\/+/, "");
-
-  const { data } = supabase.storage
-    .from(SKU_IMAGES_BUCKET)
-    .getPublicUrl(cleanedPath);
-
+  const { data } = supabase.storage.from(SKU_IMAGES_BUCKET).getPublicUrl(cleanedPath);
   return data.publicUrl || FALLBACK_IMAGE;
 }
 
@@ -80,10 +74,12 @@ function onlyDigits(value: string) {
 
 function formatCep(value: string) {
   const digits = onlyDigits(value).slice(0, 8);
+  return digits.replace(/^(\d{5})(\d)/, "$1-$2").replace(/(-\d{3}).+?$/, "$1");
+}
 
-  return digits
-    .replace(/^(\d{5})(\d)/, "$1-$2")
-    .replace(/(-\d{3}).+?$/, "$1");
+function normalizeQty(value: unknown) {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
 }
 
 export default function ProductPage() {
@@ -107,26 +103,26 @@ export default function ProductPage() {
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShippingId, setSelectedShippingId] = useState("");
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [slug]);
+
   const selectedSku = useMemo(() => {
     return skus.find((sku) => sku.id === selectedSkuId) ?? skus[0] ?? null;
   }, [skus, selectedSkuId]);
 
+  const selectedAvailableQty = normalizeQty(selectedSku?.available_qty);
+
   const variants = useMemo(() => {
     return skus.map((sku, index) => ({
       id: sku.id,
-      label:
-        sku.title?.trim() ||
-        sku.variant_name?.trim() ||
-        `Variação ${index + 1}`,
+      label: sku.title?.trim() || sku.variant_name?.trim() || `Variação ${index + 1}`,
+      availableQty: normalizeQty(sku.available_qty),
     }));
   }, [skus]);
 
   const price = selectedSku ? selectedSku.price_cents / 100 : 0;
-  const isAvailable = Boolean(
-  product?.status === "active" &&
-  selectedSku?.active &&
-  Number(selectedSku?.available_qty ?? 0) > 0
-);
+  const isAvailable = Boolean(product?.status === "active" && selectedSku?.active && selectedAvailableQty > 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,57 +151,47 @@ export default function ProductPage() {
         if (productError) throw productError;
         if (!productData) throw new Error("Produto não encontrado.");
 
-        if (cancelled) return;
-        setProduct(productData as ProductRow);
-
         const { data: skuData, error: skuError } = await supabase
           .from("skus")
-          .select(`
-    id,
-    product_id,
-    variant_name,
-    title,
-    price_cents,
-    active,
-    created_at
-  `)
+          .select("id, product_id, variant_name, title, price_cents, active, created_at")
           .eq("product_id", productData.id)
           .eq("active", true)
           .order("created_at", { ascending: true });
 
         if (skuError) throw skuError;
 
-        const baseSkus = (skuData ?? []) as SkuRow[];
-
+        const baseSkus = (skuData ?? []) as Omit<SkuRow, "available_qty">[];
         const skuIds = baseSkus.map((sku) => sku.id);
 
-        const { data: availabilityData, error: availabilityError } =
-          await supabase
+        let availabilityMap = new Map<string, number>();
+
+        if (skuIds.length > 0) {
+          const { data: availabilityData, error: availabilityError } = await supabase
             .from("sku_availability")
             .select("sku_id, available_qty")
             .in("sku_id", skuIds);
 
-        if (availabilityError) throw availabilityError;
+          if (availabilityError) throw availabilityError;
 
-        const availabilityMap = new Map(
-          (availabilityData ?? []).map((item: any) => [
-            item.sku_id,
-            Number(item.available_qty ?? 0),
-          ])
-        );
+          availabilityMap = new Map(
+            (availabilityData ?? []).map((item: any) => [String(item.sku_id), normalizeQty(item.available_qty)])
+          );
+        }
 
         const safeSkus: SkuRow[] = baseSkus.map((sku) => ({
           ...sku,
           available_qty: availabilityMap.get(sku.id) ?? 0,
         }));
 
+        const firstAvailableSku = safeSkus.find((sku) => sku.active && normalizeQty(sku.available_qty) > 0);
+        const firstSku = firstAvailableSku ?? safeSkus[0] ?? null;
+
         if (cancelled) return;
+        setProduct(productData as ProductRow);
         setSkus(safeSkus);
-        setSelectedSkuId(safeSkus[0]?.id ?? "");
+        setSelectedSkuId(firstSku?.id ?? "");
       } catch (err: any) {
-        if (!cancelled) {
-          setError(err?.message || "Erro ao carregar produto.");
-        }
+        if (!cancelled) setError(err?.message || "Erro ao carregar produto.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -249,18 +235,7 @@ export default function ProductPage() {
         .filter((img) => img.src);
 
       if (cancelled) return;
-
-      setImages(
-        normalizedImages.length > 0
-          ? normalizedImages
-          : [
-            {
-              id: "fallback",
-              src: FALLBACK_IMAGE,
-              alt: product.name || "Produto",
-            },
-          ]
-      );
+      setImages(normalizedImages.length > 0 ? normalizedImages : [{ id: "fallback", src: FALLBACK_IMAGE, alt: product.name || "Produto" }]);
     }
 
     loadSkuImages();
@@ -278,13 +253,22 @@ export default function ProductPage() {
   }, [selectedSkuId]);
 
   useEffect(() => {
+    if (selectedAvailableQty > 0 && quantity > selectedAvailableQty) {
+      setQuantity(selectedAvailableQty);
+    }
+  }, [selectedAvailableQty, quantity]);
+
+  useEffect(() => {
     setShippingError("");
     setShippingOptions([]);
     setSelectedShippingId("");
   }, [postalCode, quantity]);
 
   function addCurrentItemToCart() {
-    if (!product || !selectedSku || !isAvailable) return;
+    if (!product || !selectedSku || !isAvailable) return false;
+
+    const safeQty = Math.min(quantity, selectedAvailableQty);
+    if (safeQty <= 0) return false;
 
     add({
       id: selectedSku.id,
@@ -292,13 +276,13 @@ export default function ProductPage() {
       name: product.name,
       price,
       image: images[0]?.src || FALLBACK_IMAGE,
-      variant:
-        selectedSku.title?.trim() ||
-        selectedSku.variant_name?.trim() ||
-        "Variação",
-      qty: quantity,
+      variant: selectedSku.title?.trim() || selectedSku.variant_name?.trim() || "Variação",
+      qty: safeQty,
       available: true,
+      available_qty: selectedAvailableQty,
     } as any);
+
+    return true;
   }
 
   function handleAddToCart() {
@@ -306,8 +290,8 @@ export default function ProductPage() {
   }
 
   function handleBuyNow() {
-    addCurrentItemToCart();
-    navigate("/checkout");
+    const added = addCurrentItemToCart();
+    if (added) navigate("/checkout");
   }
 
   async function handleCalculateShipping() {
@@ -335,7 +319,7 @@ export default function ProductPage() {
     try {
       const payload = {
         to_postcode: cleanCep,
-        insurance_value: 0,
+        insurance_value: Math.round(price * quantity * 100) / 100,
         weight: Number(Math.max(0.03, 0.03 * quantity).toFixed(2)),
         services: "1,2,17,3",
       };
@@ -350,17 +334,10 @@ export default function ProductPage() {
       const data = text ? JSON.parse(text) : {};
 
       if (!res.ok) {
-        throw new Error(
-          data?.error ||
-          data?.details?.error ||
-          `Falha ao calcular frete (${res.status})`
-        );
+        throw new Error(data?.error || data?.details?.error || `Falha ao calcular frete (${res.status})`);
       }
 
-      const opts: ShippingOption[] = Array.isArray(data?.options)
-        ? data.options
-        : [];
-
+      const opts: ShippingOption[] = Array.isArray(data?.options) ? data.options : [];
       setShippingOptions(opts);
 
       if (!opts.length) {
@@ -400,17 +377,9 @@ export default function ProductPage() {
       <div className="min-h-screen bg-[#fcfaf6]">
         <Header />
         <main className="mx-auto max-w-3xl px-5 pt-[140px] text-center">
-          <p className="text-sm uppercase tracking-[0.24em] text-[#b08d57]">
-            Produto
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold text-[#2b554e]">
-            {error || "Produto não encontrado."}
-          </h1>
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="mt-6 rounded-full bg-[#2b554e] px-7 py-3 text-sm font-semibold text-white"
-          >
+          <p className="text-sm uppercase tracking-[0.24em] text-[#b08d57]">Produto</p>
+          <h1 className="mt-3 text-2xl font-semibold text-[#2b554e]">{error || "Produto não encontrado."}</h1>
+          <button type="button" onClick={() => navigate("/")} className="mt-6 rounded-full bg-[#2b554e] px-7 py-3 text-sm font-semibold text-white">
             Voltar para a loja
           </button>
         </main>
@@ -422,20 +391,14 @@ export default function ProductPage() {
     <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
       <Header />
 
-      <main className="pt-[112px] md:pt-[145px]">
+      <main className="pt-[170px] md:pt-[240px]">
         <section className="mx-auto w-full max-w-[1440px] px-0 pb-16 md:px-6 lg:px-8">
           <div className="mb-4 hidden items-center gap-2 px-1 text-[12px] text-[#8b8175] md:flex">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="inline-flex items-center gap-1 transition hover:text-[#2b554e]"
-            >
+            <button type="button" onClick={() => navigate(-1)} className="inline-flex items-center gap-1 transition hover:text-[#2b554e]">
               <ArrowLeft className="h-3.5 w-3.5" />
               Voltar
             </button>
-
             <span>/</span>
-
             <span className="truncate text-[#2b554e]">{product.name}</span>
           </div>
 
@@ -448,15 +411,11 @@ export default function ProductPage() {
             selectedVariant={selectedSku?.id ?? ""}
             onSelectVariant={setSelectedSkuId}
             quantity={quantity}
-            onDecreaseQuantity={() =>
-              setQuantity((prev) => Math.max(1, prev - 1))
-            }
-            onIncreaseQuantity={() =>
-              setQuantity((prev) => Math.min(99, prev + 1))
-            }
+            onDecreaseQuantity={() => setQuantity((prev) => Math.max(1, prev - 1))}
+            onIncreaseQuantity={() => setQuantity((prev) => Math.min(selectedAvailableQty || 1, prev + 1))}
             onAddToCart={handleAddToCart}
             onBuyNow={handleBuyNow}
-            availableQty={selectedSku?.available_qty ?? 0}
+            availableQty={selectedAvailableQty}
             images={images}
             postalCode={postalCode}
             onPostalCodeChange={(value) => setPostalCode(formatCep(value))}
