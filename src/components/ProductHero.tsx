@@ -9,6 +9,7 @@ import {
   MapPin,
   Minus,
   Plus,
+  ShoppingBag,
 } from "lucide-react";
 
 type Variant = {
@@ -366,13 +367,34 @@ export default function ProductHero({
                       </button>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="col-span-2 h-[58px] rounded-full bg-[#d8d1c6] px-6 text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7b746b]"
-                    >
-                      Produto indisponível
-                    </button>
+                    <div className="col-span-2 rounded-[22px] border border-[#e4ddd3] bg-white px-5 py-5 shadow-[0_10px_30px_rgba(43,85,78,0.06)]">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d8d1c6] bg-[#fcfaf6] text-[#2b554e]">
+                          <ShoppingBag size={22} />
+                        </div>
+
+                        <div>
+                          <p className="text-base font-semibold text-[#2b554e]">
+                            Produto indisponível
+                          </p>
+
+                          <p className="mt-1 text-sm leading-6 text-[#6f6a63]">
+                            Este produto está sem estoque no momento.
+                          </p>
+
+                          <p className="text-sm leading-6 text-[#6f6a63]">
+                            Cadastre-se para ser avisado quando chegar.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="mt-5 h-[52px] w-full rounded-full border border-[#2b554e] bg-white text-sm font-semibold uppercase tracking-[0.12em] text-[#2b554e]"
+                      >
+                        Avise quando chegar
+                      </button>
+                    </div>
                   )}
                 </div>
 
