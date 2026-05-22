@@ -573,18 +573,16 @@ export default function ProductHero({
 
         <button
           type="button"
-          onClick={isAvailable ? onAddToCart : undefined}
           disabled={!isAvailable}
+          onClick={isAvailable ? onAddToCart : undefined}
           className={[
             "h-[56px] w-full rounded-full text-sm font-semibold uppercase tracking-[0.12em] transition-all duration-300",
             isAvailable
               ? "bg-[#2b554e] text-white shadow-[0_12px_28px_rgba(43,85,78,0.22)]"
-              : "bg-[#d8d1c6] text-[#7b746b]",
+              : "border border-[#2b554e] bg-white text-[#2b554e]",
           ].join(" ")}
         >
-          {isAvailable
-            ? "Adicionar ao carrinho"
-            : "Produto indisponível"}
+          {isAvailable ? "Adicionar ao carrinho" : "Avise quando chegar"}
         </button>
       </div>
     </>
