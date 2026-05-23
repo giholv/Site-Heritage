@@ -59,6 +59,8 @@ export default function EsqueciSenhaPage() {
       const normalizedEmail = email.trim().toLowerCase();
       const redirectTo = getResetRedirectUrl();
 
+      alert("REDIRECT USADO: " + redirectTo);
+
       const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo,
       });
@@ -131,11 +133,10 @@ export default function EsqueciSenhaPage() {
                   placeholder="voce@exemplo.com"
                   autoComplete="email"
                   disabled={loading}
-                  className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 text-sm outline-none transition placeholder:text-[#2b554e]/35 disabled:cursor-not-allowed disabled:opacity-60 ${
-                    showError
+                  className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 text-sm outline-none transition placeholder:text-[#2b554e]/35 disabled:cursor-not-allowed disabled:opacity-60 ${showError
                       ? "border border-red-400 focus:ring-4 focus:ring-red-100"
                       : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
-                  }`}
+                    }`}
                 />
 
                 {showError && (
