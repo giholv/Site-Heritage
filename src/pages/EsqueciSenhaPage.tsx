@@ -7,12 +7,6 @@ function isEmail(v: string) {
 }
 
 function getResetRedirectUrl() {
-  const hostname = window.location.hostname;
-
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return `${window.location.origin}/redefinir-senha`;
-  }
-
   return "https://calea.com.br/redefinir-senha";
 }
 
