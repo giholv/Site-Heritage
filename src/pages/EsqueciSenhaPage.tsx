@@ -6,6 +6,34 @@ function isEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
+function getResetRedirectUrl() {
+  const hostname = window.location.hostname;
+
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return `${window.location.origin}/redefinir-senha`;
+  }
+
+  return "https://calea.com.br/redefinir-senha";
+}
+
+function mapResetEmailError(message?: string) {
+  const m = (message || "").toLowerCase();
+
+  if (m.includes("rate limit") || m.includes("too many")) {
+    return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+  }
+
+  if (m.includes("redirect")) {
+    return "URL de redirecionamento não autorizada no Supabase.";
+  }
+
+  if (m.includes("email")) {
+    return "Não foi possível enviar o e-mail de recuperação.";
+  }
+
+  return message || "Não foi possível enviar o e-mail.";
+}
+
 export default function EsqueciSenhaPage() {
   const [email, setEmail] = useState("");
   const [touched, setTouched] = useState(false);
@@ -24,28 +52,32 @@ export default function EsqueciSenhaPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     setSubmitted(true);
     setServerError(null);
+    setSuccess(false);
 
     if (emailError) return;
 
     setLoading(true);
 
     try {
-      const redirectTo = `${window.location.origin}/redefinir-senha`;
+      const normalizedEmail = email.trim().toLowerCase();
+      const redirectTo = getResetRedirectUrl();
 
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.trim().toLowerCase(),
-        { redirectTo }
-      );
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo,
+      });
 
       if (error) {
-        setServerError(error.message || "Não foi possível enviar o e-mail.");
+        console.error("Erro resetPasswordForEmail:", error);
+        setServerError(mapResetEmailError(error.message));
         return;
       }
 
       setSuccess(true);
-    } catch {
+    } catch (err) {
+      console.error("Falha ao enviar recuperação:", err);
       setServerError("Falha de rede ou servidor. Tente novamente.");
     } finally {
       setLoading(false);
@@ -60,7 +92,11 @@ export default function EsqueciSenhaPage() {
             <p className="text-sm uppercase tracking-[0.24em] text-[#b08d57]">
               Caléa Blanc
             </p>
-            <h1 className="mt-3 text-3xl font-semibold">Esqueci minha senha</h1>
+
+            <h1 className="mt-3 text-3xl font-semibold">
+              Esqueci minha senha
+            </h1>
+
             <p className="mt-2 text-sm leading-6 text-[#2b554e]/70">
               Informe seu e-mail para receber o link de redefinição.
             </p>
@@ -75,7 +111,7 @@ export default function EsqueciSenhaPage() {
 
             {success && (
               <div className="mb-5 rounded-2xl border border-emerald-500/20 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                Se o e-mail existir, enviamos o link de redefinição.
+                E-mail enviado com sucesso! Verifique também a caixa de spam.
               </div>
             )}
 
@@ -92,11 +128,16 @@ export default function EsqueciSenhaPage() {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (serverError) setServerError(null);
+                    if (success) setSuccess(false);
+                  }}
                   onBlur={() => setTouched(true)}
                   placeholder="voce@exemplo.com"
                   autoComplete="email"
-                  className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 text-sm outline-none transition placeholder:text-[#2b554e]/35 ${
+                  disabled={loading}
+                  className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 text-sm outline-none transition placeholder:text-[#2b554e]/35 disabled:cursor-not-allowed disabled:opacity-60 ${
                     showError
                       ? "border border-red-400 focus:ring-4 focus:ring-red-100"
                       : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
@@ -110,14 +151,17 @@ export default function EsqueciSenhaPage() {
 
               <button
                 type="submit"
-                disabled={loading || success}
+                disabled={loading}
                 className="h-12 w-full rounded-2xl bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:bg-[#23463f] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Enviando..." : "Enviar link de redefinição"}
               </button>
 
               <p className="text-center text-sm text-[#2b554e]/65">
-                <Link to="/login" className="font-medium text-[#b08d57] hover:underline">
+                <Link
+                  to="/login"
+                  className="font-medium text-[#b08d57] hover:underline"
+                >
                   Voltar para o login
                 </Link>
               </p>

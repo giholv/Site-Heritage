@@ -7,6 +7,24 @@ type FormState = {
   confirmPassword: string;
 };
 
+function mapResetError(message?: string) {
+  const m = (message || "").toLowerCase();
+
+  if (m.includes("expired") || m.includes("invalid")) {
+    return "Link inválido ou expirado. Solicite uma nova recuperação de senha.";
+  }
+
+  if (m.includes("new password should be different")) {
+    return "A nova senha precisa ser diferente da senha atual.";
+  }
+
+  if (m.includes("password")) {
+    return "Senha inválida. Use pelo menos 8 caracteres.";
+  }
+
+  return message || "Não foi possível redefinir a senha.";
+}
+
 export default function RedefinirSenhaPage() {
   const navigate = useNavigate();
 
@@ -17,6 +35,7 @@ export default function RedefinirSenhaPage() {
 
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
   const [touched, setTouched] = useState({
     password: false,
     confirmPassword: false,
@@ -32,13 +51,15 @@ export default function RedefinirSenhaPage() {
   const errors = useMemo(() => {
     const e: Partial<Record<keyof FormState, string>> = {};
 
-    if (!form.password) e.password = "Informe a nova senha.";
-    else if (form.password.length < 6) {
-      e.password = "Use pelo menos 6 caracteres.";
+    if (!form.password) {
+      e.password = "Informe a nova senha.";
+    } else if (form.password.length < 8) {
+      e.password = "Use pelo menos 8 caracteres.";
     }
 
-    if (!form.confirmPassword) e.confirmPassword = "Confirme a nova senha.";
-    else if (form.confirmPassword !== form.password) {
+    if (!form.confirmPassword) {
+      e.confirmPassword = "Confirme a nova senha.";
+    } else if (form.confirmPassword !== form.password) {
       e.confirmPassword = "As senhas não coincidem.";
     }
 
@@ -49,21 +70,86 @@ export default function RedefinirSenhaPage() {
     let mounted = true;
 
     async function validateRecoverySession() {
-      const { data, error } = await supabase.auth.getSession();
+      try {
+        setCheckingRecovery(true);
+        setServerError(null);
 
-      if (!mounted) return;
+        const url = new URL(window.location.href);
 
-      if (error) {
-        setServerError("Não foi possível validar o link de recuperação.");
+        const code = url.searchParams.get("code");
+
+        const accessToken =
+          url.hash.match(/access_token=([^&]+)/)?.[1] || null;
+
+        const refreshToken =
+          url.hash.match(/refresh_token=([^&]+)/)?.[1] || null;
+
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+          if (!mounted) return;
+
+          if (error) {
+            console.error("Erro exchangeCodeForSession:", error);
+            setCanReset(false);
+            setServerError(mapResetError(error.message));
+            setCheckingRecovery(false);
+            return;
+          }
+
+          window.history.replaceState({}, document.title, window.location.pathname);
+
+          setCanReset(true);
+          setCheckingRecovery(false);
+          return;
+        }
+
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: decodeURIComponent(accessToken),
+            refresh_token: decodeURIComponent(refreshToken),
+          });
+
+          if (!mounted) return;
+
+          if (error) {
+            console.error("Erro setSession recovery:", error);
+            setCanReset(false);
+            setServerError(mapResetError(error.message));
+            setCheckingRecovery(false);
+            return;
+          }
+
+          window.history.replaceState({}, document.title, window.location.pathname);
+
+          setCanReset(true);
+          setCheckingRecovery(false);
+          return;
+        }
+
+        const { data, error } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
+        if (error) {
+          console.error("Erro getSession recovery:", error);
+          setCanReset(false);
+          setServerError("Não foi possível validar o link de recuperação.");
+          setCheckingRecovery(false);
+          return;
+        }
+
+        setCanReset(!!data.session);
         setCheckingRecovery(false);
-        return;
-      }
+      } catch (err) {
+        console.error("Falha geral recovery:", err);
 
-      if (data.session) {
-        setCanReset(true);
-      }
+        if (!mounted) return;
 
-      setCheckingRecovery(false);
+        setCanReset(false);
+        setServerError("Falha ao validar o link de recuperação.");
+        setCheckingRecovery(false);
+      }
     }
 
     const {
@@ -78,7 +164,6 @@ export default function RedefinirSenhaPage() {
         return;
       }
 
-      // em alguns casos a sessão já entra restaurada ao abrir a página
       if (session) {
         setCanReset(true);
         setCheckingRecovery(false);
@@ -104,6 +189,7 @@ export default function RedefinirSenhaPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     setSubmitted(true);
     setServerError(null);
 
@@ -122,19 +208,20 @@ export default function RedefinirSenhaPage() {
       });
 
       if (error) {
-        setServerError(error.message || "Não foi possível redefinir a senha.");
+        console.error("Erro updateUser password:", error);
+        setServerError(mapResetError(error.message));
         return;
       }
 
       setSuccess(true);
 
-      // opcional, mas deixa o fluxo mais limpo
       await supabase.auth.signOut();
 
       setTimeout(() => {
         navigate("/login");
       }, 1800);
-    } catch {
+    } catch (err) {
+      console.error("Falha ao redefinir senha:", err);
       setServerError("Falha de rede ou servidor. Tente novamente.");
     } finally {
       setLoading(false);
@@ -149,7 +236,9 @@ export default function RedefinirSenhaPage() {
             <p className="text-sm uppercase tracking-[0.24em] text-[#b08d57]">
               Caléa Blanc
             </p>
+
             <h1 className="mt-3 text-3xl font-semibold">Redefinir senha</h1>
+
             <p className="mt-2 text-sm leading-6 text-[#2b554e]/70">
               Digite sua nova senha para concluir o acesso.
             </p>
@@ -273,6 +362,14 @@ export default function RedefinirSenhaPage() {
                 className="h-12 w-full rounded-2xl bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:bg-[#23463f] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Salvando..." : "Salvar nova senha"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/login")}
+                className="w-full text-center text-sm text-[#2b554e]/70 underline-offset-4 transition hover:text-[#b08d57] hover:underline"
+              >
+                Voltar para o login
               </button>
             </form>
           </div>
