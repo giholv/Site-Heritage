@@ -191,7 +191,7 @@ const Header: React.FC<HeaderProps> = ({
                 : "border-transparent bg-[#FCFAF6]",
             ].join(" ")}
           >
-            <div className="grid h-[54px] grid-cols-[40px_1fr_132px] items-center px-4">
+            <div className="grid h-[58px] grid-cols-[40px_1fr_132px] items-center px-4">
               <button
                 type="button"
                 onClick={() => setIsOpen((v) => !v)}
@@ -222,7 +222,7 @@ const Header: React.FC<HeaderProps> = ({
                   <img
                     src="/logo_fundo_escuro_mobile.svg"
                     alt="Logo da loja"
-                    className="h-9 w-auto object-contain"
+                    className="h-14 w-auto object-contain"
                   />
                 </button>
               </div>
