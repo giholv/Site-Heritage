@@ -175,9 +175,6 @@ export default function ProductPage() {
             .from("sku_availability")
             .select("*");
 
-          console.log("SKU IDS FRONT:", skuIds);
-          console.table(availabilityData);
-
           if (availabilityError) throw availabilityError;
 
           availabilityMap = new Map(
