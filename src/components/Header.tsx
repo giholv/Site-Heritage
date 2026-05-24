@@ -550,7 +550,7 @@ const Header: React.FC<HeaderProps> = ({
         onClose={() => setCartOpen(false)}
         items={state.items}
         subtotal={subtotal}
-        freeShippingThreshold={699}
+        freeShippingThreshold={299}
         onContinueShopping={() => setCartOpen(false)}
         onCheckout={() => {
           setCartOpen(false);

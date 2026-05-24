@@ -791,6 +791,12 @@ export default function CheckoutPagamento() {
       const isFreeShippingCoupon =
         checkoutDraft?.coupon?.discount_type === "free_shipping";
 
+      const isAutomaticFreeShipping =
+        Boolean(checkoutDraft?.free_shipping_applied) ||
+        Number(checkoutDraft?.shippingPrice || 0) === 0;
+
+      const isFreeShippingApplied =
+        isFreeShippingCoupon || isAutomaticFreeShipping;
 
       const itemDiscountCents = isFreeShippingCoupon ? 0 : discountCents;
 
@@ -802,7 +808,7 @@ export default function CheckoutPagamento() {
         discountCents: itemDiscountCents,
       });
 
-      const shippingAmountCents = isFreeShippingCoupon
+      const shippingAmountCents = isFreeShippingApplied
         ? 0
         : Math.round(Number(checkoutDraft.shippingPrice || 0) * 100);
 
@@ -847,8 +853,8 @@ export default function CheckoutPagamento() {
 
         shipping: {
           amount: shippingAmountCents,
-          description: isFreeShippingCoupon
-            ? `${checkoutDraft.shipping.name || "Frete"} - cupom frete grátis`
+          description: isFreeShippingApplied
+            ? `${checkoutDraft.shipping.name || "Frete"} - frete grátis`
             : checkoutDraft.shipping.name || "Frete",
           recipientName: identification.name,
           recipientPhone: identification.phone,
@@ -860,22 +866,39 @@ export default function CheckoutPagamento() {
           local_order_id: orderId,
           order_number: identification?.order_number || null,
           original_subtotal_cents: Math.round(Number(checkoutDraft?.subtotal || 0) * 100),
-          original_shipping_cents: Math.round(Number(checkoutDraft.shippingPrice || 0) * 100),
+          original_shipping_cents:
+            typeof checkoutDraft?.original_shipping_cents === "number"
+              ? checkoutDraft.original_shipping_cents
+              : Math.round(
+                Number(
+                  checkoutDraft?.originalShippingPrice ??
+                  checkoutDraft?.shipping?.original_price ??
+                  checkoutDraft?.shippingPrice ??
+                  0
+                ) * 100
+              ),
+
           pagarme_shipping_cents: shippingAmountCents,
+          free_shipping_applied: isFreeShippingApplied,
+          free_shipping_reason: isFreeShippingCoupon
+            ? "coupon"
+            : isAutomaticFreeShipping
+              ? "subtotal_threshold"
+              : null,
           original_total_cents: totalCents,
           payment_total_cents: paymentTotalCents,
           coupon_code: couponCode,
           coupon_type: checkoutDraft?.coupon?.discount_type || null,
           discount_cents: discountCents,
           discount_applied_to_items: itemDiscountCents > 0,
-          free_shipping_applied: isFreeShippingCoupon,
+
           pix_expires_at:
             paymentMethod === "pix"
               ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
               : null,
         },
       };
-      
+
       if (paymentMethod === "pix") {
         payload.pix = {
           expiresIn: 600,
@@ -1314,8 +1337,28 @@ export default function CheckoutPagamento() {
 
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600">Frete</span>
-                    <span className="font-semibold">
-                      {moneyBRL(checkoutDraft?.shippingPrice || 0)}
+
+                    <span
+                      className={[
+                        "font-semibold",
+                        Boolean(checkoutDraft?.shipping) &&
+                          (
+                            checkoutDraft?.free_shipping_applied ||
+                            checkoutDraft?.coupon?.discount_type === "free_shipping" ||
+                            Number(checkoutDraft?.shippingPrice || 0) === 0
+                          )
+                          ? "text-emerald-700"
+                          : "",
+                      ].join(" ")}
+                    >
+                      {Boolean(checkoutDraft?.shipping) &&
+                        (
+                          checkoutDraft?.free_shipping_applied ||
+                          checkoutDraft?.coupon?.discount_type === "free_shipping" ||
+                          Number(checkoutDraft?.shippingPrice || 0) === 0
+                        )
+                        ? "Grátis"
+                        : moneyBRL(checkoutDraft?.shippingPrice || 0)}
                     </span>
                   </div>
 

@@ -170,19 +170,34 @@ export default function Checkout() {
     [items]
   );
 
-  const shippingPrice = selectedShipping?.price ?? 0;
+  const FREE_SHIPPING_THRESHOLD = 299;
+  const FREE_SHIPPING_THRESHOLD_CENTS = FREE_SHIPPING_THRESHOLD * 100;
+
   const subtotalCents = Math.round(Number(subtotal || 0) * 100);
-  const shippingCents = Math.round(Number(shippingPrice || 0) * 100);
+
+  const originalShippingPrice = selectedShipping?.price ?? 0;
+  const hasAutomaticFreeShipping =
+    subtotalCents >= FREE_SHIPPING_THRESHOLD_CENTS && Boolean(selectedShipping);
+
+  const shippingPrice = hasAutomaticFreeShipping ? 0 : originalShippingPrice;
+
+  
+  const originalShippingCents = Math.round(Number(originalShippingPrice || 0) * 100);
 
   const discountCents = useMemo(() => {
     return calculateCouponDiscountCents({
       coupon: appliedCoupon,
       subtotalCents,
-      shippingCents,
+      shippingCents: originalShippingCents,
     });
-  }, [appliedCoupon, subtotalCents, shippingCents]);
+  }, [appliedCoupon, subtotalCents, originalShippingCents]);
 
-  const discountValue = discountCents / 100;
+  const effectiveDiscountCents =
+    hasAutomaticFreeShipping && appliedCoupon?.discount_type === "free_shipping"
+      ? 0
+      : discountCents;
+
+  const discountValue = effectiveDiscountCents / 100;
 
   const total = Math.max(
     subtotal + (giftWrap ? giftWrapPrice : 0) + shippingPrice - discountValue,
@@ -332,7 +347,7 @@ export default function Checkout() {
       const nextDiscountCents = calculateCouponDiscountCents({
         coupon: normalizedCoupon,
         subtotalCents,
-        shippingCents,
+        shippingCents: originalShippingCents,
       });
 
       if (
@@ -378,16 +393,23 @@ export default function Checkout() {
         ? {
           id: selectedShipping.id,
           name: selectedShipping.name,
-          price: selectedShipping.price,
+          price: shippingPrice,
+          original_price: originalShippingPrice,
           deadline: selectedShipping.deadline,
+          free_shipping_applied: hasAutomaticFreeShipping,
         }
         : null,
+
       shippingPrice,
+      originalShippingPrice,
+      original_shipping_cents: originalShippingCents,
+      free_shipping_applied: hasAutomaticFreeShipping,
+      free_shipping_threshold: FREE_SHIPPING_THRESHOLD,
       couponCode: appliedCoupon?.code || null,
       coupon_id: appliedCoupon?.id || null,
       coupon: appliedCoupon,
       discount: discountValue,
-      discount_cents: discountCents,
+      discount_cents: effectiveDiscountCents,
       total,
       updatedAt: new Date().toISOString(),
     };
@@ -597,11 +619,13 @@ export default function Checkout() {
                 applyCoupon={applyCoupon}
                 removeCoupon={removeCoupon}
                 subtotal={subtotal}
-                discountCents={discountCents}
+                discountCents={effectiveDiscountCents}
                 discountValue={discountValue}
                 giftWrap={giftWrap}
                 giftWrapPrice={giftWrapPrice}
                 shippingPrice={shippingPrice}
+                originalShippingPrice={originalShippingPrice}
+                hasAutomaticFreeShipping={hasAutomaticFreeShipping}
                 total={total}
                 canContinue={canContinue}
                 handleContinue={handleContinue}
@@ -616,6 +640,7 @@ export default function Checkout() {
           total={total}
           canContinue={canContinue}
           selectedShipping={selectedShipping}
+          hasAutomaticFreeShipping={hasAutomaticFreeShipping}
           handleContinue={handleContinue}
         />
       )}
@@ -857,11 +882,7 @@ function DeliverySection({
           {shippingError}
         </div>
       )}
-      {shippingError && (
-        <div className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-sm text-red-600">
-          {shippingError}
-        </div>
-      )}
+
 
       {shippingOptions.length > 0 && (
         <div className="mt-4 space-y-3">
@@ -1011,6 +1032,8 @@ function OrderSummary({
   giftWrapPrice,
   selectedShipping,
   shippingPrice,
+  originalShippingPrice,
+  hasAutomaticFreeShipping,
   total,
   canContinue,
   handleContinue,
@@ -1039,7 +1062,12 @@ function OrderSummary({
         {selectedShipping && (
           <SummaryLine
             label={`Frete (${selectedShipping.name})`}
-            value={moneyBRL(shippingPrice)}
+            value={
+              hasAutomaticFreeShipping
+                ? `Grátis ${originalShippingPrice > 0 ? `(${moneyBRL(originalShippingPrice)})` : ""}`
+                : moneyBRL(shippingPrice)
+            }
+            success={hasAutomaticFreeShipping}
           />
         )}
       </div>
@@ -1117,11 +1145,13 @@ function MobileCheckoutBar({
   total,
   canContinue,
   selectedShipping,
+  hasAutomaticFreeShipping,
   handleContinue,
 }: {
   total: number;
   canContinue: boolean;
   selectedShipping: ShippingOption | null;
+  hasAutomaticFreeShipping: boolean;
   handleContinue: () => void;
 }) {
   return (
@@ -1138,7 +1168,9 @@ function MobileCheckoutBar({
 
         <p className="text-right text-xs text-[#8a8175]">
           {selectedShipping
-            ? `Entrega: ${selectedShipping.name}`
+            ? hasAutomaticFreeShipping
+              ? `Entrega grátis: ${selectedShipping.name}`
+              : `Entrega: ${selectedShipping.name}`
             : "Escolha o frete"}
         </p>
       </div>
