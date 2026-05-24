@@ -15,6 +15,7 @@ import {
 type Variant = {
   id: string;
   label: string;
+  availableQty?: number;
 };
 
 export type ProductImage = {
@@ -46,6 +47,7 @@ type ProductHeroProps = {
   onAddToCart: () => void;
   onBuyNow: () => void;
   availableQty?: number;
+  isAvailable: boolean;
   images?: ProductImage[];
   postalCode: string;
   onPostalCodeChange: (value: string) => void;
@@ -76,6 +78,11 @@ function formatBRL(value: number) {
   }).format(Number(value || 0));
 }
 
+function normalizeQty(value: unknown) {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+}
+
 export default function ProductHero({
   name,
   description,
@@ -90,6 +97,7 @@ export default function ProductHero({
   onAddToCart,
   onBuyNow,
   availableQty = 0,
+  isAvailable,
   images = [],
   postalCode,
   onPostalCodeChange,
@@ -97,15 +105,12 @@ export default function ProductHero({
   shippingLoading = false,
   shippingError = "",
   shippingOptions = [],
-  selectedShippingId: _selectedShippingId = "",
-  onSelectShipping: _onSelectShipping,
+  selectedShippingId = "",
+  onSelectShipping,
 }: ProductHeroProps) {
   const [activeImage, setActiveImage] = useState(0);
 
-  const hasStockLoaded = availableQty !== undefined && availableQty !== null;
-
-  const isAvailable =
-    hasStockLoaded && Number(availableQty) > 0;
+  const safeAvailableQty = normalizeQty(availableQty);
 
   const displayImages: ProductImage[] =
     Array.isArray(images) && images.length > 0
@@ -122,9 +127,7 @@ export default function ProductHero({
 
   function prevImage() {
     if (displayImages.length <= 1) return;
-    setActiveImage((prev) =>
-      prev === 0 ? displayImages.length - 1 : prev - 1
-    );
+    setActiveImage((prev) => (prev === 0 ? displayImages.length - 1 : prev - 1));
   }
 
   function nextImage() {
@@ -142,7 +145,7 @@ export default function ProductHero({
             <div className="self-start lg:sticky lg:top-[155px]">
               <div className="bg-[#f5f0e8] lg:rounded-[28px] lg:border lg:border-[#e7ded2] lg:bg-white lg:p-4 lg:shadow-[0_18px_50px_rgba(43,85,78,0.07)]">
                 <div className="relative overflow-hidden bg-[#f3efe8] lg:rounded-[28px]">
-                  {hasStockLoaded && !isAvailable && (
+                  {!isAvailable && (
                     <div className="absolute left-4 top-4 z-10 rounded-full bg-white/95 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#7b746b] shadow-sm">
                       Esgotado
                     </div>
@@ -151,7 +154,8 @@ export default function ProductHero({
                   <img
                     src={currentImage.src}
                     alt={currentImage.alt || name}
-                    className="h-[58vh] w-full object-cover sm:h-[62vh] md:aspect-[4/5] md:h-auto" onError={(e) => {
+                    className="h-[58vh] w-full object-cover sm:h-[62vh] md:aspect-[4/5] md:h-auto"
+                    onError={(e) => {
                       e.currentTarget.src = FALLBACK_IMAGE;
                     }}
                   />
@@ -214,6 +218,7 @@ export default function ProductHero({
                     <div className="mt-3 flex flex-wrap gap-3">
                       {variants.map((variant) => {
                         const active = selectedVariant === variant.id;
+                        const variantAvailable = normalizeQty(variant.availableQty) > 0;
 
                         return (
                           <button
@@ -225,6 +230,7 @@ export default function ProductHero({
                               active
                                 ? "border-[#2b554e] bg-[#2b554e] text-white"
                                 : "border-[#d9d1c7] bg-white text-[#2b554e]",
+                              !variantAvailable ? "opacity-50" : "",
                             ].join(" ")}
                           >
                             {variant.label}
@@ -235,25 +241,32 @@ export default function ProductHero({
                   </div>
                 )}
 
-                <div className="mt-8">
-                  <p className="mb-3 text-xs font-medium uppercase tracking-[0.24em] text-[#81786e]">
-                    Quantidade
-                  </p>
+                {isAvailable && (
+                  <div className="mt-8">
+                    <p className="mb-3 text-xs font-medium uppercase tracking-[0.24em] text-[#81786e]">
+                      Quantidade
+                    </p>
 
-                  <div className="flex h-[56px] w-[150px] items-center justify-between rounded-full border border-[#ddd5ca] bg-white px-5">
-                    <button type="button" onClick={onDecreaseQuantity} className="text-[#2b554e]">
-                      <Minus size={16} />
-                    </button>
+                    <div className="flex h-[56px] w-[150px] items-center justify-between rounded-full border border-[#ddd5ca] bg-white px-5">
+                      <button type="button" onClick={onDecreaseQuantity} className="text-[#2b554e]">
+                        <Minus size={16} />
+                      </button>
 
-                    <span className="text-base font-semibold text-[#23473f]">
-                      {quantity}
-                    </span>
+                      <span className="text-base font-semibold text-[#23473f]">
+                        {quantity}
+                      </span>
 
-                    <button type="button" onClick={onIncreaseQuantity} className="text-[#2b554e]">
-                      <Plus size={16} />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={onIncreaseQuantity}
+                        disabled={quantity >= safeAvailableQty}
+                        className="text-[#2b554e] disabled:opacity-40"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="mt-6 hidden lg:block">
                   {isAvailable ? (
@@ -275,34 +288,7 @@ export default function ProductHero({
                       </button>
                     </div>
                   ) : (
-                    <div className="rounded-[24px] border border-[#e6ddd1] bg-white p-5 shadow-[0_10px_30px_rgba(43,85,78,0.06)]">
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ddd5ca] bg-[#fcfaf6] text-[#2b554e]">
-                          <ShoppingBag size={20} />
-                        </div>
-
-                        <div>
-                          <p className="text-base font-semibold text-[#2b554e]">
-                            Produto indisponível
-                          </p>
-
-                          <p className="mt-1 text-sm leading-6 text-[#6f6a63]">
-                            Este produto está sem estoque no momento.
-                          </p>
-
-                          <p className="text-sm leading-6 text-[#6f6a63]">
-                            Cadastre-se para ser avisado quando voltar.
-                          </p>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="mt-5 h-[52px] w-full rounded-full border border-[#2b554e] bg-white text-sm font-semibold uppercase tracking-[0.12em] text-[#2b554e]"
-                      >
-                        Avise quando chegar
-                      </button>
-                    </div>
+                    <UnavailableBox />
                   )}
                 </div>
 
@@ -368,35 +354,47 @@ export default function ProductHero({
         </div>
       </section>
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#e8dfd3] bg-[#fcfaf6]/92 px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-3 shadow-[0_-10px_30px_rgba(43,85,78,0.08)] backdrop-blur-xl lg:hidden">        <div className="mb-3 flex items-center justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#81786e]">
-            Total
-          </p>
-          <p className="text-lg font-semibold text-[#2b554e]">
-            {formatBRL(price)}
-          </p>
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#e8dfd3] bg-[#fcfaf6]/92 px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-3 shadow-[0_-10px_30px_rgba(43,85,78,0.08)] backdrop-blur-xl lg:hidden">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-[#81786e]">
+              Total
+            </p>
+            <p className="text-lg font-semibold text-[#2b554e]">
+              {formatBRL(price)}
+            </p>
+          </div>
+
+          {isAvailable && (
+            <div className="flex h-10 items-center rounded-full border border-[#ddd5ca] bg-white px-2">
+              <button
+                type="button"
+                onClick={onDecreaseQuantity}
+                className="flex h-8 w-8 items-center justify-center text-[#2b554e]"
+              >
+                <Minus size={15} />
+              </button>
+
+              <span className="w-7 text-center text-sm font-semibold text-[#2b554e]">
+                {quantity}
+              </span>
+
+              <button
+                type="button"
+                onClick={onIncreaseQuantity}
+                disabled={quantity >= safeAvailableQty}
+                className="flex h-8 w-8 items-center justify-center text-[#2b554e] disabled:opacity-40"
+              >
+                <Plus size={15} />
+              </button>
+            </div>
+          )}
         </div>
-
-        <div className="flex h-10 items-center rounded-full border border-[#ddd5ca] bg-white px-2">
-          <button type="button" onClick={onDecreaseQuantity} className="flex h-8 w-8 items-center justify-center text-[#2b554e]">
-            <Minus size={15} />
-          </button>
-
-          <span className="w-7 text-center text-sm font-semibold text-[#2b554e]">
-            {quantity}
-          </span>
-
-          <button type="button" onClick={onIncreaseQuantity} className="flex h-8 w-8 items-center justify-center text-[#2b554e]">
-            <Plus size={15} />
-          </button>
-        </div>
-      </div>
 
         <button
           type="button"
           onClick={isAvailable ? onAddToCart : undefined}
-          disabled={!hasStockLoaded || !isAvailable}
+          disabled={!isAvailable}
           className={[
             "h-[56px] w-full rounded-full text-sm font-semibold uppercase tracking-[0.12em]",
             isAvailable
@@ -404,14 +402,43 @@ export default function ProductHero({
               : "border border-[#2b554e] bg-white text-[#2b554e]",
           ].join(" ")}
         >
-          {!hasStockLoaded
-            ? "Carregando..."
-            : isAvailable
-              ? "Adicionar ao carrinho"
-              : "Avise quando chegar"}
+          {isAvailable ? "Adicionar ao carrinho" : "Avise quando chegar"}
         </button>
       </div>
     </>
+  );
+}
+
+function UnavailableBox() {
+  return (
+    <div className="rounded-[24px] border border-[#e6ddd1] bg-white p-5 shadow-[0_10px_30px_rgba(43,85,78,0.06)]">
+      <div className="flex items-start gap-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ddd5ca] bg-[#fcfaf6] text-[#2b554e]">
+          <ShoppingBag size={20} />
+        </div>
+
+        <div>
+          <p className="text-base font-semibold text-[#2b554e]">
+            Produto indisponível
+          </p>
+
+          <p className="mt-1 text-sm leading-6 text-[#6f6a63]">
+            Este produto está sem estoque no momento.
+          </p>
+
+          <p className="text-sm leading-6 text-[#6f6a63]">
+            Cadastre-se para ser avisado quando voltar.
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="mt-5 h-[52px] w-full rounded-full border border-[#2b554e] bg-white text-sm font-semibold uppercase tracking-[0.12em] text-[#2b554e]"
+      >
+        Avise quando chegar
+      </button>
+    </div>
   );
 }
 

@@ -122,7 +122,12 @@ export default function ProductPage() {
   }, [skus]);
 
   const price = selectedSku ? selectedSku.price_cents / 100 : 0;
-  const isAvailable = Boolean(product?.status === "active" && selectedSku?.active && selectedAvailableQty > 0);
+
+  const isAvailable = Boolean(
+    product?.status === "active" &&
+    selectedSku?.active &&
+    selectedAvailableQty > 0
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -168,13 +173,18 @@ export default function ProductPage() {
         if (skuIds.length > 0) {
           const { data: availabilityData, error: availabilityError } = await supabase
             .from("sku_availability")
-            .select("sku_id, available_qty")
-            .in("sku_id", skuIds);
+            .select("*");
+
+          console.log("SKU IDS FRONT:", skuIds);
+          console.table(availabilityData);
 
           if (availabilityError) throw availabilityError;
 
           availabilityMap = new Map(
-            (availabilityData ?? []).map((item: any) => [String(item.sku_id), normalizeQty(item.available_qty)])
+            (availabilityData ?? []).map((item: any) => [
+              String(item.sku_id),
+              normalizeQty(item.available_qty),
+            ])
           );
         }
 
@@ -183,13 +193,27 @@ export default function ProductPage() {
           available_qty: availabilityMap.get(sku.id) ?? 0,
         }));
 
-        const firstAvailableSku = safeSkus.find((sku) => sku.active && normalizeQty(sku.available_qty) > 0);
+        const firstAvailableSku = safeSkus.find(
+          (sku) => sku.active && normalizeQty(sku.available_qty) > 0
+        );
+
         const firstSku = firstAvailableSku ?? safeSkus[0] ?? null;
 
         if (cancelled) return;
+
         setProduct(productData as ProductRow);
         setSkus(safeSkus);
         setSelectedSkuId(firstSku?.id ?? "");
+
+        console.table(
+          safeSkus.map((sku) => ({
+            sku_id: sku.id,
+            title: sku.title,
+            variant_name: sku.variant_name,
+            active: sku.active,
+            available_qty: sku.available_qty,
+          }))
+        );
       } catch (err: any) {
         if (!cancelled) setError(err?.message || "Erro ao carregar produto.");
       } finally {
@@ -235,7 +259,12 @@ export default function ProductPage() {
         .filter((img) => img.src);
 
       if (cancelled) return;
-      setImages(normalizedImages.length > 0 ? normalizedImages : [{ id: "fallback", src: FALLBACK_IMAGE, alt: product.name || "Produto" }]);
+
+      setImages(
+        normalizedImages.length > 0
+          ? normalizedImages
+          : [{ id: "fallback", src: FALLBACK_IMAGE, alt: product.name || "Produto" }]
+      );
     }
 
     loadSkuImages();
@@ -378,8 +407,14 @@ export default function ProductPage() {
         <Header />
         <main className="mx-auto max-w-3xl px-5 pt-[140px] text-center">
           <p className="text-sm uppercase tracking-[0.24em] text-[#b08d57]">Produto</p>
-          <h1 className="mt-3 text-2xl font-semibold text-[#2b554e]">{error || "Produto não encontrado."}</h1>
-          <button type="button" onClick={() => navigate("/")} className="mt-6 rounded-full bg-[#2b554e] px-7 py-3 text-sm font-semibold text-white">
+          <h1 className="mt-3 text-2xl font-semibold text-[#2b554e]">
+            {error || "Produto não encontrado."}
+          </h1>
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="mt-6 rounded-full bg-[#2b554e] px-7 py-3 text-sm font-semibold text-white"
+          >
             Voltar para a loja
           </button>
         </main>
@@ -394,7 +429,11 @@ export default function ProductPage() {
       <main className="pt-[170px] md:pt-[240px]">
         <section className="mx-auto w-full max-w-[1440px] px-0 pb-16 md:px-6 lg:px-8">
           <div className="mb-4 hidden items-center gap-2 px-1 text-[12px] text-[#8b8175] md:flex">
-            <button type="button" onClick={() => navigate(-1)} className="inline-flex items-center gap-1 transition hover:text-[#2b554e]">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-1 transition hover:text-[#2b554e]"
+            >
               <ArrowLeft className="h-3.5 w-3.5" />
               Voltar
             </button>
@@ -412,10 +451,16 @@ export default function ProductPage() {
             onSelectVariant={setSelectedSkuId}
             quantity={quantity}
             onDecreaseQuantity={() => setQuantity((prev) => Math.max(1, prev - 1))}
-            onIncreaseQuantity={() => setQuantity((prev) => Math.min(selectedAvailableQty || 1, prev + 1))}
+            onIncreaseQuantity={() =>
+              setQuantity((prev) => {
+                if (selectedAvailableQty <= 0) return 1;
+                return Math.min(selectedAvailableQty, prev + 1);
+              })
+            }
             onAddToCart={handleAddToCart}
             onBuyNow={handleBuyNow}
             availableQty={selectedAvailableQty}
+            isAvailable={isAvailable}
             images={images}
             postalCode={postalCode}
             onPostalCodeChange={(value) => setPostalCode(formatCep(value))}
