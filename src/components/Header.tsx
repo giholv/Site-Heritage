@@ -39,7 +39,7 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
   const goSection = (id: string) => {
     setIsOpen(false);
 
-    // se já estiver na home, só scrolla
+
     if (location.pathname === "/") {
       scrollToId(id);
       return;
@@ -96,8 +96,19 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSearchSubmit) return onSearchSubmit(q);
-    console.log("Pesquisar:", q);
+
+    const term = q.trim();
+
+    if (!term) return;
+
+    setIsOpen(false);
+
+    if (onSearchSubmit) {
+      onSearchSubmit(term);
+      return;
+    }
+
+    navigate(`/joias?q=${encodeURIComponent(term)}`);
   };
   const onLogin = () => navigate("/login");
 
@@ -210,18 +221,12 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
             {/* DESKTOP */}
             <div
               className={[
-                "hidden md:flex items-center gap-6 transition-all duration-300",
+                "hidden md:grid grid-cols-[240px_1fr_240px] lg:grid-cols-[280px_1fr_280px] items-center gap-6 transition-all duration-300",
                 scrolled ? "h-20 lg:h-24" : "h-24 lg:h-28",
               ].join(" ")}
             >
-
-              {/* Logo - UMA só */}
-              <div
-                className={[
-                  "flex-none flex items-center transition-all duration-300",
-                  scrolled ? "w-[260px] lg:w-[300px] pt-2" : "w-[320px] lg:w-[360px] pt-9",
-                ].join(" ")}
-              >
+              {/* Logo */}
+              <div className="flex items-center justify-start">
                 <button
                   type="button"
                   onClick={() => navigate("/")}
@@ -233,54 +238,71 @@ const Header: React.FC<HeaderProps> = ({ searchValue, onSearchChange, onSearchSu
                     alt="Logo da loja"
                     className={[
                       "w-auto object-contain transition-all duration-300",
-                      scrolled ? "h-[92px] lg:h-[110px] xl:h-[120px]" : "h-[130px] lg:h-[155px] xl:h-[175px]",
+                      scrolled
+                        ? "h-[92px] lg:h-[110px]"
+                        : "h-[115px] lg:h-[135px] xl:h-[145px]",
                     ].join(" ")}
                   />
                 </button>
               </div>
 
               {/* Busca */}
-              <div className="flex-1 flex justify-center">
-                <form onSubmit={handleSearchSubmit} className="w-full max-w-[560px]">
-                  <div className="relative">
-                    <input
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      placeholder="Buscar por nome ou código"
-                      className="w-full h-11 pl-4 pr-11 rounded-md border border-[#2b554e]/15 bg-white/50
-text-[#2b554e] text-base lg:text-[17px] placeholder:text-[#2b554e]/45
-backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
-                    />
-                    <button
-                      type="submit"
-                      aria-label="Pesquisar"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#2b554e]/70 hover:text-[#b08d57] transition-colors"
-                    >
-                      <Search className="h-5 w-5" />
-                    </button>
-                  </div>
+              <div className="flex w-full justify-center">
+                <form
+                  onSubmit={handleSearchSubmit}
+                  className="relative w-full max-w-[700px]"
+                >
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Buscar por nome ou código"
+                    className="
+          h-14 w-full rounded-lg border border-[#dcd6cc]
+          bg-white px-6 pr-14 text-base text-[#2b554e]
+          placeholder:text-[#9aa8a3]
+          outline-none transition
+          focus:border-[#2b554e]
+          focus:ring-2 focus:ring-[#2b554e]/10
+        "
+                  />
+
+                  <button
+                    type="submit"
+                    aria-label="Pesquisar"
+                    className="
+          absolute right-4 top-1/2 -translate-y-1/2
+          text-[#54716b] transition-colors hover:text-[#b08d57]
+        "
+                  >
+                    <Search className="h-6 w-6" strokeWidth={1.8} />
+                  </button>
                 </form>
               </div>
 
               {/* Ícones */}
-              <div className="flex-none w-[260px] flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-4">
                 <button
                   type="button"
                   onClick={onLogin}
                   aria-label="Login"
-                  className="h-13 w-13 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                  className="
+        h-12 w-12 inline-flex items-center justify-center
+        text-[#2b554e] transition-colors hover:text-[#b08d57]
+      "
                 >
-                  <User className="h-6 w-6 lg:h-7 lg:w-7" />
+                  <User className="h-7 w-7" strokeWidth={1.8} />
                 </button>
 
                 <button
                   type="button"
                   onClick={openCart}
                   aria-label="Carrinho"
-                  className="relative h-13 w-13 inline-flex items-center justify-center text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                  className="
+        relative h-12 w-12 inline-flex items-center justify-center
+        text-[#2b554e] transition-colors hover:text-[#b08d57]
+      "
                 >
-
-                  <ShoppingBag className="h-6 w-6 lg:h-7 lg:w-7" />
+                  <ShoppingBag className="h-7 w-7" strokeWidth={1.8} />
                   {badge(count)}
                 </button>
               </div>
@@ -288,14 +310,17 @@ backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-[#b08d57]/30"
           </div>
 
           {/* MENU desktop */}
-          <nav className="hidden md:block">
-            <div className="container mx-auto px-4 md:px-6 h-12 flex items-center justify-center gap-10">
+          <nav className="hidden md:block border-t border-[#eee8dc]/80">
+            <div className="container mx-auto px-4 md:px-6 h-14 flex items-center justify-center gap-12">
               {menuItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => goSection(item.id)}
-                  className="text-base lg:text-[17px] font-medium tracking-wide text-[#2b554e] hover:text-[#b08d57] transition-colors"
+                  className="
+          text-base lg:text-[17px] font-medium tracking-[0.12em]
+          text-[#2b554e] transition-colors hover:text-[#b08d57]
+        "
                 >
                   {item.label}
                 </button>

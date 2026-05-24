@@ -70,7 +70,11 @@ function moneyBRL(value: number) {
 }
 
 function centsToBRL(cents?: number | null) {
-  return moneyBRL((cents ?? 0) / 100);
+  if (cents === null || cents === undefined) {
+    return "Preço indisponível";
+  }
+
+  return moneyBRL(cents / 100);
 }
 
 function brlToCents(value: number) {
@@ -379,7 +383,14 @@ export default function JewelryListing() {
       }
 
       if (qText) {
-        query = query.ilike("name", `%${qText}%`);
+        const safeQ = qText.replace(/[%_]/g, "\\$&");
+
+        query = query.or(
+          [
+            `name.ilike.%${safeQ}%`,
+            `slug.ilike.%${safeQ}%`,
+          ].join(",")
+        );
       }
 
       const min = userSetPrice ? effMin : priceBounds?.min ?? 0;
@@ -962,6 +973,11 @@ export default function JewelryListing() {
                             {centsToBRL(product.min_price_cents)}
                           </div>
 
+                          {product.min_price_cents !== null && product.min_price_cents !== undefined && (
+                            <div className="mt-0.5 text-xs text-black/45">
+                              em até 3x sem juros
+                            </div>
+                          )}
                           {!isAvailable && (
                             <div className="mt-1 text-xs text-black/45">
                               Sem estoque

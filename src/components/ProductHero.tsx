@@ -102,7 +102,10 @@ export default function ProductHero({
 }: ProductHeroProps) {
   const [activeImage, setActiveImage] = useState(0);
 
-  const isAvailable = Number(availableQty || 0) > 0;
+  const hasStockLoaded = availableQty !== undefined && availableQty !== null;
+
+  const isAvailable =
+    hasStockLoaded && Number(availableQty) > 0;
 
   const displayImages: ProductImage[] =
     Array.isArray(images) && images.length > 0
@@ -139,7 +142,7 @@ export default function ProductHero({
             <div className="self-start lg:sticky lg:top-[155px]">
               <div className="bg-[#f5f0e8] lg:rounded-[28px] lg:border lg:border-[#e7ded2] lg:bg-white lg:p-4 lg:shadow-[0_18px_50px_rgba(43,85,78,0.07)]">
                 <div className="relative overflow-hidden bg-[#f3efe8] lg:rounded-[28px]">
-                  {!isAvailable && (
+                  {hasStockLoaded && !isAvailable && (
                     <div className="absolute left-4 top-4 z-10 rounded-full bg-white/95 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#7b746b] shadow-sm">
                       Esgotado
                     </div>
@@ -393,7 +396,7 @@ export default function ProductHero({
         <button
           type="button"
           onClick={isAvailable ? onAddToCart : undefined}
-          disabled={!isAvailable}
+          disabled={!hasStockLoaded || !isAvailable}
           className={[
             "h-[56px] w-full rounded-full text-sm font-semibold uppercase tracking-[0.12em]",
             isAvailable
@@ -401,7 +404,11 @@ export default function ProductHero({
               : "border border-[#2b554e] bg-white text-[#2b554e]",
           ].join(" ")}
         >
-          {isAvailable ? "Adicionar ao carrinho" : "Avise quando chegar"}
+          {!hasStockLoaded
+            ? "Carregando..."
+            : isAvailable
+              ? "Adicionar ao carrinho"
+              : "Avise quando chegar"}
         </button>
       </div>
     </>
