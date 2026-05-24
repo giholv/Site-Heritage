@@ -383,7 +383,7 @@ export default function ProductPage() {
     return (
       <div className="min-h-screen bg-[#fcfaf6]">
         <Header />
-        <main className="mx-auto max-w-7xl px-5 pt-[130px] md:pt-[160px]">
+        <main className="mx-auto max-w-7xl px-5 pt-[104px] md:pt-[160px]">
           <div className="grid gap-8 lg:grid-cols-2">
             <div className="aspect-[4/5] animate-pulse rounded-[32px] bg-[#eee7dc]" />
             <div className="space-y-5">
@@ -402,7 +402,7 @@ export default function ProductPage() {
     return (
       <div className="min-h-screen bg-[#fcfaf6]">
         <Header />
-        <main className="mx-auto max-w-3xl px-5 pt-[140px] text-center">
+        <main className="mx-auto max-w-3xl px-5 pt-[104px] text-center md:pt-[150px]">
           <p className="text-sm uppercase tracking-[0.24em] text-[#b08d57]">Produto</p>
           <h1 className="mt-3 text-2xl font-semibold text-[#2b554e]">
             {error || "Produto não encontrado."}
@@ -423,7 +423,7 @@ export default function ProductPage() {
     <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
       <Header />
 
-      <main className="pt-[170px] md:pt-[240px]">
+      <main className="pt-[94px] pb-[150px] md:pt-[240px] md:pb-0">
         <section className="mx-auto w-full max-w-[1440px] px-0 pb-16 md:px-6 lg:px-8">
           <div className="mb-4 hidden items-center gap-2 px-1 text-[12px] text-[#8b8175] md:flex">
             <button

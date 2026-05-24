@@ -51,11 +51,11 @@ export default function AmbientSound() {
     await playAudio();
   }
 
-  async function handleEnded() {
+  function handleEnded() {
     const nextIndex = (trackIndex + 1) % TRACKS.length;
     setTrackIndex(nextIndex);
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       playAudio();
     }, 80);
   }
@@ -75,18 +75,29 @@ export default function AmbientSound() {
         aria-label={playing ? "Desligar som ambiente" : "Ligar som ambiente"}
         title={playing ? "Desligar som ambiente" : "Ligar som ambiente"}
         className={[
-          "fixed bottom-6 left-5 z-[9998]",
-          "flex h-12 w-12 items-center justify-center rounded-full",
-          "border border-white/50 bg-white/45 text-[#2b554e]",
-          "backdrop-blur-xl shadow-[0_10px_30px_rgba(43,85,78,0.16)]",
-          "transition hover:bg-white/65 active:scale-95",
-          playing ? "bg-[#2b554e]/90 text-white" : "",
+          /**
+           * MOBILE:
+           * sobe o botão para não encostar na barra fixa de compra
+           */
+          "fixed left-4 bottom-[142px] z-[9998]",
+
+          /**
+           * DESKTOP:
+           * volta para o canto inferior
+           */
+          "md:bottom-6 md:left-5",
+
+          "flex h-11 w-11 items-center justify-center rounded-full md:h-12 md:w-12",
+          "border border-[#e8dfd2]/80 bg-[#FCFAF6]/90 text-[#2b554e]",
+          "backdrop-blur-xl shadow-[0_10px_28px_rgba(43,85,78,0.16)]",
+          "transition hover:bg-white active:scale-95",
+          playing ? "border-[#2b554e] bg-[#2b554e] text-white" : "",
         ].join(" ")}
       >
         {playing ? (
-          <Music size={20} strokeWidth={1.8} />
+          <Music size={19} strokeWidth={1.8} />
         ) : (
-          <VolumeX size={20} strokeWidth={1.8} />
+          <VolumeX size={19} strokeWidth={1.8} />
         )}
       </button>
     </>
