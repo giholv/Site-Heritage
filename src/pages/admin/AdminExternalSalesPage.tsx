@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 type SkuOption = {
@@ -11,6 +11,7 @@ type SkuOption = {
 
 type ItemForm = {
   sku_id: string;
+  sku_search: string;
   qty: number;
   unit_price_cents: number;
 };
@@ -30,13 +31,28 @@ function centsToBRL(cents: number) {
   });
 }
 
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function skuLabel(sku: SkuOption) {
+  return `${sku.sku_code} - ${sku.product_name}${sku.variant_name ? ` - ${sku.variant_name}` : ""
+    }`;
+}
+
 export default function AdminExternalSalesPage() {
   const [loading, setLoading] = useState(false);
   const [skus, setSkus] = useState<SkuOption[]>([]);
   const [items, setItems] = useState<ItemForm[]>([
-    { sku_id: "", qty: 1, unit_price_cents: 0 },
+    { sku_id: "", sku_search: "", qty: 1, unit_price_cents: 0 },
   ]);
 
+  const [activeSkuSearchIndex, setActiveSkuSearchIndex] = useState<number | null>(
+    null
+  );
   const [form, setForm] = useState({
     sales_channel: "whatsapp",
     status: "paid",
@@ -91,9 +107,11 @@ export default function AdminExternalSalesPage() {
   }
 
   function addItem() {
-    setItems((prev) => [...prev, { sku_id: "", qty: 1, unit_price_cents: 0 }]);
+    setItems((prev) => [
+      ...prev,
+      { sku_id: "", sku_search: "", qty: 1, unit_price_cents: 0 },
+    ]);
   }
-
   function removeItem(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
@@ -158,6 +176,7 @@ export default function AdminExternalSalesPage() {
         sku_id: item.sku_id,
         quantity: item.qty,
         unit_price_cents: item.unit_price_cents,
+        line_total_cents: item.qty * item.unit_price_cents,
       }));
 
       const { error: itemsError } = await supabase
@@ -182,13 +201,41 @@ export default function AdminExternalSalesPage() {
         notes: "",
       });
 
-      setItems([{ sku_id: "", qty: 1, unit_price_cents: 0 }]);
+      setItems([{ sku_id: "", sku_search: "", qty: 1, unit_price_cents: 0 }]);
     } catch (err: any) {
       alert(err.message || "Erro ao salvar venda externa.");
       console.error(err);
     } finally {
       setLoading(false);
     }
+  }
+
+  function getFilteredSkus(search: string) {
+    const q = normalizeText(search.trim());
+
+    if (!q) {
+      return skus.slice(0, 30);
+    }
+
+    return skus
+      .filter((sku) => {
+        const text = normalizeText(
+          `${sku.sku_code} ${sku.product_name} ${sku.variant_name ?? ""}`
+        );
+
+        return text.includes(q);
+      })
+      .slice(0, 30);
+  }
+
+  function selectSku(index: number, sku: SkuOption) {
+    updateItem(index, {
+      sku_id: sku.id,
+      sku_search: skuLabel(sku),
+      unit_price_cents: sku.price_cents ?? 0,
+    });
+
+    setActiveSkuSearchIndex(null);
   }
 
   return (
@@ -316,28 +363,55 @@ export default function AdminExternalSalesPage() {
               <div className="space-y-3">
                 {items.map((item, index) => (
                   <div key={index} className="grid md:grid-cols-12 gap-3">
-                    <div className="md:col-span-6">
-                      <select
+                    <div className="md:col-span-6 relative">
+                      <input
                         className="w-full rounded-xl border px-3 py-2"
-                        value={item.sku_id}
+                        placeholder="Buscar por SKU, produto ou variação"
+                        value={item.sku_search}
+                        onFocus={() => setActiveSkuSearchIndex(index)}
                         onChange={(e) => {
-                          const skuId = e.target.value;
-                          const sku = skus.find((s) => s.id === skuId);
-
                           updateItem(index, {
-                            sku_id: skuId,
-                            unit_price_cents: sku?.price_cents ?? 0,
+                            sku_search: e.target.value,
+                            sku_id: "",
+                            unit_price_cents: 0,
                           });
+
+                          setActiveSkuSearchIndex(index);
                         }}
-                      >
-                        <option value="">Selecione um SKU</option>
-                        {skus.map((sku) => (
-                          <option key={sku.id} value={sku.id}>
-                            {sku.sku_code} - {sku.product_name}
-                            {sku.variant_name ? ` - ${sku.variant_name}` : ""}
-                          </option>
-                        ))}
-                      </select>
+                        onBlur={() => {
+                          setTimeout(() => setActiveSkuSearchIndex(null), 150);
+                        }}
+                      />
+
+                      {activeSkuSearchIndex === index ? (
+                        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border bg-white shadow-lg">
+                          {getFilteredSkus(item.sku_search).map((sku) => (
+                            <button
+                              key={sku.id}
+                              type="button"
+                              className="block w-full px-3 py-3 text-left text-sm hover:bg-[#FCFAF6]"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => selectSku(index, sku)}
+                            >
+                              <div className="font-medium text-neutral-800">
+                                {sku.product_name}
+                              </div>
+
+                              <div className="text-xs text-neutral-500">
+                                {sku.sku_code}
+                                {sku.variant_name ? ` • ${sku.variant_name}` : ""} •{" "}
+                                {centsToBRL(sku.price_cents)}
+                              </div>
+                            </button>
+                          ))}
+
+                          {getFilteredSkus(item.sku_search).length === 0 ? (
+                            <div className="px-3 py-3 text-sm text-neutral-500">
+                              Nenhum SKU encontrado.
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="md:col-span-2">
