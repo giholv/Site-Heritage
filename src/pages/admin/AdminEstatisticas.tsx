@@ -8,6 +8,11 @@ import {
   Users,
   AlertTriangle,
   CalendarDays,
+  TrendingUp,
+  TrendingDown,
+  Percent,
+  BarChart3,
+  Package,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
@@ -16,6 +21,16 @@ type Metrics = {
   orders: number;
   newCustomers: number;
   criticalStock: number;
+};
+
+type ProfitMetrics = {
+  productRevenue: number;
+  cmv: number;
+  grossProfit: number;
+  marginPercent: number;
+  markupPercent: number;
+  missingCostItems: number;
+  lowMarginItems: number;
 };
 
 type RecentOrderRow = {
@@ -51,15 +66,29 @@ type BestSeller = {
   qty: number;
 };
 
+type ProfitProduct = {
+  product_id: string;
+  name: string;
+  qty: number;
+  revenue_cents: number;
+  cost_cents: number;
+  profit_cents: number;
+  margin_percent: number;
+  missing_cost: boolean;
+};
+
 type StockMovement = {
   sku_id: string;
   type: "in" | "out" | "adjust" | "reserve" | "unreserve";
   quantity: number;
 };
 
-type SkuRow = {
+type ProfitSkuRow = {
   id: string;
   product_id: string;
+  cost_cents: number | null;
+  cost_gross_cents: number | null;
+  cost_plating_cents: number | null;
 };
 
 type ProductRow = {
@@ -67,11 +96,30 @@ type ProductRow = {
   name: string;
 };
 
+type OrderItemProfitRow = {
+  order_id: string;
+  sku_id: string | null;
+  quantity: number;
+  unit_price_cents: number;
+  line_total_cents: number | null;
+};
+
+type PaidOrderRow = {
+  id: string;
+  total_cents: number | null;
+  created_at: string;
+  status: string | null;
+};
+
 function moneyBRL(value: number) {
   return (value / 100).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
+}
+
+function formatPercent(value: number) {
+  return `${Number(value || 0).toFixed(2).replace(".", ",")}%`;
 }
 
 function formatDateBR(value: string) {
@@ -92,37 +140,14 @@ function initials(name: string) {
 function statusMeta(status: string) {
   const s = (status || "").toLowerCase();
 
-  if (s === "paid") {
-    return { label: "Pago", className: "bg-emerald-100 text-emerald-700" };
-  }
-
-  if (s === "pending_payment" || s === "pending") {
-    return { label: "Pendente", className: "bg-amber-100 text-amber-700" };
-  }
-
-  if (s === "canceled" || s === "cancelled") {
-    return { label: "Cancelado", className: "bg-rose-100 text-rose-700" };
-  }
-
-  if (s === "processing") {
-    return { label: "Processando", className: "bg-sky-100 text-sky-700" };
-  }
-
-  if (s === "shipped") {
-    return { label: "Enviado", className: "bg-violet-100 text-violet-700" };
-  }
-
-  if (s === "delivered") {
-    return { label: "Entregue", className: "bg-emerald-100 text-emerald-700" };
-  }
-
-  if (s === "refunded") {
-    return { label: "Reembolsado", className: "bg-slate-100 text-slate-700" };
-  }
-
-  if (s === "draft") {
-    return { label: "Rascunho", className: "bg-gray-100 text-gray-700" };
-  }
+  if (s === "paid") return { label: "Pago", className: "bg-emerald-100 text-emerald-700" };
+  if (s === "pending_payment" || s === "pending") return { label: "Pendente", className: "bg-amber-100 text-amber-700" };
+  if (s === "canceled" || s === "cancelled") return { label: "Cancelado", className: "bg-rose-100 text-rose-700" };
+  if (s === "processing") return { label: "Processando", className: "bg-sky-100 text-sky-700" };
+  if (s === "shipped") return { label: "Enviado", className: "bg-violet-100 text-violet-700" };
+  if (s === "delivered") return { label: "Entregue", className: "bg-emerald-100 text-emerald-700" };
+  if (s === "refunded") return { label: "Reembolsado", className: "bg-slate-100 text-slate-700" };
+  if (s === "draft") return { label: "Rascunho", className: "bg-gray-100 text-gray-700" };
 
   return { label: status || "-", className: "bg-gray-100 text-gray-700" };
 }
@@ -146,6 +171,26 @@ function applyMovement(
     default:
       return current;
   }
+}
+
+function getSkuCost(sku?: ProfitSkuRow | null) {
+  if (!sku) return 0;
+
+  if (sku.cost_cents !== null && sku.cost_cents !== undefined) {
+    return Number(sku.cost_cents || 0);
+  }
+
+  return Number(sku.cost_gross_cents || 0) + Number(sku.cost_plating_cents || 0);
+}
+
+function hasMissingCost(sku?: ProfitSkuRow | null) {
+  if (!sku) return true;
+
+  return (
+    sku.cost_cents === null &&
+    sku.cost_gross_cents === null &&
+    sku.cost_plating_cents === null
+  );
 }
 
 function MetricCard({
@@ -192,6 +237,52 @@ function MetricCard({
   if (!to) return content;
 
   return <Link to={to}>{content}</Link>;
+}
+
+function FinanceCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  tone = "default",
+}: {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ReactNode;
+  tone?: "default" | "good" | "warn" | "danger";
+}) {
+  const toneMap = {
+    default: "bg-[#FCFAF6] text-[#2b554e]",
+    good: "bg-emerald-50 text-emerald-700",
+    warn: "bg-amber-50 text-amber-700",
+    danger: "bg-rose-50 text-rose-700",
+  };
+
+  return (
+    <div className="rounded-2xl border bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm text-gray-500">{title}</div>
+          <div className="mt-2 text-3xl font-semibold text-slate-800">
+            {value}
+          </div>
+
+          {subtitle ? (
+            <div className="mt-2 text-sm font-medium text-zinc-500">
+              {subtitle}
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-full ${toneMap[tone]}`}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SectionCard({
@@ -244,9 +335,8 @@ function MiniLineChart({ data }: { data: WeeklyPoint[] }) {
     .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
     .join(" ");
 
-  const areaPath = `${path} L ${points[points.length - 1]?.x ?? padding} ${
-    height - padding
-  } L ${points[0]?.x ?? padding} ${height - padding} Z`;
+  const areaPath = `${path} L ${points[points.length - 1]?.x ?? padding} ${height - padding
+    } L ${points[0]?.x ?? padding} ${height - padding} Z`;
 
   return (
     <div>
@@ -285,6 +375,16 @@ export default function AdminEstatisticas() {
     criticalStock: 0,
   });
 
+  const [profitMetrics, setProfitMetrics] = useState<ProfitMetrics>({
+    productRevenue: 0,
+    cmv: 0,
+    grossProfit: 0,
+    marginPercent: 0,
+    markupPercent: 0,
+    missingCostItems: 0,
+    lowMarginItems: 0,
+  });
+
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [recentCustomers, setRecentCustomers] = useState<RecentCustomer[]>([]);
   const [weeklySales, setWeeklySales] = useState<WeeklyPoint[]>([
@@ -297,12 +397,63 @@ export default function AdminEstatisticas() {
     { label: "Dom", total: 0 },
   ]);
   const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
+  const [profitProducts, setProfitProducts] = useState<ProfitProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   useEffect(() => {
     loadDashboard();
-  }, []);
+  }, [startDate, endDate]);
+
+  function getPeriodLabel() {
+    if (startDate && endDate) {
+      return `${new Date(startDate + "T00:00:00").toLocaleDateString(
+        "pt-BR"
+      )} até ${new Date(endDate + "T00:00:00").toLocaleDateString("pt-BR")}`;
+    }
+
+    if (startDate) {
+      return `A partir de ${new Date(startDate + "T00:00:00").toLocaleDateString(
+        "pt-BR"
+      )}`;
+    }
+
+    if (endDate) {
+      return `Até ${new Date(endDate + "T00:00:00").toLocaleDateString(
+        "pt-BR"
+      )}`;
+    }
+
+    return "Total geral";
+  }
+
+  function applyOrdersDateFilter(query: any) {
+    let filteredQuery = query;
+
+    if (startDate) {
+      filteredQuery = filteredQuery.gte(
+        "created_at",
+        new Date(startDate + "T00:00:00").toISOString()
+      );
+    }
+
+    if (endDate) {
+      filteredQuery = filteredQuery.lte(
+        "created_at",
+        new Date(endDate + "T23:59:59").toISOString()
+      );
+    }
+
+    return filteredQuery;
+  }
+
+  function clearDateFilter() {
+    setStartDate("");
+    setEndDate("");
+  }
 
   async function loadDashboard() {
     try {
@@ -311,13 +462,8 @@ export default function AdminEstatisticas() {
 
       const today = new Date();
 
-      const last7Days = new Date();
-      last7Days.setDate(today.getDate() - 6);
-
       const last30Days = new Date();
       last30Days.setDate(today.getDate() - 30);
-
-      const start7 = last7Days.toISOString();
       const start30 = last30Days.toISOString();
 
       const [
@@ -327,7 +473,6 @@ export default function AdminEstatisticas() {
         recentOrdersResult,
         recentCustomersResult,
         stockMovementsResult,
-        orderItemsResult,
       ] = await Promise.all([
         supabase.from("orders").select("id", { count: "exact", head: true }),
 
@@ -336,11 +481,12 @@ export default function AdminEstatisticas() {
           .select("id", { count: "exact", head: true })
           .gte("created_at", start30),
 
-        supabase
-          .from("orders")
-          .select("id, total_cents, created_at, status")
-          .eq("status", "paid")
-          .gte("created_at", start7),
+        applyOrdersDateFilter(
+          supabase
+            .from("orders")
+            .select("id, total_cents, created_at, status")
+            .eq("status", "paid")
+        ),
 
         supabase
           .from("orders")
@@ -356,14 +502,7 @@ export default function AdminEstatisticas() {
           .order("created_at", { ascending: false })
           .limit(3),
 
-        supabase
-          .from("stock_movements")
-          .select("sku_id, type, quantity"),
-
-        supabase
-          .from("order_items")
-          .select("sku_id, quantity")
-          .not("sku_id", "is", null),
+        supabase.from("stock_movements").select("sku_id, type, quantity"),
       ]);
 
       if (ordersResult.error) throw ordersResult.error;
@@ -372,13 +511,15 @@ export default function AdminEstatisticas() {
       if (recentOrdersResult.error) throw recentOrdersResult.error;
       if (recentCustomersResult.error) throw recentCustomersResult.error;
       if (stockMovementsResult.error) throw stockMovementsResult.error;
-      if (orderItemsResult.error) throw orderItemsResult.error;
 
-      const salesTotal =
-        paidOrdersResult.data?.reduce(
-          (acc, item) => acc + (item.total_cents ?? 0),
-          0
-        ) ?? 0;
+      const paidOrders = (paidOrdersResult.data ?? []) as PaidOrderRow[];
+
+      const paidOrderIds = paidOrders.map((order: PaidOrderRow) => order.id);
+
+      const salesTotal = paidOrders.reduce(
+        (acc: number, item: PaidOrderRow) => acc + (item.total_cents ?? 0),
+        0
+      );
 
       const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 
@@ -392,12 +533,12 @@ export default function AdminEstatisticas() {
         Dom: 0,
       };
 
-      (paidOrdersResult.data ?? []).forEach((order) => {
+      paidOrders.forEach((order: PaidOrderRow) => {
         const date = new Date(order.created_at);
         const label = days[date.getDay()];
         weekMap[label] += order.total_cents ?? 0;
       });
-
+      
       setWeeklySales([
         { label: "Seg", total: weekMap.Seg },
         { label: "Ter", total: weekMap.Ter },
@@ -486,75 +627,8 @@ export default function AdminEstatisticas() {
         criticalStock,
       });
 
-      const qtyBySku = new Map<string, number>();
-
-      (orderItemsResult.data ?? []).forEach((item) => {
-        if (!item.sku_id) return;
-
-        qtyBySku.set(
-          item.sku_id,
-          (qtyBySku.get(item.sku_id) ?? 0) + (item.quantity ?? 0)
-        );
-      });
-
-      const skuIds = Array.from(qtyBySku.keys());
-
-      if (skuIds.length === 0) {
-        setBestSellers([]);
-        return;
-      }
-
-      const { data: skusData, error: skusError } = await supabase
-        .from("skus")
-        .select("id, product_id")
-        .in("id", skuIds);
-
-      if (skusError) throw skusError;
-
-      const skuRows = (skusData ?? []) as SkuRow[];
-
-      const productIds = Array.from(
-        new Set(skuRows.map((sku) => sku.product_id).filter(Boolean))
-      );
-
-      if (productIds.length === 0) {
-        setBestSellers([]);
-        return;
-      }
-
-      const { data: productsData, error: productsError } = await supabase
-        .from("products")
-        .select("id, name")
-        .in("id", productIds);
-
-      if (productsError) throw productsError;
-
-      const productRows = (productsData ?? []) as ProductRow[];
-
-      const skuToProduct = new Map(
-        skuRows.map((sku) => [sku.id, sku.product_id])
-      );
-
-      const productNameMap = new Map(
-        productRows.map((product) => [product.id, product.name])
-      );
-
-      const qtyByProduct = new Map<string, number>();
-
-      qtyBySku.forEach((qty, skuId) => {
-        const productId = skuToProduct.get(skuId);
-        if (!productId) return;
-
-        const productName = productNameMap.get(productId) ?? "Produto";
-        qtyByProduct.set(productName, (qtyByProduct.get(productName) ?? 0) + qty);
-      });
-
-      const topProducts = Array.from(qtyByProduct.entries())
-        .map(([name, qty]) => ({ name, qty }))
-        .sort((a, b) => b.qty - a.qty)
-        .slice(0, 3);
-
-      setBestSellers(topProducts);
+      await loadProfitAnalytics(paidOrderIds);
+      await loadBestSellers(paidOrderIds);
     } catch (err: any) {
       console.error("Erro ao carregar estatísticas:", err);
       setError(err?.message || "Erro ao carregar estatísticas");
@@ -563,16 +637,259 @@ export default function AdminEstatisticas() {
     }
   }
 
+  async function loadBestSellers(paidOrderIds: string[]) {
+    if (paidOrderIds.length === 0) {
+      setBestSellers([]);
+      return;
+    }
+
+    const { data: orderItemsData, error: orderItemsError } = await supabase
+      .from("order_items")
+      .select("sku_id, quantity")
+      .in("order_id", paidOrderIds)
+      .not("sku_id", "is", null);
+
+    if (orderItemsError) throw orderItemsError;
+
+    const qtyBySku = new Map<string, number>();
+
+    (orderItemsData ?? []).forEach((item) => {
+      if (!item.sku_id) return;
+
+      qtyBySku.set(
+        item.sku_id,
+        (qtyBySku.get(item.sku_id) ?? 0) + (item.quantity ?? 0)
+      );
+    });
+
+    const skuIds = Array.from(qtyBySku.keys());
+
+    if (skuIds.length === 0) {
+      setBestSellers([]);
+      return;
+    }
+
+    const { data: skusData, error: skusError } = await supabase
+      .from("skus")
+      .select("id, product_id")
+      .in("id", skuIds);
+
+    if (skusError) throw skusError;
+
+    const skuRows = skusData ?? [];
+
+    const productIds = Array.from(
+      new Set(skuRows.map((sku) => sku.product_id).filter(Boolean))
+    );
+
+    if (productIds.length === 0) {
+      setBestSellers([]);
+      return;
+    }
+
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("id, name")
+      .in("id", productIds);
+
+    if (productsError) throw productsError;
+
+    const productNameMap = new Map(
+      ((productsData ?? []) as ProductRow[]).map((product) => [
+        product.id,
+        product.name,
+      ])
+    );
+
+    const skuToProduct = new Map(
+      skuRows.map((sku) => [sku.id, sku.product_id])
+    );
+
+    const qtyByProduct = new Map<string, number>();
+
+    qtyBySku.forEach((qty, skuId) => {
+      const productId = skuToProduct.get(skuId);
+      if (!productId) return;
+
+      const productName = productNameMap.get(productId) ?? "Produto";
+      qtyByProduct.set(productName, (qtyByProduct.get(productName) ?? 0) + qty);
+    });
+
+    const topProducts = Array.from(qtyByProduct.entries())
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 3);
+
+    setBestSellers(topProducts);
+  }
+
+  async function loadProfitAnalytics(paidOrderIds: string[]) {
+    if (paidOrderIds.length === 0) {
+      setProfitMetrics({
+        productRevenue: 0,
+        cmv: 0,
+        grossProfit: 0,
+        marginPercent: 0,
+        markupPercent: 0,
+        missingCostItems: 0,
+        lowMarginItems: 0,
+      });
+
+      setProfitProducts([]);
+      return;
+    }
+
+    const { data: orderItemsData, error: orderItemsError } = await supabase
+      .from("order_items")
+      .select("order_id, sku_id, quantity, unit_price_cents, line_total_cents")
+      .in("order_id", paidOrderIds)
+      .not("sku_id", "is", null);
+
+    if (orderItemsError) throw orderItemsError;
+
+    const items = (orderItemsData ?? []) as OrderItemProfitRow[];
+
+    const skuIds = Array.from(
+      new Set(items.map((item) => item.sku_id).filter((id): id is string => !!id))
+    );
+
+    if (skuIds.length === 0) {
+      setProfitMetrics({
+        productRevenue: 0,
+        cmv: 0,
+        grossProfit: 0,
+        marginPercent: 0,
+        markupPercent: 0,
+        missingCostItems: 0,
+        lowMarginItems: 0,
+      });
+
+      setProfitProducts([]);
+      return;
+    }
+
+    const { data: skusData, error: skusError } = await supabase
+      .from("skus")
+      .select("id, product_id, cost_cents, cost_gross_cents, cost_plating_cents")
+      .in("id", skuIds);
+
+    if (skusError) throw skusError;
+
+    const skuRows = (skusData ?? []) as ProfitSkuRow[];
+
+    const productIds = Array.from(
+      new Set(skuRows.map((sku) => sku.product_id).filter(Boolean))
+    );
+
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("id, name")
+      .in("id", productIds);
+
+    if (productsError) throw productsError;
+
+    const productRows = (productsData ?? []) as ProductRow[];
+
+    const skuMap = new Map(skuRows.map((sku) => [sku.id, sku]));
+    const productNameMap = new Map(
+      productRows.map((product) => [product.id, product.name])
+    );
+
+    let productRevenue = 0;
+    let cmv = 0;
+    let missingCostItems = 0;
+    let lowMarginItems = 0;
+
+    const productMap = new Map<string, ProfitProduct>();
+
+    items.forEach((item) => {
+      if (!item.sku_id) return;
+
+      const sku = skuMap.get(item.sku_id);
+      const unitCost = getSkuCost(sku);
+      const itemRevenue =
+        item.line_total_cents ?? item.unit_price_cents * item.quantity;
+      const itemCost = unitCost * item.quantity;
+      const itemProfit = itemRevenue - itemCost;
+      const itemMargin = itemRevenue > 0 ? (itemProfit / itemRevenue) * 100 : 0;
+      const missingCost = hasMissingCost(sku);
+
+      productRevenue += itemRevenue;
+      cmv += itemCost;
+
+      if (missingCost) missingCostItems += 1;
+      if (!missingCost && itemMargin < 40) lowMarginItems += 1;
+
+      const productId = sku?.product_id || "sem-produto";
+      const productName = productNameMap.get(productId) || "Produto";
+
+      const current =
+        productMap.get(productId) ||
+        ({
+          product_id: productId,
+          name: productName,
+          qty: 0,
+          revenue_cents: 0,
+          cost_cents: 0,
+          profit_cents: 0,
+          margin_percent: 0,
+          missing_cost: false,
+        } satisfies ProfitProduct);
+
+      current.qty += item.quantity;
+      current.revenue_cents += itemRevenue;
+      current.cost_cents += itemCost;
+      current.profit_cents = current.revenue_cents - current.cost_cents;
+      current.margin_percent =
+        current.revenue_cents > 0
+          ? (current.profit_cents / current.revenue_cents) * 100
+          : 0;
+      current.missing_cost = current.missing_cost || missingCost;
+
+      productMap.set(productId, current);
+    });
+
+    const grossProfit = productRevenue - cmv;
+    const marginPercent =
+      productRevenue > 0 ? (grossProfit / productRevenue) * 100 : 0;
+    const markupPercent = cmv > 0 ? (grossProfit / cmv) * 100 : 0;
+
+    setProfitMetrics({
+      productRevenue,
+      cmv,
+      grossProfit,
+      marginPercent,
+      markupPercent,
+      missingCostItems,
+      lowMarginItems,
+    });
+
+    setProfitProducts(
+      Array.from(productMap.values()).sort(
+        (a, b) => b.profit_cents - a.profit_cents
+      )
+    );
+  }
+
   const weeklyTotal = useMemo(() => {
     return weeklySales.reduce((acc, item) => acc + item.total, 0);
   }, [weeklySales]);
 
+  const topProfitProducts = useMemo(() => {
+    return profitProducts.slice(0, 5);
+  }, [profitProducts]);
+
+  const lowMarginProducts = useMemo(() => {
+    return profitProducts
+      .filter((item) => item.missing_cost || item.margin_percent < 40)
+      .sort((a, b) => a.margin_percent - b.margin_percent)
+      .slice(0, 5);
+  }, [profitProducts]);
+
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-[#e9e2d6] bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium text-[#b08d57]">
-          Indicadores
-        </p>
+        <p className="text-sm font-medium text-[#b08d57]">Indicadores</p>
 
         <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -581,7 +898,7 @@ export default function AdminEstatisticas() {
             </h1>
 
             <p className="mt-2 text-sm text-zinc-500">
-              Acompanhe vendas, clientes, estoque e produtos mais vendidos.
+              Acompanhe vendas, clientes, estoque, lucro bruto e rentabilidade.
             </p>
           </div>
 
@@ -600,15 +917,53 @@ export default function AdminEstatisticas() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <button className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] px-4 text-sm font-medium text-zinc-600">
-            <CalendarDays size={16} />
-            Últimos 7 dias
-          </button>
+        <div className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">
+                Data inicial
+              </label>
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-11 rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] px-4 text-sm font-medium text-zinc-600 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">
+                Data final
+              </label>
+
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="h-11 rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] px-4 text-sm font-medium text-zinc-600 outline-none"
+              />
+            </div>
+
+            <div className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] px-4 text-sm font-medium text-zinc-600">
+              <CalendarDays size={16} />
+              {getPeriodLabel()}
+            </div>
+
+            {startDate || endDate ? (
+              <button
+                type="button"
+                onClick={clearDateFilter}
+                className="h-11 rounded-2xl border border-[#e9e2d6] bg-white px-4 text-sm font-semibold text-zinc-600 hover:bg-zinc-50"
+              >
+                Limpar filtro
+              </button>
+            ) : null}
+          </div>
 
           <button
             onClick={() => navigate("/admin/vendas")}
-            className="rounded-2xl bg-[#2b554e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#244841]"
+            className="h-11 rounded-2xl bg-[#2b554e] px-4 text-sm font-semibold text-white hover:bg-[#244841]"
           >
             Ver vendas
           </button>
@@ -629,7 +984,7 @@ export default function AdminEstatisticas() {
             <MetricCard
               title="Vendas"
               value={moneyBRL(metrics.salesTotal)}
-              subtitle="Últimos 7 dias"
+              subtitle={getPeriodLabel()}
               icon={<DollarSign size={20} />}
               iconBg="#54b27a"
               to="/admin/vendas"
@@ -661,6 +1016,91 @@ export default function AdminEstatisticas() {
               iconBg="#dc6a5a"
               to="/admin/estoques"
             />
+          </section>
+
+          <section className="rounded-3xl border border-[#e9e2d6] bg-[#FCFAF6] p-5 shadow-sm">
+            <div className="mb-5 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-medium text-[#b08d57]">
+                  Analytics Financeiro
+                </p>
+
+                <h2 className="mt-1 text-2xl font-semibold text-[#2b554e]">
+                  Lucro & Rentabilidade
+                </h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  Indicadores calculados com pedidos pagos: {getPeriodLabel()}.
+                </p>
+              </div>
+
+              <button
+                onClick={() => navigate("/admin/produtos")}
+                className="rounded-2xl border border-[#e9e2d6] bg-white px-4 py-2 text-sm font-semibold text-zinc-600 hover:bg-zinc-50"
+              >
+                Ajustar custos dos produtos
+              </button>
+            </div>
+
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <FinanceCard
+                title="Receita de Produtos"
+                value={moneyBRL(profitMetrics.productRevenue)}
+                subtitle="Venda dos itens, sem considerar frete"
+                icon={<Package size={20} />}
+                tone="default"
+              />
+
+              <FinanceCard
+                title="CMV"
+                value={moneyBRL(profitMetrics.cmv)}
+                subtitle="Custo das mercadorias vendidas"
+                icon={<TrendingDown size={20} />}
+                tone="warn"
+              />
+
+              <FinanceCard
+                title="Lucro Bruto"
+                value={moneyBRL(profitMetrics.grossProfit)}
+                subtitle="Receita dos produtos menos CMV"
+                icon={<TrendingUp size={20} />}
+                tone={profitMetrics.grossProfit >= 0 ? "good" : "danger"}
+              />
+
+              <FinanceCard
+                title="Margem Bruta"
+                value={formatPercent(profitMetrics.marginPercent)}
+                subtitle="Lucro sobre preço de venda"
+                icon={<Percent size={20} />}
+                tone={profitMetrics.marginPercent >= 40 ? "good" : "warn"}
+              />
+            </section>
+
+            <section className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <FinanceCard
+                title="Markup"
+                value={formatPercent(profitMetrics.markupPercent)}
+                subtitle="Lucro sobre custo"
+                icon={<BarChart3 size={20} />}
+                tone="default"
+              />
+
+              <FinanceCard
+                title="Sem Custo"
+                value={profitMetrics.missingCostItems}
+                subtitle="Itens vendidos sem custo cadastrado"
+                icon={<AlertTriangle size={20} />}
+                tone={profitMetrics.missingCostItems > 0 ? "danger" : "good"}
+              />
+
+              <FinanceCard
+                title="Margem Baixa"
+                value={profitMetrics.lowMarginItems}
+                subtitle="Itens vendidos com margem menor que 40%"
+                icon={<AlertTriangle size={20} />}
+                tone={profitMetrics.lowMarginItems > 0 ? "warn" : "good"}
+              />
+            </section>
           </section>
 
           <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_0.95fr]">
@@ -733,7 +1173,7 @@ export default function AdminEstatisticas() {
             </SectionCard>
 
             <div className="grid gap-6">
-              <SectionCard title="Vendas da Semana" actionPath="/admin/vendas">
+              <SectionCard title="Vendas por Dia da Semana" actionPath="/admin/vendas">
                 <div className="mb-3 flex items-start justify-between">
                   <div className="text-4xl font-semibold text-slate-800">
                     {moneyBRL(weeklyTotal)}
@@ -774,6 +1214,155 @@ export default function AdminEstatisticas() {
                   {bestSellers.length === 0 ? (
                     <div className="text-sm text-slate-500">
                       Sem dados de venda.
+                    </div>
+                  ) : null}
+                </div>
+              </SectionCard>
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_0.95fr]">
+            <SectionCard title="Rentabilidade por Produto" actionPath="/admin/produtos">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-slate-500">
+                      <th className="pb-3 pr-4 font-medium">Produto</th>
+                      <th className="pb-3 pr-4 font-medium">Qtd</th>
+                      <th className="pb-3 pr-4 font-medium">Receita</th>
+                      <th className="pb-3 pr-4 font-medium">CMV</th>
+                      <th className="pb-3 pr-4 font-medium">Lucro</th>
+                      <th className="pb-3 pr-0 font-medium">Margem</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {profitProducts.map((item) => (
+                      <tr
+                        key={item.product_id}
+                        className="border-b last:border-b-0 hover:bg-slate-50"
+                      >
+                        <td className="py-4 pr-4 font-semibold text-slate-700">
+                          {item.name}
+                        </td>
+
+                        <td className="py-4 pr-4 text-slate-600">
+                          {item.qty}
+                        </td>
+
+                        <td className="py-4 pr-4 text-slate-700">
+                          {moneyBRL(item.revenue_cents)}
+                        </td>
+
+                        <td className="py-4 pr-4 text-slate-700">
+                          {moneyBRL(item.cost_cents)}
+                        </td>
+
+                        <td
+                          className={`py-4 pr-4 font-semibold ${item.profit_cents >= 0
+                            ? "text-emerald-700"
+                            : "text-rose-700"
+                            }`}
+                        >
+                          {moneyBRL(item.profit_cents)}
+                        </td>
+
+                        <td className="py-4 pr-0">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.missing_cost
+                              ? "bg-rose-100 text-rose-700"
+                              : item.margin_percent < 40
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-emerald-100 text-emerald-700"
+                              }`}
+                          >
+                            {item.missing_cost
+                              ? "Sem custo"
+                              : formatPercent(item.margin_percent)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {profitProducts.length === 0 ? (
+                  <div className="py-4 text-sm text-slate-500">
+                    Sem dados de lucro para o período.
+                  </div>
+                ) : null}
+              </div>
+            </SectionCard>
+
+            <div className="grid gap-6">
+              <SectionCard title="Top Lucro" actionPath="/admin/produtos">
+                <div className="space-y-3">
+                  {topProfitProducts.map((item, idx) => (
+                    <div
+                      key={item.product_id}
+                      className="rounded-xl border bg-[#FCFAF6] p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold text-slate-700">
+                            {idx + 1}. {item.name}
+                          </div>
+
+                          <div className="mt-1 text-sm text-slate-500">
+                            {item.qty} unidades vendidas
+                          </div>
+                        </div>
+
+                        <div className="text-sm font-semibold text-emerald-700">
+                          {moneyBRL(item.profit_cents)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {topProfitProducts.length === 0 ? (
+                    <div className="text-sm text-slate-500">
+                      Sem dados de lucro.
+                    </div>
+                  ) : null}
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Alertas de Margem" actionPath="/admin/produtos">
+                <div className="space-y-3">
+                  {lowMarginProducts.map((item) => (
+                    <div
+                      key={item.product_id}
+                      className="rounded-xl border border-amber-100 bg-amber-50 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold text-slate-700">
+                            {item.name}
+                          </div>
+
+                          <div className="mt-1 text-sm text-zinc-600">
+                            {item.missing_cost
+                              ? "Produto vendido sem custo cadastrado"
+                              : `Margem: ${formatPercent(item.margin_percent)}`}
+                          </div>
+                        </div>
+
+                        <AlertTriangle
+                          size={18}
+                          className={
+                            item.missing_cost
+                              ? "text-rose-600"
+                              : "text-amber-600"
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  {lowMarginProducts.length === 0 ? (
+                    <div className="text-sm text-slate-500">
+                      Nenhum alerta encontrado.
                     </div>
                   ) : null}
                 </div>

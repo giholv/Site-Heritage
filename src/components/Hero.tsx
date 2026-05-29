@@ -69,7 +69,7 @@ const Hero: React.FC = () => {
     <section
 
       id="home"
-      className="bg-[#FCFAF6] pt-5 md:pt-6"
+      className="bg-[#FCFAF6] pt-3 md:pt-6"
     >
 
       <div className="container mx-auto px-4 md:px-6">
