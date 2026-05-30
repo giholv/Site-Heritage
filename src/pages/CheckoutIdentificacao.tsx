@@ -1215,47 +1215,95 @@ export default function CheckoutIdentificacao() {
 
                 <div className="my-5 h-px bg-[#eee5d8]" />
 
-                <div className="rounded-3xl bg-[#2b554e] p-5 text-white">
+                <div className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm opacity-80">Total</span>
-                    <span className="text-2xl font-semibold">{moneyBRL(total)}</span>
+                    <span className="text-[#766e64]">Subtotal</span>
+                    <span className="font-semibold text-[#3f3a34]">{moneyBRL(subtotal)}</span>
                   </div>
 
-                  {shippingDeadline && (
-                    <p className="mt-2 text-xs opacity-80">
-                      Prazo estimado: {shippingDeadline}
-                    </p>
+                  {shippingPrice > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#766e64]">
+                        Frete{shippingName ? ` (${shippingName})` : ""}
+                      </span>
+                      <span className="font-semibold text-[#3f3a34]">
+                        {moneyBRL(shippingPrice)}
+                      </span>
+                    </div>
                   )}
+
+                  {checkoutDraft?.discount_cents ? (
+                    <div className="flex items-center justify-between text-emerald-700">
+                      <span>Desconto</span>
+                      <span className="font-semibold">
+                        -{moneyBRL(Number(checkoutDraft.discount_cents) / 100)}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
-                  <button
-                    type="button"
-                    onClick={handleContinue}
-                    disabled={!requiredOk || saving}
-                    className="mt-5 flex h-[58px] w-full items-center justify-center gap-2 rounded-full bg-[#2b554e] text-sm font-semibold text-white shadow-[0_14px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Salvando...
-                      </>
-                    ) : (
-                      <>
-                        Continuar para pagamento
-                        <ChevronRight className="h-4 w-4" />
-                      </>
-                    )}
-                  </button>
-                  <div className="flex items-start gap-3">
-                    <ShieldCheck
-                      className="mt-0.5 h-5 w-5 shrink-0"
-                      style={{ color: CALEA.primary }}
-                    />
-                    <p className="text-xs leading-5 text-[#8a8175]">
-                      Ambiente seguro para concluir sua compra.
+                <div className="mt-5 rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
+                  <p className="text-[11px] uppercase tracking-[0.20em]" style={{ color: CALEA.accent }}>
+                    Entrega
+                  </p>
+
+                  <div className="mt-3 space-y-1.5 text-sm text-[#766e64]">
+                    <p>
+                      <strong className="text-[#2b554e]">{shippingName || "-"}</strong> ·{" "}
+                      {shippingDeadline || "-"}
                     </p>
+
+                    <p>
+                      {form.street && form.number
+                        ? `${form.street}, ${form.number}`
+                        : "Endereço ainda não preenchido"}
+                    </p>
+
+                    <p>
+                      {form.neighborhood ? `${form.neighborhood} · ` : ""}
+                      {form.city && form.state ? `${form.city}/${form.state}` : ""}
+                    </p>
+
+                    <p>CEP {form.cep || "-"}</p>
                   </div>
+                </div>
+
+                <div className="mt-5 rounded-[26px] bg-[#2b554e] px-5 py-4 text-white">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm opacity-80">Total</span>
+                    <span className="text-[30px] font-semibold tracking-[-0.04em]">
+                      {moneyBRL(total)}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleContinue}
+                  disabled={!requiredOk || saving}
+                  className="mt-5 flex h-[58px] w-full items-center justify-center gap-2 rounded-full bg-[#2b554e] text-sm font-semibold text-white shadow-[0_14px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      Continuar para pagamento
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+
+                <div className="mt-4 flex items-start gap-3 rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
+                  <ShieldCheck
+                    className="mt-0.5 h-5 w-5 shrink-0"
+                    style={{ color: CALEA.primary }}
+                  />
+                  <p className="text-xs leading-5 text-[#8a8175]">
+                    Ambiente seguro para concluir sua compra.
+                  </p>
                 </div>
               </div>
             </aside>
