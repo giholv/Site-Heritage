@@ -79,6 +79,14 @@ function mapAuthErrorMessage(message?: string) {
   const m = (message || "").toLowerCase();
 
   if (
+    m.includes("weak") ||
+    m.includes("easy to guess") ||
+    m.includes("authweakpassword")
+  ) {
+    return "Senha muito fraca. Use maiúscula, minúscula, número e símbolo. Ex: Calea@2026";
+  }
+
+  if (
     m.includes("already") ||
     m.includes("registered") ||
     m.includes("duplicate")
@@ -86,7 +94,10 @@ function mapAuthErrorMessage(message?: string) {
     return "Esse e-mail já está cadastrado. Faça login ou recupere sua senha.";
   }
 
-  if (m.includes("password")) return "Senha muito curta. Use no mínimo 8 caracteres.";
+  if (m.includes("password")) {
+    return "Senha inválida. Use uma senha mais forte.";
+  }
+
   if (m.includes("email")) return "E-mail inválido.";
 
   return "Não foi possível concluir seu cadastro. Tente novamente.";
@@ -183,24 +194,19 @@ export default function CadastroUsuariosPage() {
         return;
       }
 
-      const customerPayload = {
-        user_id: userId,
-        email,
-        full_name: fullName,
-        phone,
-        birth_date: form.birthDate || null,
-        marketing_opt_in: form.receiveNews,
-        whatsapp_opt_in: form.receiveNews,
-        updated_at: new Date().toISOString(),
-      };
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      const { error: customerError } = await supabase
-        .from("customers")
-        .upsert(customerPayload, { onConflict: "user_id" });
+      if (!session) {
+        setSuccess(
+          "Conta criada com sucesso. Verifique seu e-mail para confirmar o cadastro."
+        );
 
-      if (customerError) {
-        console.error("Erro customers:", customerError);
-        setServerError("Cadastro criado, mas não foi possível salvar seus dados.");
+        setTimeout(() => {
+          navigate("/login");
+        }, 2500);
+
         return;
       }
 
