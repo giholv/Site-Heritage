@@ -1223,6 +1223,9 @@ export default function CheckoutIdentificacao() {
                       className="mt-0.5 h-5 w-5 shrink-0"
                       style={{ color: CALEA.primary }}
                     />
+                    <p className="text-xs leading-5 text-[#8a8175]">
+                      Ambiente seguro para concluir sua compra.
+                    </p>
                   </div>
                 </div>
               </div>

@@ -444,49 +444,58 @@ async function createPagarmeCardToken(card: CardForm) {
 function Step({
   label,
   active,
+  done,
   Icon,
   onClick,
 }: {
   label: string;
   active?: boolean;
+  done?: boolean;
   Icon: React.ElementType;
   onClick?: () => void;
 }) {
-  const clickable = Boolean(onClick);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!clickable}
-      className={[
-        "flex shrink-0 flex-col items-center gap-2",
-        clickable ? "cursor-pointer" : "cursor-default",
-      ].join(" ")}
-      aria-current={active ? "step" : undefined}
-      title={clickable ? `Ir para ${label}` : label}
-    >
+  const content = (
+    <>
       <span
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors"
-        style={{
-          backgroundColor: active ? CALEA.primary : "white",
-          borderColor: active ? CALEA.primary : "#d8d1c6",
-          color: active ? "white" : clickable ? "#8f897f" : "#b3aca2",
-        }}
+        className={[
+          "inline-flex h-10 w-10 items-center justify-center rounded-full border transition",
+          active
+            ? "border-[#2b554e] bg-[#2b554e] text-white shadow-[0_10px_22px_rgba(43,85,78,0.18)]"
+            : done
+              ? "border-[#b08d57] bg-[#fff8ed] text-[#b08d57]"
+              : "border-[#ddd5ca] bg-white text-[#aaa197]",
+        ].join(" ")}
       >
         <Icon className="h-5 w-5" />
       </span>
 
       <span
         className={[
-          "whitespace-nowrap text-xs sm:text-sm",
-          active ? "font-semibold" : "text-gray-400",
+          "whitespace-nowrap text-[11px] sm:text-xs",
+          active ? "font-semibold text-[#2b554e]" : "text-[#9a9187]",
         ].join(" ")}
-        style={{ color: active ? CALEA.primary : undefined }}
       >
         {label}
       </span>
-    </button>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-w-[82px] flex-col items-center gap-2"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex min-w-[82px] flex-col items-center gap-2">
+      {content}
+    </div>
   );
 }
 
@@ -967,45 +976,56 @@ export default function CheckoutPagamento() {
     <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
       <Header />
 
-      <main className="pt-[160px] md:pt-[180px]">
-        <section className="border-b" style={{ borderColor: CALEA.line }}>
-          <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-            <div className="text-center">
-              <p
-                className="text-[11px] uppercase tracking-[0.28em]"
-                style={{ color: CALEA.accent }}
-              >
+      <main className="pt-[128px] md:pt-[156px]">
+        <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+            <button
+              type="button"
+              onClick={() => navigate("/checkout/identificacao")}
+              className="mb-5 inline-flex items-center gap-2 text-sm text-[#756d63] transition hover:text-[#2b554e]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para identificação
+            </button>
+
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-[#b08d57]">
                 Checkout
               </p>
 
-              <h1
-                className="mt-2 text-2xl font-medium sm:text-3xl"
-                style={{ color: CALEA.primary }}
-              >
-                Escolha o pagamento
+              <h1 className="mt-2 text-[30px] font-light leading-tight tracking-[-0.04em] text-[#2b554e] sm:text-[40px]">
+                Pagamento
               </h1>
 
-              <p className="mt-2 text-sm text-gray-500">
-                Confirme o resumo e selecione a forma de pagamento.
+              <p className="mt-2 max-w-xl text-sm leading-6 text-[#7a746c]">
+                Escolha a forma de pagamento para finalizar sua compra.
               </p>
             </div>
 
-            <div className="mx-auto mt-8 max-w-3xl">
-              <div className="flex items-center gap-6 overflow-x-auto px-2 pb-2 [-webkit-overflow-scrolling:touch] sm:justify-between sm:overflow-visible sm:px-0">
+            <div className="mt-8 overflow-x-auto pb-2">
+              <div className="flex min-w-max items-center gap-4 sm:min-w-0 sm:justify-between">
                 <Step
                   label="Sacola"
+                  done
                   Icon={ShoppingBag}
                   onClick={() => navigate("/checkout")}
                 />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
+
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
+
                 <Step
                   label="Identificação"
+                  done
                   Icon={User}
                   onClick={() => navigate("/checkout/identificacao")}
                 />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
+
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
+
                 <Step label="Pagamento" active Icon={CreditCard} />
-                <div className="hidden h-px flex-1 bg-[#ddd5c9] sm:block" />
+
+                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
+
                 <Step label="Confirmação" Icon={CheckCircle} />
               </div>
             </div>
@@ -1013,32 +1033,22 @@ export default function CheckoutPagamento() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <div>
-                    <h2
-                      className="text-lg font-semibold"
-                      style={{ color: CALEA.primary }}
-                    >
-                      Pagamento
-                    </h2>
-
-                    <p className="mt-1 text-sm text-gray-500">
-                      Escolha como deseja concluir seu pedido.
-                    </p>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="space-y-6">
+              <section className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">                <div className="mb-6 flex items-center justify-between gap-4">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-[#fcfaf6] px-3 py-1 text-xs font-semibold text-[#2b554e] ring-1 ring-[#e9e2d6]">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    Pagamento
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => navigate("/checkout/identificacao")}
-                    className="inline-flex items-center gap-2 text-sm text-gray-600 transition hover:text-black"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Voltar
-                  </button>
+                  <h2 className="mt-3 text-xl font-semibold text-[#2b554e]">
+                    Como deseja pagar?
+                  </h2>
                 </div>
+
+
+              </div>
 
                 {loadingSettings && (
                   <p className="mb-4 rounded-2xl bg-[#fcfaf6] px-4 py-3 text-sm text-gray-500">
@@ -1066,20 +1076,19 @@ export default function CheckoutPagamento() {
 
                 <div className="space-y-3">
                   {paymentSettings.pix_enabled && (
-                    <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-[#e7dccb] bg-white p-4 transition hover:bg-[#fcfaf6]">
-                      <input
-                        type="radio"
-                        checked={paymentMethod === "pix"}
-                        onChange={() => setPaymentMethod("pix")}
-                        style={{ accentColor: CALEA.primary }}
-                      />
+                    <label className="flex cursor-pointer items-center gap-3 rounded-[22px] border border-[#e7dccb] bg-[#fffdf9] p-4 transition hover:border-[#b08d57] hover:bg-[#fcfaf6]">                      <input
+                      type="radio"
+                      checked={paymentMethod === "pix"}
+                      onChange={() => setPaymentMethod("pix")}
+                      style={{ accentColor: CALEA.primary }}
+                    />
                       <QrCode className="h-5 w-5" />
                       <span className="font-medium">Pix</span>
                     </label>
                   )}
 
                   {paymentSettings.boleto_enabled && (
-                    <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-[#e7dccb] bg-white p-4 transition hover:bg-[#fcfaf6]">
+                    <label className="flex cursor-pointer items-center gap-3 rounded-[22px] border border-[#e7dccb] bg-[#fffdf9] p-4 transition hover:border-[#b08d57] hover:bg-[#fcfaf6]">
                       <input
                         type="radio"
                         checked={paymentMethod === "boleto"}
@@ -1092,7 +1101,7 @@ export default function CheckoutPagamento() {
                   )}
 
                   {paymentSettings.credit_card_enabled && (
-                    <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-[#e7dccb] bg-white p-4 transition hover:bg-[#fcfaf6]">
+                    <label className="flex cursor-pointer items-center gap-3 rounded-[22px] border border-[#e7dccb] bg-[#fffdf9] p-4 transition hover:border-[#b08d57] hover:bg-[#fcfaf6]">
                       <input
                         type="radio"
                         checked={paymentMethod === "credit_card"}
@@ -1287,9 +1296,9 @@ export default function CheckoutPagamento() {
                   onClick={handleCreateOrder}
                   disabled={loading}
                   className="mt-6 w-full rounded-full py-4 text-sm font-semibold tracking-[0.08em] text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ backgroundColor: CALEA.accent }}
+                  style={{ backgroundColor: CALEA.primary }}
                 >
-                  {loading ? "PROCESSANDO..." : "FINALIZAR PAGAMENTO"}
+                  {loading ? "Processando..." : "Finalizar pagamento"}
                 </button>
 
                 <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4">
@@ -1299,8 +1308,7 @@ export default function CheckoutPagamento() {
                       style={{ color: CALEA.primary }}
                     />
                     <p className="text-xs leading-5 text-gray-500">
-                      Seu pedido será criado agora. Aguarde a confirmação de
-                      pagamento.
+                      Aguarde a confirmação do pagamento.
                     </p>
                   </div>
                 </div>
@@ -1308,12 +1316,13 @@ export default function CheckoutPagamento() {
             </div>
 
             <aside className="h-fit space-y-6 lg:sticky lg:top-24">
-              <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
-                <h2
-                  className="text-sm font-semibold"
-                  style={{ color: CALEA.primary }}
-                >
-                  Resumo do pedido
+              <div className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-[#b08d57]">
+                  Resumo
+                </p>
+
+                <h2 className="mt-2 text-lg font-semibold text-[#2b554e]">
+                  Seu pedido
                 </h2>
 
                 <div className="mt-4 space-y-3 text-sm">
@@ -1383,22 +1392,16 @@ export default function CheckoutPagamento() {
                 </div>
 
                 <div className="my-5 h-px bg-[#eee5d8]" />
+                <div className="rounded-3xl bg-[#2b554e] p-5 text-white">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm opacity-80">Total</span>
 
-                <div className="flex items-center justify-between text-base">
-                  <span
-                    className="font-semibold"
-                    style={{ color: CALEA.primary }}
-                  >
-                    Total
-                  </span>
-                  <span
-                    className="text-xl font-semibold"
-                    style={{ color: CALEA.primary }}
-                  >
-                    {paymentMethod === "credit_card" && selectedInstallment
-                      ? moneyBRL(selectedInstallment.totalAmountCents / 100)
-                      : moneyBRL(checkoutDraft?.total || 0)}
-                  </span>
+                    <span className="text-2xl font-semibold">
+                      {paymentMethod === "credit_card" && selectedInstallment
+                        ? moneyBRL(selectedInstallment.totalAmountCents / 100)
+                        : moneyBRL(checkoutDraft?.total || 0)}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4">
@@ -1408,7 +1411,7 @@ export default function CheckoutPagamento() {
                       style={{ color: CALEA.primary }}
                     />
                     <p className="text-xs leading-5 text-gray-500">
-                      Seu pagamento será processado em ambiente seguro.
+                      Ambiente seguro para concluir sua compra.
                     </p>
                   </div>
                 </div>
