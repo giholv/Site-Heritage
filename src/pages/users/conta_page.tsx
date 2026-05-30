@@ -59,24 +59,36 @@ type Order = {
 };
 
 type OrderItem = {
-  id?: string;
+  id: string;
   order_id: string;
-  product_id?: string | null;
-  sku_id?: string | null;
-  product_name?: string | null;
-  product_title?: string | null;
-  title?: string | null;
-  name?: string | null;
-  sku_title?: string | null;
-  variant_name?: string | null;
-  quantity?: number | null;
-  qty?: number | null;
-  unit_price_cents?: number | null;
-  price_cents?: number | null;
-  total_cents?: number | null;
-  image_url?: string | null;
-  product_image_url?: string | null;
-  thumbnail_url?: string | null;
+  sku_id: string | null;
+  unit_price_cents: number;
+  quantity: number;
+  line_total_cents: number | null;
+  skus:
+  | {
+    id: string;
+    variant_name: string | null;
+    title: string | null;
+    plating_type: string | null;
+    products:
+    | {
+      id: string;
+      name: string;
+      slug: string;
+    }
+    | null;
+    sku_images:
+    | {
+      id: string;
+      path: string;
+      alt: string | null;
+      is_primary: boolean;
+      sort_order: number;
+    }[]
+    | null;
+  }
+  | null;
 };
 
 type LoyaltySummary = {
@@ -209,11 +221,38 @@ export default function ContaPage() {
         if (orderIds.length > 0) {
           const { data: itemsData, error: itemsError } = await supabase
             .from("order_items")
-            .select("*")
+            .select(`
+                id,
+                order_id,
+                sku_id,
+                unit_price_cents,
+                quantity,
+                line_total_cents,
+                skus:sku_id (
+                  id,
+                  variant_name,
+                  title,
+                  plating_type,
+                  products:product_id (
+                    id,
+                    name,
+                    slug
+                  ),
+                  sku_images (
+                    id,
+                    path,
+                    alt,
+                    is_primary,
+                    sort_order
+                  )
+                )
+              `)
             .in("order_id", orderIds);
 
           if (!itemsError && mounted) {
-            const grouped = ((itemsData as OrderItem[]) || []).reduce(
+            const normalizedItems = ((itemsData || []) as unknown as OrderItem[]);
+
+            const grouped = normalizedItems.reduce(
               (acc, item) => {
                 if (!acc[item.order_id]) acc[item.order_id] = [];
                 acc[item.order_id].push(item);
@@ -311,12 +350,12 @@ export default function ContaPage() {
     label: string;
     icon: React.ElementType;
   }> = [
-    { key: "pedidos", label: "Pedidos", icon: Package },
-    { key: "perfil", label: "Dados do perfil", icon: User },
-    { key: "enderecos", label: "Endereços", icon: MapPin },
-    { key: "trocas", label: "Notificações", icon: ShieldCheck },
-    { key: "fidelidade", label: "Indicações", icon: Heart },
-  ];
+      { key: "pedidos", label: "Pedidos", icon: Package },
+      { key: "perfil", label: "Dados do perfil", icon: User },
+      { key: "enderecos", label: "Endereços", icon: MapPin },
+      { key: "trocas", label: "Notificações", icon: ShieldCheck },
+      { key: "fidelidade", label: "Indicações", icon: Heart },
+    ];
 
   function updateProfileField(field: keyof ProfileFormState, value: string) {
     setProfileForm((prev) => ({ ...prev, [field]: value }));
@@ -391,7 +430,7 @@ export default function ContaPage() {
     <div className="min-h-screen" style={{ background: CALEA.bg }}>
       <Header />
 
-      <main className="mx-auto w-full max-w-[1560px] px-4 pb-14 pt-5 md:px-8">
+      <main className="mx-auto w-full max-w-[1560px] px-4 pb-20 pt-[190px] md:px-8 md:pt-[220px]">
         <div className="mb-6 overflow-hidden rounded-[28px] border bg-white shadow-sm md:mb-8">
           <div
             className="grid gap-5 p-6 md:grid-cols-[1.2fr_0.8fr] md:p-8"
@@ -927,9 +966,9 @@ function OrderCard({ order, items }: { order: Order; items: OrderItem[] }) {
 function OrderItemRow({ item }: { item: OrderItem }) {
   const image = getItemImage(item);
   const name = getItemName(item);
-  const variant = item.sku_title || item.variant_name;
-  const qty = item.quantity || item.qty || 1;
-  const total = item.total_cents ?? ((item.unit_price_cents || item.price_cents || 0) * qty);
+  const variant = getItemVariant(item);
+  const qty = item.quantity || 1;
+  const total = item.line_total_cents ?? item.unit_price_cents * qty;
 
   return (
     <div className="flex gap-4">
@@ -1087,17 +1126,27 @@ function ProfileField({
 }
 
 function getItemName(item: OrderItem) {
-  return (
-    item.product_name ||
-    item.product_title ||
-    item.title ||
-    item.name ||
-    "Produto"
-  );
+  return item.skus?.products?.name || item.skus?.title || "Produto";
+}
+
+function getItemVariant(item: OrderItem) {
+  return item.skus?.variant_name || item.skus?.plating_type || "";
 }
 
 function getItemImage(item: OrderItem) {
-  return item.image_url || item.product_image_url || item.thumbnail_url || "";
+  const images = item.skus?.sku_images || [];
+
+  const primary =
+    images.find((img) => img.is_primary) ||
+    [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
+
+  if (!primary?.path) return "";
+
+  const { data } = supabase.storage
+    .from("product-images")
+    .getPublicUrl(primary.path);
+
+  return data.publicUrl;
 }
 
 function getFirstName(value?: string | null) {
