@@ -7,12 +7,16 @@ import {
   Heart,
   Loader2,
   Pencil,
+  ShoppingBag,
+  ChevronRight,
+  CreditCard,
+  Truck,
 } from "lucide-react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { supabase } from "../../lib/supabase";
 
-type TabKey = "perfil" | "pedidos" | "trocas" | "enderecos" | "fidelidade";
+type TabKey = "pedidos" | "perfil" | "enderecos" | "trocas" | "fidelidade";
 
 type AuthUser = {
   id: string;
@@ -54,6 +58,27 @@ type Order = {
   payment_method: string | null;
 };
 
+type OrderItem = {
+  id?: string;
+  order_id: string;
+  product_id?: string | null;
+  sku_id?: string | null;
+  product_name?: string | null;
+  product_title?: string | null;
+  title?: string | null;
+  name?: string | null;
+  sku_title?: string | null;
+  variant_name?: string | null;
+  quantity?: number | null;
+  qty?: number | null;
+  unit_price_cents?: number | null;
+  price_cents?: number | null;
+  total_cents?: number | null;
+  image_url?: string | null;
+  product_image_url?: string | null;
+  thumbnail_url?: string | null;
+};
+
 type LoyaltySummary = {
   totalOrders: number;
   totalSpentCents: number;
@@ -82,10 +107,12 @@ export default function ContaPage() {
   const [orderFilter, setOrderFilter] = useState<
     "todos" | "abertos" | "concluidos" | "cancelados"
   >("todos");
+
   const [loading, setLoading] = useState(true);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,6 +146,7 @@ export default function ContaPage() {
             setAuthUser(null);
             setProfile(null);
             setOrders([]);
+            setOrderItems({});
             setAddresses([]);
           }
           return;
@@ -153,36 +181,67 @@ export default function ContaPage() {
           });
         }
 
-        if (customerData?.id) {
-          const { data: ordersData, error: ordersError } = await supabase
-            .from("orders")
-            .select(
-              "id, created_at, status, subtotal_cents, shipping_cents, discount_cents, total_cents, payment_method"
-            )
-            .eq("customer_id", customerData.id)
-            .order("created_at", { ascending: false });
-
-          if (ordersError) throw ordersError;
-          if (mounted) setOrders((ordersData as Order[]) || []);
-
-          const { data: addressData, error: addressError } = await supabase
-            .from("addresses")
-            .select(
-              "id, recipient_name, street, number, complement, neighborhood, city, state, cep, is_default"
-            )
-            .eq("customer_id", customerData.id)
-            .order("is_default", { ascending: false });
-
-          if (addressError) throw addressError;
-          if (mounted) setAddresses((addressData as Address[]) || []);
-        } else {
+        if (!customerData?.id) {
           if (mounted) {
             setOrders([]);
+            setOrderItems({});
             setAddresses([]);
           }
+          return;
         }
+
+        const { data: ordersData, error: ordersError } = await supabase
+          .from("orders")
+          .select(
+            "id, created_at, status, subtotal_cents, shipping_cents, discount_cents, total_cents, payment_method"
+          )
+          .eq("customer_id", customerData.id)
+          .order("created_at", { ascending: false });
+
+        if (ordersError) throw ordersError;
+
+        const nextOrders = (ordersData as Order[]) || [];
+
+        if (mounted) setOrders(nextOrders);
+
+        const orderIds = nextOrders.map((order) => order.id);
+
+        if (orderIds.length > 0) {
+          const { data: itemsData, error: itemsError } = await supabase
+            .from("order_items")
+            .select("*")
+            .in("order_id", orderIds);
+
+          if (!itemsError && mounted) {
+            const grouped = ((itemsData as OrderItem[]) || []).reduce(
+              (acc, item) => {
+                if (!acc[item.order_id]) acc[item.order_id] = [];
+                acc[item.order_id].push(item);
+                return acc;
+              },
+              {} as Record<string, OrderItem[]>
+            );
+
+            setOrderItems(grouped);
+          }
+        } else if (mounted) {
+          setOrderItems({});
+        }
+
+        const { data: addressData, error: addressError } = await supabase
+          .from("addresses")
+          .select(
+            "id, recipient_name, street, number, complement, neighborhood, city, state, cep, is_default"
+          )
+          .eq("customer_id", customerData.id)
+          .order("is_default", { ascending: false });
+
+        if (addressError) throw addressError;
+
+        if (mounted) setAddresses((addressData as Address[]) || []);
       } catch (err: any) {
         console.error("Erro ao carregar página da conta:", err);
+
         if (mounted) {
           setError(err?.message || "Não foi possível carregar sua conta.");
         }
@@ -218,29 +277,46 @@ export default function ContaPage() {
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const status = String(order.status || "").toLowerCase();
+
       if (orderFilter === "todos") return true;
+
       if (orderFilter === "abertos") {
         return ["draft", "pending_payment", "processing", "shipped"].includes(
           status
         );
       }
+
       if (orderFilter === "concluidos") {
         return ["paid", "delivered"].includes(status);
       }
+
       if (orderFilter === "cancelados") {
         return ["canceled", "cancelled", "refunded"].includes(status);
       }
+
       return true;
     });
   }, [orders, orderFilter]);
 
-  const menuItems = [
+  const openOrdersCount = useMemo(() => {
+    return orders.filter((order) =>
+      ["draft", "pending_payment", "processing", "shipped"].includes(
+        String(order.status || "").toLowerCase()
+      )
+    ).length;
+  }, [orders]);
+
+  const menuItems: Array<{
+    key: TabKey;
+    label: string;
+    icon: React.ElementType;
+  }> = [
     { key: "pedidos", label: "Pedidos", icon: Package },
     { key: "perfil", label: "Dados do perfil", icon: User },
     { key: "enderecos", label: "Endereços", icon: MapPin },
     { key: "trocas", label: "Notificações", icon: ShieldCheck },
     { key: "fidelidade", label: "Indicações", icon: Heart },
-  ] as const;
+  ];
 
   function updateProfileField(field: keyof ProfileFormState, value: string) {
     setProfileForm((prev) => ({ ...prev, [field]: value }));
@@ -261,7 +337,7 @@ export default function ContaPage() {
     setProfileForm({
       full_name: profile?.full_name || "",
       email: profile?.email || authUser?.email || "",
-      phone: profile?.phone || authUser?.phone || "",
+      phone: profile?.phone || "",
       document: profile?.document || "",
       birth_date: profile?.birth_date || "",
     });
@@ -294,6 +370,7 @@ export default function ContaPage() {
       if (updateError) throw updateError;
 
       const nextProfile = data as CustomerProfile;
+
       setProfile(nextProfile);
       setProfileForm({
         full_name: nextProfile.full_name || "",
@@ -314,18 +391,44 @@ export default function ContaPage() {
     <div className="min-h-screen" style={{ background: CALEA.bg }}>
       <Header />
 
-      <main className="mx-auto w-full max-w-[1880px] px-5 pb-14 pt-4 md:px-6">
-        <div className="grid grid-cols-1 gap-8 xl:grid-cols-[420px_minmax(0,1fr)]">
-          <aside className="pt-1">
-            <h1
-              className="mb-8 text-[44px] font-normal leading-none md:text-[52px]"
-              style={{ color: CALEA.primary }}
-            >
-              Minha conta
-            </h1>
+      <main className="mx-auto w-full max-w-[1560px] px-4 pb-14 pt-5 md:px-8">
+        <div className="mb-6 overflow-hidden rounded-[28px] border bg-white shadow-sm md:mb-8">
+          <div
+            className="grid gap-5 p-6 md:grid-cols-[1.2fr_0.8fr] md:p-8"
+            style={{ borderColor: CALEA.line }}
+          >
+            <div>
+              <p
+                className="mb-3 text-xs font-semibold uppercase tracking-[0.22em]"
+                style={{ color: CALEA.accent }}
+              >
+                Área do cliente
+              </p>
 
+              <h1
+                className="text-[34px] font-normal leading-tight md:text-[48px]"
+                style={{ color: CALEA.primary }}
+              >
+                Olá, {getFirstName(profile?.full_name) || "cliente"}.
+              </h1>
+
+              <p className="mt-3 max-w-2xl text-base md:text-lg" style={{ color: CALEA.textSoft }}>
+                Acompanhe seus pedidos, dados cadastrais, endereços e histórico de compras.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <SummaryCard label="Pedidos" value={String(orders.length)} />
+              <SummaryCard label="Em aberto" value={String(openOrdersCount)} />
+              <SummaryCard label="Total" value={formatBRL(loyalty.totalSpentCents)} />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="xl:sticky xl:top-24 xl:h-fit">
             <div
-              className="overflow-hidden rounded-[24px] border shadow-sm"
+              className="flex gap-3 overflow-x-auto rounded-[24px] border p-2 xl:block xl:overflow-hidden xl:p-0"
               style={{
                 borderColor: CALEA.line,
                 background: CALEA.soft,
@@ -341,92 +444,61 @@ export default function ContaPage() {
                     type="button"
                     onClick={() => setActiveTab(item.key)}
                     className={[
-                      "flex w-full items-center gap-5 px-6 py-6 text-left text-[24px] transition",
-                      active ? "bg-white" : "bg-transparent hover:bg-white/70",
-                      index !== 0 ? "border-t" : "",
+                      "flex shrink-0 items-center gap-3 rounded-[18px] px-5 py-4 text-left text-sm transition xl:w-full xl:rounded-none xl:px-6 xl:py-5 xl:text-base",
+                      active ? "bg-white shadow-sm" : "bg-transparent hover:bg-white/70",
+                      index !== 0 ? "xl:border-t" : "",
                     ].join(" ")}
                     style={{
                       borderColor: index !== 0 ? CALEA.line : undefined,
+                      color: CALEA.primary,
                     }}
                   >
-                    <Icon size={28} strokeWidth={1.8} style={{ color: CALEA.primary }} />
-                    <span style={{ color: CALEA.primary }}>{item.label}</span>
+                    <Icon size={20} strokeWidth={1.8} />
+                    <span className="whitespace-nowrap">{item.label}</span>
                   </button>
                 );
               })}
             </div>
           </aside>
 
-          <section className="pt-1">
+          <section>
             {loading ? (
-              <div
-                className="flex min-h-[320px] items-center justify-center rounded-[24px] border bg-white"
-                style={{ borderColor: CALEA.line }}
-              >
-                <div className="flex items-center gap-3" style={{ color: CALEA.primary }}>
-                  <Loader2 className="animate-spin" size={22} />
-                  <span>Carregando...</span>
-                </div>
-              </div>
+              <LoadingBox />
             ) : !authUser ? (
-              <div
-                className="rounded-[24px] border bg-white p-8"
-                style={{ borderColor: CALEA.line }}
-              >
-                <h2 className="text-[36px]" style={{ color: CALEA.primary }}>
-                  Faça login
-                </h2>
-                <p className="mt-3 text-lg" style={{ color: CALEA.textSoft }}>
-                  Você precisa estar autenticada para acessar essa área.
-                </p>
-                <a
-                  href="/login"
-                  className="mt-6 inline-flex rounded-full px-6 py-3 text-base text-white"
-                  style={{ background: CALEA.primary }}
-                >
-                  Ir para login
-                </a>
-              </div>
+              <LoginRequired />
             ) : error ? (
-              <div
-                className="rounded-[24px] border bg-white p-8"
-                style={{ borderColor: CALEA.line }}
-              >
-                <h2 className="text-[36px]" style={{ color: CALEA.primary }}>
-                  Erro ao carregar
-                </h2>
-                <p className="mt-3 text-lg text-[#7b4545]">{error}</p>
-              </div>
+              <ErrorBox error={error} />
             ) : (
               <>
                 {activeTab === "pedidos" && (
                   <div>
-                    <h2
-                      className="text-[44px] font-normal md:text-[52px]"
-                      style={{ color: CALEA.primary }}
-                    >
-                      Pedidos
-                    </h2>
+                    <SectionHeader
+                      title="Meus pedidos"
+                      description="Veja os pedidos realizados e acompanhe o andamento da compra."
+                    />
 
-                    <div className="mt-8 flex flex-wrap gap-3">
+                    <div className="mt-6 flex gap-3 overflow-x-auto pb-1">
                       <OrderFilterButton
                         active={orderFilter === "todos"}
                         onClick={() => setOrderFilter("todos")}
                       >
                         Todos
                       </OrderFilterButton>
+
                       <OrderFilterButton
                         active={orderFilter === "abertos"}
                         onClick={() => setOrderFilter("abertos")}
                       >
                         Abertos
                       </OrderFilterButton>
+
                       <OrderFilterButton
                         active={orderFilter === "concluidos"}
                         onClick={() => setOrderFilter("concluidos")}
                       >
                         Concluídos
                       </OrderFilterButton>
+
                       <OrderFilterButton
                         active={orderFilter === "cancelados"}
                         onClick={() => setOrderFilter("cancelados")}
@@ -435,82 +507,17 @@ export default function ContaPage() {
                       </OrderFilterButton>
                     </div>
 
-                    <div className="mt-10">
+                    <div className="mt-6 space-y-4">
                       {filteredOrders.length === 0 ? (
-                        <div
-                          className="rounded-[24px] border bg-white px-8 py-12"
-                          style={{ borderColor: CALEA.line }}
-                        >
-                          <h3 className="text-[28px]" style={{ color: CALEA.primary }}>
-                            Nenhum pedido encontrado
-                          </h3>
-                          <p className="mt-2 text-lg" style={{ color: CALEA.textSoft }}>
-                            Não há pedidos para o filtro selecionado.
-                          </p>
-                        </div>
+                        <EmptyOrders />
                       ) : (
-                        <div>
-                          {filteredOrders.map((order, index) => (
-                            <div
-                              key={order.id}
-                              className={[
-                                "grid grid-cols-1 items-center gap-6 py-10 xl:grid-cols-[minmax(0,1fr)_260px_240px]",
-                                index !== 0 ? "border-t" : "",
-                              ].join(" ")}
-                              style={{
-                                borderColor: index !== 0 ? CALEA.line : undefined,
-                              }}
-                            >
-                              <div>
-                                <div
-                                  className="text-[24px] md:text-[28px]"
-                                  style={{ color: CALEA.primary }}
-                                >
-                                  {formatDateLong(order.created_at)}
-                                  <span style={{ color: CALEA.textSoft }}>
-                                    {" "}
-                                    / {formatBRL(order.total_cents)}
-                                  </span>
-                                </div>
-
-                                <p
-                                  className="mt-6 text-[20px] md:text-[21px]"
-                                  style={{ color: CALEA.textSoft }}
-                                >
-                                  Nº pedido: #{order.id.slice(0, 7)}
-                                </p>
-
-                                <div className="mt-6 flex flex-wrap items-center gap-4">
-                                  <span
-                                    className="text-[20px] md:text-[21px]"
-                                    style={{ color: CALEA.textSoft }}
-                                  >
-                                    Status do pedido
-                                  </span>
-                                  <StatusPill status={order.status} />
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-start gap-3 xl:justify-center">
-                                <ProductThumb />
-                                {index % 2 === 1 ? <ProductThumb /> : null}
-                              </div>
-
-                              <div className="flex xl:justify-end">
-                                <a
-                                  href={`/conta/pedidos/${order.id}`}
-                                  className="inline-flex min-h-[88px] min-w-[230px] items-center justify-center rounded-full border bg-white px-8 text-[22px] transition hover:bg-[#fcfaf6]"
-                                  style={{
-                                    borderColor: CALEA.accent,
-                                    color: CALEA.primary,
-                                  }}
-                                >
-                                  Ver pedido
-                                </a>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        filteredOrders.map((order) => (
+                          <OrderCard
+                            key={order.id}
+                            order={order}
+                            items={orderItems[order.id] || []}
+                          />
+                        ))
                       )}
                     </div>
                   </div>
@@ -518,22 +525,17 @@ export default function ContaPage() {
 
                 {activeTab === "perfil" && (
                   <div
-                    className="rounded-[24px] border bg-white p-8"
+                    className="rounded-[28px] border bg-white p-6 shadow-sm md:p-8"
                     style={{ borderColor: CALEA.line }}
                   >
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <h2
-                        className="text-[44px] font-normal md:text-[52px]"
-                        style={{ color: CALEA.primary }}
-                      >
-                        Dados do perfil
-                      </h2>
+                      <SectionTitle title="Dados do perfil" />
 
                       {!editingProfile ? (
                         <button
                           type="button"
                           onClick={handleStartProfileEdit}
-                          className="inline-flex items-center gap-2 rounded-full border bg-white px-6 py-3 text-base transition hover:bg-[#fcfaf6]"
+                          className="inline-flex items-center justify-center gap-2 rounded-full border bg-white px-5 py-3 text-sm transition hover:bg-[#fcfaf6]"
                           style={{
                             borderColor: CALEA.accent,
                             color: CALEA.primary,
@@ -547,7 +549,7 @@ export default function ContaPage() {
                           <button
                             type="button"
                             onClick={handleCancelProfileEdit}
-                            className="inline-flex rounded-full border bg-white px-6 py-3 text-base transition hover:bg-[#fafafa]"
+                            className="inline-flex rounded-full border bg-white px-5 py-3 text-sm transition hover:bg-[#fafafa]"
                             style={{
                               borderColor: CALEA.line,
                               color: CALEA.primary,
@@ -555,11 +557,12 @@ export default function ContaPage() {
                           >
                             Cancelar
                           </button>
+
                           <button
                             type="button"
                             onClick={handleSaveProfile}
                             disabled={savingProfile}
-                            className="inline-flex rounded-full px-6 py-3 text-base text-white transition disabled:opacity-60"
+                            className="inline-flex rounded-full px-5 py-3 text-sm text-white transition disabled:opacity-60"
                             style={{ background: CALEA.primary }}
                           >
                             {savingProfile ? "Salvando..." : "Salvar alterações"}
@@ -626,19 +629,15 @@ export default function ContaPage() {
 
                 {activeTab === "enderecos" && (
                   <div
-                    className="rounded-[24px] border bg-white p-8"
+                    className="rounded-[28px] border bg-white p-6 shadow-sm md:p-8"
                     style={{ borderColor: CALEA.line }}
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <h2
-                        className="text-[44px] font-normal md:text-[52px]"
-                        style={{ color: CALEA.primary }}
-                      >
-                        Endereços
-                      </h2>
+                      <SectionTitle title="Endereços" />
+
                       <a
                         href="/checkout-identificacao"
-                        className="inline-flex rounded-full border bg-white px-6 py-3 text-base"
+                        className="inline-flex items-center justify-center rounded-full border bg-white px-5 py-3 text-sm"
                         style={{
                           borderColor: CALEA.accent,
                           color: CALEA.primary,
@@ -649,29 +648,28 @@ export default function ContaPage() {
                     </div>
 
                     {addresses.length === 0 ? (
-                      <p className="mt-8 text-lg" style={{ color: CALEA.textSoft }}>
+                      <p className="mt-8 text-base" style={{ color: CALEA.textSoft }}>
                         Nenhum endereço cadastrado.
                       </p>
                     ) : (
                       <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
                         {addresses.map((address) => {
                           const lines = joinAddress(address);
+
                           return (
                             <div
                               key={address.id}
-                              className="rounded-[18px] border p-5"
+                              className="rounded-[22px] border p-5"
                               style={{
                                 borderColor: CALEA.line,
                                 background: CALEA.bg,
                               }}
                             >
                               <div className="flex items-center justify-between gap-3">
-                                <h3
-                                  className="text-xl"
-                                  style={{ color: CALEA.primary }}
-                                >
+                                <h3 className="text-lg" style={{ color: CALEA.primary }}>
                                   {address.recipient_name || "Endereço cadastrado"}
                                 </h3>
+
                                 {address.is_default ? (
                                   <span
                                     className="rounded-full px-3 py-1 text-xs text-white"
@@ -681,8 +679,9 @@ export default function ContaPage() {
                                   </span>
                                 ) : null}
                               </div>
+
                               <div
-                                className="mt-4 space-y-1 text-base"
+                                className="mt-4 space-y-1 text-sm md:text-base"
                                 style={{ color: CALEA.textSoft }}
                               >
                                 {lines.map((line, idx) => (
@@ -698,42 +697,30 @@ export default function ContaPage() {
                 )}
 
                 {activeTab === "trocas" && (
-                  <div
-                    className="rounded-[24px] border bg-white p-8"
-                    style={{ borderColor: CALEA.line }}
-                  >
-                    <h2
-                      className="text-[44px] font-normal md:text-[52px]"
-                      style={{ color: CALEA.primary }}
-                    >
-                      Notificações
-                    </h2>
-                    <p className="mt-4 text-lg" style={{ color: CALEA.textSoft }}>
-                      Área reservada para avisos da conta.
-                    </p>
-                  </div>
+                  <InfoPanel
+                    title="Notificações"
+                    description="Área reservada para avisos da conta, trocas, entregas e atualizações importantes."
+                  />
                 )}
 
                 {activeTab === "fidelidade" && (
                   <div
-                    className="rounded-[24px] border bg-white p-8"
+                    className="rounded-[28px] border bg-white p-6 shadow-sm md:p-8"
                     style={{ borderColor: CALEA.line }}
                   >
-                    <h2
-                      className="text-[44px] font-normal md:text-[52px]"
-                      style={{ color: CALEA.primary }}
-                    >
-                      Indicações
-                    </h2>
+                    <SectionTitle title="Indicações" />
+
                     <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
                       <PlainInfoBox
                         label="Compras concluídas"
                         value={String(loyalty.totalOrders)}
                       />
+
                       <PlainInfoBox
                         label="Total investido"
                         value={formatBRL(loyalty.totalSpentCents)}
                       />
+
                       <PlainInfoBox
                         label="Última compra"
                         value={formatDate(loyalty.lastOrderDate)}
@@ -752,6 +739,87 @@ export default function ContaPage() {
   );
 }
 
+function LoadingBox() {
+  return (
+    <div className="flex min-h-[360px] items-center justify-center rounded-[28px] border bg-white">
+      <div className="flex items-center gap-3 text-[#2b554e]">
+        <Loader2 className="animate-spin" size={22} />
+        <span>Carregando sua conta...</span>
+      </div>
+    </div>
+  );
+}
+
+function LoginRequired() {
+  return (
+    <div className="rounded-[28px] border bg-white p-8 shadow-sm">
+      <h2 className="text-[32px] font-normal text-[#2b554e]">Faça login</h2>
+
+      <p className="mt-3 text-base text-[#6f6558]">
+        Você precisa estar autenticada para acessar seus pedidos e dados da conta.
+      </p>
+
+      <a
+        href="/login"
+        className="mt-6 inline-flex rounded-full px-6 py-3 text-sm text-white"
+        style={{ background: CALEA.primary }}
+      >
+        Ir para login
+      </a>
+    </div>
+  );
+}
+
+function ErrorBox({ error }: { error: string }) {
+  return (
+    <div className="rounded-[28px] border bg-white p-8 shadow-sm">
+      <h2 className="text-[32px] font-normal text-[#2b554e]">Erro ao carregar</h2>
+
+      <p className="mt-3 text-base text-[#7b4545]">{error}</p>
+    </div>
+  );
+}
+
+function SectionHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <h2 className="text-[34px] font-normal leading-tight text-[#2b554e] md:text-[44px]">
+        {title}
+      </h2>
+
+      <p className="mt-2 max-w-2xl text-base text-[#6f6558]">{description}</p>
+    </div>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <h2 className="text-[32px] font-normal leading-tight text-[#2b554e] md:text-[42px]">
+      {title}
+    </h2>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[20px] border bg-[#FCFAF6] p-4" style={{ borderColor: CALEA.line }}>
+      <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#b08d57]">
+        {label}
+      </p>
+
+      <p className="mt-2 truncate text-lg font-medium text-[#2b554e] md:text-xl">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function OrderFilterButton({
   active,
   onClick,
@@ -766,10 +834,10 @@ function OrderFilterButton({
       type="button"
       onClick={onClick}
       className={[
-        "min-h-[76px] rounded-[24px] border px-8 text-[20px] transition md:text-[22px]",
+        "min-h-[46px] shrink-0 rounded-full border px-5 text-sm transition",
         active
           ? "border-[#2b554e] bg-[#2b554e] text-white"
-          : "border-[#e9e2d6] bg-[#f6f3ee] text-[#2b554e] hover:bg-white",
+          : "border-[#e9e2d6] bg-white text-[#2b554e] hover:bg-[#f6f3ee]",
       ].join(" ")}
     >
       {children}
@@ -777,27 +845,185 @@ function OrderFilterButton({
   );
 }
 
+function OrderCard({ order, items }: { order: Order; items: OrderItem[] }) {
+  const visibleItems = items.slice(0, 3);
+  const moreItems = Math.max(items.length - visibleItems.length, 0);
+
+  return (
+    <article
+      className="overflow-hidden rounded-[28px] border bg-white shadow-sm"
+      style={{ borderColor: CALEA.line }}
+    >
+      <div className="grid gap-5 p-5 md:grid-cols-[1fr_auto] md:p-6">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <StatusPill status={order.status} />
+
+            <span className="text-sm text-[#6f6558]">
+              Pedido #{order.id.slice(0, 8)}
+            </span>
+          </div>
+
+          <h3 className="mt-4 text-[24px] font-normal text-[#2b554e] md:text-[30px]">
+            {formatBRL(order.total_cents)}
+          </h3>
+
+          <div className="mt-3 grid gap-2 text-sm text-[#6f6558] md:grid-cols-3">
+            <span className="inline-flex items-center gap-2">
+              <ShoppingBag size={16} />
+              {formatDateLong(order.created_at)}
+            </span>
+
+            <span className="inline-flex items-center gap-2">
+              <CreditCard size={16} />
+              {translatePaymentMethod(order.payment_method)}
+            </span>
+
+            <span className="inline-flex items-center gap-2">
+              <Truck size={16} />
+              Frete {formatBRL(order.shipping_cents)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center md:justify-end">
+          <a
+            href={`/conta/pedidos/${order.id}`}
+            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full border bg-white px-5 text-sm transition hover:bg-[#fcfaf6]"
+            style={{
+              borderColor: CALEA.accent,
+              color: CALEA.primary,
+            }}
+          >
+            Ver detalhes
+            <ChevronRight size={16} />
+          </a>
+        </div>
+      </div>
+
+      <div className="border-t px-5 py-5 md:px-6" style={{ borderColor: CALEA.line }}>
+        {items.length === 0 ? (
+          <p className="text-sm text-[#6f6558]">
+            Pedido encontrado. Os itens não foram retornados pela tabela de itens do pedido.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {visibleItems.map((item, index) => (
+              <OrderItemRow key={item.id || `${item.order_id}-${index}`} item={item} />
+            ))}
+
+            {moreItems > 0 ? (
+              <p className="pt-1 text-sm text-[#6f6558]">
+                + {moreItems} item(ns) neste pedido
+              </p>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function OrderItemRow({ item }: { item: OrderItem }) {
+  const image = getItemImage(item);
+  const name = getItemName(item);
+  const variant = item.sku_title || item.variant_name;
+  const qty = item.quantity || item.qty || 1;
+  const total = item.total_cents ?? ((item.unit_price_cents || item.price_cents || 0) * qty);
+
+  return (
+    <div className="flex gap-4">
+      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] border bg-[#f6f3ee]">
+        {image ? (
+          <img src={image} alt={name} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[#b08d57]">
+            <Package size={22} />
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base font-medium text-[#2b554e]">{name}</p>
+
+        <p className="mt-1 text-sm text-[#6f6558]">
+          {variant ? `${variant} • ` : ""}
+          Qtd. {qty}
+        </p>
+      </div>
+
+      <div className="text-right text-sm font-medium text-[#2b554e]">
+        {formatBRL(total)}
+      </div>
+    </div>
+  );
+}
+
+function EmptyOrders() {
+  return (
+    <div
+      className="rounded-[28px] border bg-white px-6 py-12 text-center shadow-sm"
+      style={{ borderColor: CALEA.line }}
+    >
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#f6f3ee] text-[#2b554e]">
+        <Package size={26} />
+      </div>
+
+      <h3 className="mt-5 text-[24px] font-normal text-[#2b554e]">
+        Nenhum pedido encontrado
+      </h3>
+
+      <p className="mx-auto mt-2 max-w-md text-base text-[#6f6558]">
+        Quando a cliente finalizar uma compra, o pedido aparecerá aqui automaticamente.
+      </p>
+
+      <a
+        href="/produtos"
+        className="mt-6 inline-flex rounded-full px-6 py-3 text-sm text-white"
+        style={{ background: CALEA.primary }}
+      >
+        Ver produtos
+      </a>
+    </div>
+  );
+}
+
+function InfoPanel({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div
+      className="rounded-[28px] border bg-white p-6 shadow-sm md:p-8"
+      style={{ borderColor: CALEA.line }}
+    >
+      <SectionTitle title={title} />
+
+      <p className="mt-4 text-base text-[#6f6558]">{description}</p>
+    </div>
+  );
+}
+
 function StatusPill({ status }: { status?: string | null }) {
   const key = String(status || "").toLowerCase();
+
   const isDone = ["paid", "delivered"].includes(key);
   const isOpen = ["draft", "pending_payment", "processing", "shipped"].includes(key);
   const isCancelled = ["canceled", "cancelled", "refunded"].includes(key);
 
   let classes = "bg-[#f6f3ee] text-[#6f6558]";
+
   if (isDone) classes = "bg-[#e7f1ed] text-[#2b554e]";
   if (isOpen) classes = "bg-[#f8eddc] text-[#8b6a3e]";
   if (isCancelled) classes = "bg-[#f8e5e5] text-[#a35a5a]";
 
   return (
-    <span className={`inline-flex rounded-[8px] px-4 py-2 text-[18px] leading-none ${classes}`}>
+    <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-medium ${classes}`}>
       {translateOrderStatus(status)}
     </span>
-  );
-}
-
-function ProductThumb() {
-  return (
-    <div className="h-[132px] w-[132px] rounded-[18px] border border-[#e9e2d6] bg-[#f6f3ee]" />
   );
 }
 
@@ -809,8 +1035,11 @@ function PlainInfoBox({
   value: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[#e9e2d6] bg-[#fcfaf6] p-5">
-      <p className="text-sm text-[#b08d57]">{label}</p>
+    <div className="rounded-[20px] border border-[#e9e2d6] bg-[#fcfaf6] p-5">
+      <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#b08d57]">
+        {label}
+      </p>
+
       <p className="mt-2 text-[20px] text-[#2b554e]">{value}</p>
     </div>
   );
@@ -836,8 +1065,10 @@ function ProfileField({
   type?: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[#e9e2d6] bg-[#fcfaf6] p-5">
-      <p className="text-sm text-[#b08d57]">{label}</p>
+    <div className="rounded-[20px] border border-[#e9e2d6] bg-[#fcfaf6] p-5">
+      <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#b08d57]">
+        {label}
+      </p>
 
       {editing ? (
         <input
@@ -846,19 +1077,41 @@ function ProfileField({
           onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
           inputMode={inputMode}
-          className="mt-3 h-12 w-full rounded-xl border border-[#e9e2d6] bg-white px-4 text-[18px] text-[#2b554e] outline-none transition focus:border-[#b08d57] focus:ring-2 focus:ring-[#b08d57]/15"
+          className="mt-3 h-12 w-full rounded-xl border border-[#e9e2d6] bg-white px-4 text-base text-[#2b554e] outline-none transition focus:border-[#b08d57] focus:ring-2 focus:ring-[#b08d57]/15"
         />
       ) : (
-        <p className="mt-2 text-[20px] text-[#2b554e]">{value}</p>
+        <p className="mt-2 text-lg text-[#2b554e]">{value}</p>
       )}
     </div>
   );
 }
 
+function getItemName(item: OrderItem) {
+  return (
+    item.product_name ||
+    item.product_title ||
+    item.title ||
+    item.name ||
+    "Produto"
+  );
+}
+
+function getItemImage(item: OrderItem) {
+  return item.image_url || item.product_image_url || item.thumbnail_url || "";
+}
+
+function getFirstName(value?: string | null) {
+  if (!value) return "";
+  return value.trim().split(" ")[0];
+}
+
 function formatDateLong(value?: string | null) {
   if (!value) return "—";
+
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return "—";
+
   return new Intl.DateTimeFormat("pt-BR", {
     day: "numeric",
     month: "short",
@@ -875,8 +1128,11 @@ function formatBRL(value?: number | null) {
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
+
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return "—";
+
   return date.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -894,63 +1150,95 @@ function cleanPhone(value?: string | null) {
 
 function formatPhoneInput(value?: string | null) {
   const digits = cleanPhone(value);
+
   if (digits.length <= 2) return digits;
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+
   if (digits.length <= 10) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
   }
+
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
 function formatCpf(value?: string | null) {
   const digits = cleanDigits(value).slice(0, 11);
+
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+
   if (digits.length <= 9) {
     return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
   }
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(
+    6,
+    9
+  )}-${digits.slice(9)}`;
 }
 
 function maskDocument(doc?: string | null) {
   if (!doc) return "—";
+
   const digits = doc.replace(/\D/g, "");
+
   if (digits.length !== 11) return doc;
+
   return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
 }
 
 function maskPhone(phone?: string | null) {
   if (!phone) return "—";
+
   const digits = phone.replace(/\D/g, "");
+
   if (digits.length === 11) {
     return digits.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
   }
+
   if (digits.length === 10) {
     return digits.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
   }
+
   return phone;
 }
 
 function translateOrderStatus(status?: string | null) {
   const map: Record<string, string> = {
     draft: "Aberto",
-    pending_payment: "Aberto",
-    processing: "Aberto",
-    shipped: "Aberto",
-    paid: "Concluído",
-    delivered: "Concluído",
+    pending_payment: "Aguardando pagamento",
+    processing: "Em separação",
+    shipped: "Enviado",
+    paid: "Pago",
+    delivered: "Entregue",
     canceled: "Cancelado",
     cancelled: "Cancelado",
-    refunded: "Cancelado",
+    refunded: "Reembolsado",
   };
+
   return map[(status || "").toLowerCase()] || (status ? status : "—");
+}
+
+function translatePaymentMethod(method?: string | null) {
+  const map: Record<string, string> = {
+    pix: "Pix",
+    boleto: "Boleto",
+    card: "Cartão",
+    credit_card: "Cartão",
+    debit_card: "Débito",
+  };
+
+  return map[(method || "").toLowerCase()] || method || "Pagamento";
 }
 
 function joinAddress(address: Address) {
   const line1 = [address.street, address.number].filter(Boolean).join(", ");
+
   const line2 = [address.neighborhood, address.city, address.state]
     .filter(Boolean)
     .join(" • ");
+
   const zip = address.cep ? `CEP ${address.cep}` : "";
+
   return [line1, address.complement, line2, zip].filter(Boolean);
 }
