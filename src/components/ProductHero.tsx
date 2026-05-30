@@ -105,8 +105,12 @@ export default function ProductHero({
   shippingLoading = false,
   shippingError = "",
   shippingOptions = [],
+  selectedShippingId = "",
+  onSelectShipping,
 }: ProductHeroProps) {
   const [activeImage, setActiveImage] = useState(0);
+  const [showAddedMessage, setShowAddedMessage] = useState(false);
+
 
   const safeAvailableQty = normalizeQty(availableQty);
 
@@ -134,6 +138,23 @@ export default function ProductHero({
       prev === displayImages.length - 1 ? 0 : prev + 1
     );
   }
+
+  function handleAddToCartClick() {
+    if (!isAvailable || showAddedMessage) return;
+
+    onAddToCart();
+    setShowAddedMessage(true);
+  }
+
+  useEffect(() => {
+    if (!showAddedMessage) return;
+
+    const timer = window.setTimeout(() => {
+      setShowAddedMessage(false);
+    }, 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [showAddedMessage]);
 
   return (
     <>
@@ -268,23 +289,32 @@ export default function ProductHero({
 
                 <div className="mt-6 hidden lg:block">
                   {isAvailable ? (
-                    <div className="grid gap-3 lg:grid-cols-[1fr_0.85fr]">
-                      <button
-                        type="button"
-                        onClick={onAddToCart}
-                        className="h-[58px] rounded-full bg-[#2b554e] px-6 text-[13px] font-semibold uppercase tracking-[0.14em] text-white shadow-[0_14px_35px_rgba(43,85,78,0.22)]"
-                      >
-                        Adicionar ao carrinho
-                      </button>
+                    <>
+                      <div className="grid gap-3 lg:grid-cols-[1fr_0.85fr]">
+                        <button
+                          type="button"
+                          onClick={handleAddToCartClick}
+                          disabled={showAddedMessage}
+                          className="h-[58px] rounded-full bg-[#2b554e] px-6 text-[13px] font-semibold uppercase tracking-[0.14em] text-white shadow-[0_14px_35px_rgba(43,85,78,0.22)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {showAddedMessage ? "Adicionado" : "Adicionar ao carrinho"}
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={onBuyNow}
-                        className="h-[58px] rounded-full border border-[#2b554e] bg-white px-6 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#2b554e]"
-                      >
-                        Comprar agora
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={onBuyNow}
+                          className="h-[58px] rounded-full border border-[#2b554e] bg-white px-6 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#2b554e]"
+                        >
+                          Comprar agora
+                        </button>
+                      </div>
+
+                      {showAddedMessage && (
+                        <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                          Item adicionado ao carrinho.
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <UnavailableBox />
                   )}
@@ -345,6 +375,51 @@ export default function ProductHero({
                       Informe seu CEP para consultar prazo e valor do frete.
                     </p>
                   )}
+                  {shippingOptions.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      {shippingOptions.map((option) => {
+                        const active = selectedShippingId === String(option.id);
+
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => onSelectShipping?.(String(option.id))}
+                            className={[
+                              "w-full rounded-[20px] border px-4 py-3 text-left transition",
+                              active
+                                ? "border-[#2b554e] bg-[#f7f3ec]"
+                                : "border-[#e7ded3] bg-white hover:border-[#b08d57]",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="text-sm font-semibold text-[#2b554e]">
+                                  {option.name}
+                                </p>
+
+                                <p className="mt-1 text-xs text-[#697671]">
+                                  {option.deadline || "Prazo indisponível"}
+                                </p>
+                              </div>
+
+                              <div className="text-right">
+                                <p className="text-sm font-semibold text-[#2b554e]">
+                                  {formatBRL(option.price)}
+                                </p>
+
+                                {option.original_price && option.original_price > option.price && (
+                                  <p className="mt-0.5 text-xs text-[#9a9187] line-through">
+                                    {formatBRL(option.original_price)}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -388,19 +463,27 @@ export default function ProductHero({
             </div>
           )}
         </div>
-
+        {showAddedMessage && (
+          <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-700">
+            Item adicionado ao carrinho.
+          </div>
+        )}
         <button
           type="button"
-          onClick={isAvailable ? onAddToCart : undefined}
-          disabled={!isAvailable}
+          onClick={isAvailable ? handleAddToCartClick : undefined}
+          disabled={!isAvailable || showAddedMessage}
           className={[
-            "h-[56px] w-full rounded-full text-sm font-semibold uppercase tracking-[0.12em]",
+            "h-[56px] w-full rounded-full text-sm font-semibold uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-70",
             isAvailable
               ? "bg-[#2b554e] text-white shadow-[0_12px_28px_rgba(43,85,78,0.22)]"
               : "border border-[#2b554e] bg-white text-[#2b554e]",
           ].join(" ")}
         >
-          {isAvailable ? "Adicionar ao carrinho" : "Avise quando chegar"}
+          {!isAvailable
+            ? "Avise quando chegar"
+            : showAddedMessage
+              ? "Adicionado"
+              : "Adicionar ao carrinho"}
         </button>
       </div>
     </>

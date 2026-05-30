@@ -511,7 +511,7 @@ export default function Checkout() {
     <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
       <Header />
 
-      <main className="pb-44 pt-[112px] md:pb-16 md:pt-[145px]">
+      <main className="pb-16 pt-[112px] md:pt-[145px]">
         <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
             <button
@@ -644,16 +644,6 @@ export default function Checkout() {
         </section>
       </main>
 
-      {items.length > 0 && (
-        <MobileCheckoutBar
-          total={total}
-          canContinue={canContinue}
-          selectedShipping={selectedShipping}
-          hasAutomaticFreeShipping={hasAutomaticFreeShipping}
-          handleContinue={handleContinue}
-        />
-      )}
-
       <Footer />
     </div>
   );
@@ -692,12 +682,8 @@ function CuradoriaCalea({ items }: { items: any[] }) {
     <div className="mt-7 rounded-[26px] border border-[#eadfce] bg-[#fcfaf6] p-4 sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#b08d57]">
-            Curadoria Caléa
-          </p>
-
-          <h3 className="mt-1 text-base font-semibold text-[#2b554e]">
-            Complete sua escolha
+          <h3 className="text-base font-semibold text-[#2b554e]">
+            Combine com sua escolha
           </h3>
 
           <p className="mt-1 text-xs leading-5 text-[#7a746c]">
@@ -1221,57 +1207,3 @@ function Divider() {
   return <div className="my-6 h-px bg-[#eee5d8]" />;
 }
 
-function MobileCheckoutBar({
-  total,
-  canContinue,
-  selectedShipping,
-  hasAutomaticFreeShipping,
-  handleContinue,
-}: {
-  total: number;
-  canContinue: boolean;
-  selectedShipping: ShippingOption | null;
-  hasAutomaticFreeShipping: boolean;
-  handleContinue: () => void;
-}) {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#e8dfd3] bg-[#fcfaf6]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3 shadow-[0_-12px_34px_rgba(43,85,78,0.10)] backdrop-blur-md lg:hidden">
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-[#81786e]">
-            Total do pedido
-          </p>
-
-          <p className="mt-0.5 text-[24px] font-semibold tracking-[-0.04em] text-[#2b554e]">
-            {moneyBRL(total)}
-          </p>
-        </div>
-
-        <div className="max-w-[150px] text-right">
-          <p className="text-[11px] leading-4 text-[#8a8175]">
-            {selectedShipping
-              ? hasAutomaticFreeShipping
-                ? `Frete grátis • ${selectedShipping.name}`
-                : `Entrega • ${selectedShipping.name}`
-              : "Escolha uma opção de entrega"}
-          </p>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleContinue}
-        disabled={!canContinue}
-        className="flex h-[58px] w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] text-[13px] font-semibold uppercase tracking-[0.16em] text-white shadow-[0_14px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"      >
-        Continuar
-        <span className="text-lg leading-none">›</span>
-      </button>
-
-      {!canContinue ? (
-        <p className="mt-2 text-center text-[11px] text-[#8a8175]">
-          Calcule e selecione o frete para avançar.
-        </p>
-      ) : null}
-    </div>
-  );
-}

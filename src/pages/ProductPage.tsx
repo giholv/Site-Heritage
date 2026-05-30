@@ -337,6 +337,13 @@ export default function ProductPage() {
       return;
     }
 
+    if (!isAvailable) {
+      setShippingError("Produto indisponível para compra.");
+      setShippingOptions([]);
+      setSelectedShippingId("");
+      return;
+    }
+
     setShippingLoading(true);
     setShippingError("");
     setShippingOptions([]);
@@ -345,35 +352,53 @@ export default function ProductPage() {
     try {
       const payload = {
         to_postcode: cleanCep,
-        insurance_value: Math.round(price * quantity * 100) / 100,
+        insurance_value: Number((price * quantity).toFixed(2)),
         weight: Number(Math.max(0.03, 0.03 * quantity).toFixed(2)),
         services: "1,2,17,3",
       };
 
+      console.log("Calculando frete:", payload);
+
       const res = await fetch("/.netlify/functions/shipping-quote", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(payload),
       });
 
       const text = await res.text();
-      const data = text ? JSON.parse(text) : {};
 
-      if (!res.ok) {
-        throw new Error(data?.error || data?.details?.error || `Falha ao calcular frete (${res.status})`);
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error("Resposta inválida da função de frete.");
       }
 
-      const opts: ShippingOption[] = Array.isArray(data?.options) ? data.options : [];
-      setShippingOptions(opts);
+      if (!res.ok) {
+        throw new Error(
+          data?.error ||
+          data?.details?.error ||
+          data?.message ||
+          `Falha ao calcular frete (${res.status})`
+        );
+      }
+
+      const opts: ShippingOption[] = Array.isArray(data?.options)
+        ? data.options
+        : [];
 
       if (!opts.length) {
         setShippingError("Nenhuma opção de frete encontrada para esse CEP.");
         return;
       }
 
-      setSelectedShippingId(opts[0].id);
+      setShippingOptions(opts);
+      setSelectedShippingId(String(opts[0].id));
     } catch (e: any) {
-      setShippingError(e?.message ?? "Erro ao calcular frete.");
+      console.error("Erro ao calcular frete:", e);
+      setShippingError(e?.message || "Erro ao calcular frete.");
     } finally {
       setShippingLoading(false);
     }
