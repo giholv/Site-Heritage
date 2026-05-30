@@ -970,12 +970,14 @@ export default function JewelryListing() {
                             className="mt-2 text-lg font-semibold"
                             style={{ color: CALEA.accent }}
                           >
-                            {centsToBRL(product.min_price_cents)}
+                            {product.min_price_cents !== null && product.min_price_cents !== undefined
+                              ? `A partir de ${centsToBRL(product.min_price_cents)}`
+                              : centsToBRL(product.min_price_cents)}
                           </div>
 
                           {product.min_price_cents !== null && product.min_price_cents !== undefined && (
                             <div className="mt-0.5 text-xs text-black/45">
-                              em até 3x sem juros
+                              Consulte as opções disponíveis
                             </div>
                           )}
                           {!isAvailable && (

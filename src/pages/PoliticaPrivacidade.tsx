@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function PoliticaPrivacidade() {
   return (
     <main className="min-h-screen bg-[#FCFAF6] text-[#2b554e]">

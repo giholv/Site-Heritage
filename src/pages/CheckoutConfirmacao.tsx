@@ -20,13 +20,6 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { supabase } from "../lib/supabase";
 
-const CALEA = {
-  primary: "#2b554e",
-  accent: "#b08d57",
-  bg: "#fcfaf6",
-  line: "#e9e2d6",
-};
-
 function moneyBRL(value: number) {
   return Number(value || 0).toLocaleString("pt-BR", {
     style: "currency",

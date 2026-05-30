@@ -1,5 +1,5 @@
 // src/pages/Checkout.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ShoppingBag,
   User,
@@ -61,6 +61,10 @@ function moneyBRL(value: number) {
 
 function onlyDigits(value: string) {
   return String(value ?? "").replace(/\D/g, "");
+}
+
+function itemCountLabel(count: number) {
+  return `${count} ${count === 1 ? "peça" : "peças"}`;
 }
 
 function formatCEP(value: string) {
@@ -181,7 +185,7 @@ export default function Checkout() {
 
   const shippingPrice = hasAutomaticFreeShipping ? 0 : originalShippingPrice;
 
-  
+
   const originalShippingCents = Math.round(Number(originalShippingPrice || 0) * 100);
 
   const discountCents = useMemo(() => {
@@ -507,7 +511,7 @@ export default function Checkout() {
     <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
       <Header />
 
-      <main className="pb-32 pt-[112px] md:pb-16 md:pt-[145px]">
+      <main className="pb-44 pt-[112px] md:pb-16 md:pt-[145px]">
         <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
             <button
@@ -535,9 +539,7 @@ export default function Checkout() {
                 </p>
               </div>
 
-              <div className="rounded-full border border-[#e5dbce] bg-white px-4 py-2 text-sm text-[#2b554e] shadow-sm">
-                {count} item(ns)
-              </div>
+
             </div>
 
             <div className="mt-8 overflow-x-auto pb-2">
@@ -558,15 +560,22 @@ export default function Checkout() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_390px] lg:items-start">
             <div className="space-y-5">
               <div className="rounded-[28px] border border-[#eee5d8] bg-white p-4 shadow-[0_14px_40px_rgba(43,85,78,0.05)] sm:p-6">
-                <div className="mb-5 flex items-center justify-between gap-4">
+                <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-semibold text-[#2b554e]">
                       Produtos
                     </h2>
+
                     <p className="mt-1 text-sm text-[#7a746c]">
                       Ajuste quantidades ou remova itens da sua sacola.
                     </p>
                   </div>
+
+                  {items.length > 0 && (
+                    <span className="rounded-full bg-[#f7f1e7] px-3 py-1 text-xs font-medium text-[#8a6a38]">
+                      {itemCountLabel(count)}
+                    </span>
+                  )}
                 </div>
 
                 {items.length === 0 ? (
@@ -587,7 +596,7 @@ export default function Checkout() {
                   </div>
                 )}
 
-                {items.length > 0 && <CombineWith items={items} />}
+                {items.length > 0 && <CuradoriaCalea items={items} />}
               </div>
 
               {items.length > 0 && (
@@ -649,6 +658,77 @@ export default function Checkout() {
     </div>
   );
 }
+
+function CuradoriaCalea({ items }: { items: any[] }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    if (reducedMotion) return;
+
+    const timer = window.setInterval(() => {
+      if (!el || el.scrollWidth <= el.clientWidth) return;
+
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const isAtEnd = el.scrollLeft >= maxScroll - 16;
+
+      if (isAtEnd) {
+        el.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        el.scrollBy({ left: 280, behavior: "smooth" });
+      }
+    }, 3800);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="mt-7 rounded-[26px] border border-[#eadfce] bg-[#fcfaf6] p-4 sm:p-5">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-[#b08d57]">
+            Curadoria Caléa
+          </p>
+
+          <h3 className="mt-1 text-base font-semibold text-[#2b554e]">
+            Complete sua escolha
+          </h3>
+
+          <p className="mt-1 text-xs leading-5 text-[#7a746c]">
+            Arraste para o lado e veja mais peças selecionadas.
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 rounded-full border border-[#e1d6c7] bg-white px-3 py-1.5 text-xs font-medium text-[#2b554e] shadow-sm">
+          ver mais
+          <span className="text-base leading-none">›</span>
+        </div>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="-mx-4 overflow-x-auto px-4 pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <div className="min-w-max">
+          <CombineWith items={items} />
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-center gap-1.5 sm:hidden">
+        <span className="h-1.5 w-5 rounded-full bg-[#2b554e]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[#d8c9b4]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[#d8c9b4]" />
+      </div>
+    </div>
+  );
+}
+
 
 function EmptyCart({ onContinue }: { onContinue: () => void }) {
   return (
@@ -1086,7 +1166,7 @@ function OrderSummary({
       </div>
 
       <button
-        className="mt-6 hidden w-full rounded-full bg-[#b08d57] py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(176,141,87,0.22)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 lg:block"
+        className="mt-6 hidden w-full rounded-full bg-[#2b554e] py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 lg:block"
         onClick={handleContinue}
         type="button"
         disabled={!canContinue}
@@ -1155,34 +1235,43 @@ function MobileCheckoutBar({
   handleContinue: () => void;
 }) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#e8dfd3] bg-[#fcfaf6]/95 p-4 shadow-[0_-10px_30px_rgba(43,85,78,0.08)] backdrop-blur-md lg:hidden">
-      <div className="mb-3 flex items-end justify-between gap-4">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#e8dfd3] bg-[#fcfaf6]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3 shadow-[0_-12px_34px_rgba(43,85,78,0.10)] backdrop-blur-md lg:hidden">
+      <div className="mb-3 flex items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#81786e]">
-            Total
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[#81786e]">
+            Total do pedido
           </p>
-          <p className="text-xl font-semibold tracking-[-0.03em] text-[#2b554e]">
+
+          <p className="mt-0.5 text-[24px] font-semibold tracking-[-0.04em] text-[#2b554e]">
             {moneyBRL(total)}
           </p>
         </div>
 
-        <p className="text-right text-xs text-[#8a8175]">
-          {selectedShipping
-            ? hasAutomaticFreeShipping
-              ? `Entrega grátis: ${selectedShipping.name}`
-              : `Entrega: ${selectedShipping.name}`
-            : "Escolha o frete"}
-        </p>
+        <div className="max-w-[150px] text-right">
+          <p className="text-[11px] leading-4 text-[#8a8175]">
+            {selectedShipping
+              ? hasAutomaticFreeShipping
+                ? `Frete grátis • ${selectedShipping.name}`
+                : `Entrega • ${selectedShipping.name}`
+              : "Escolha uma opção de entrega"}
+          </p>
+        </div>
       </div>
 
       <button
         type="button"
         onClick={handleContinue}
         disabled={!canContinue}
-        className="h-[56px] w-full rounded-full bg-[#b08d57] text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(176,141,87,0.22)] transition disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Continuar para identificação
+        className="flex h-[58px] w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] text-[13px] font-semibold uppercase tracking-[0.16em] text-white shadow-[0_14px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"      >
+        Continuar
+        <span className="text-lg leading-none">›</span>
       </button>
+
+      {!canContinue ? (
+        <p className="mt-2 text-center text-[11px] text-[#8a8175]">
+          Calcule e selecione o frete para avançar.
+        </p>
+      ) : null}
     </div>
   );
 }

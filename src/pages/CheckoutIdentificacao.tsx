@@ -11,9 +11,6 @@ import {
   MapPin,
   AlertCircle,
   Loader2,
-  Lock,
-  Truck,
-  Sparkles,
   Home,
   ChevronRight,
 } from "lucide-react";
@@ -252,27 +249,6 @@ function inputClass(error?: string) {
   ].join(" ");
 }
 
-function InfoBadge({
-  Icon,
-  title,
-  text,
-}: {
-  Icon: React.ElementType;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-[#e9e2d6]">
-        <Icon className="h-4 w-4 text-[#2b554e]" />
-      </span>
-      <div>
-        <p className="text-sm font-semibold text-[#2b554e]">{title}</p>
-        <p className="mt-0.5 text-xs leading-5 text-[#8a8175]">{text}</p>
-      </div>
-    </div>
-  );
-}
 
 export default function CheckoutIdentificacao() {
   const navigate = useNavigate();
@@ -388,10 +364,10 @@ export default function CheckoutIdentificacao() {
 
         setForm((prev) => ({
           ...prev,
-          street: prev.street || data.logradouro || "",
-          neighborhood: prev.neighborhood || data.bairro || "",
-          city: prev.city || data.localidade || "",
-          state: prev.state || data.uf || "",
+          street: data.logradouro || "",
+          neighborhood: data.bairro || "",
+          city: data.localidade || "",
+          state: data.uf || "",
         }));
 
         setErrors((prev) => {
@@ -826,10 +802,6 @@ export default function CheckoutIdentificacao() {
                   Complete seus dados para criarmos o pedido e seguir para o pagamento com segurança.
                 </p>
               </div>
-
-              <div className="rounded-full border border-[#e5dbce] bg-white px-4 py-2 text-sm text-[#2b554e] shadow-sm">
-                Identificação
-              </div>
             </div>
 
             <div className="mt-8 overflow-x-auto pb-2">
@@ -878,11 +850,6 @@ export default function CheckoutIdentificacao() {
                     <p className="mt-1 text-sm leading-6 text-[#8a8175]">
                       Os campos com asterisco são obrigatórios.
                     </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-[#fcfaf6] px-4 py-3 text-xs leading-5 text-[#8a8175] ring-1 ring-[#e9e2d6]">
-                    <strong className="block text-[#2b554e]">Dica</strong>
-                    Use o WhatsApp do comprador para receber atualizações do pedido.
                   </div>
                 </div>
 
@@ -934,7 +901,6 @@ export default function CheckoutIdentificacao() {
                     label="CPF"
                     required
                     error={errors.document}
-                    hint="Usado apenas para emissão e identificação do pedido."
                     className="sm:col-span-2"
                   >
                     <input
@@ -971,10 +937,6 @@ export default function CheckoutIdentificacao() {
                     >
                       Endereço de entrega
                     </h2>
-
-                    <p className="mt-1 text-sm leading-6 text-[#8a8175]">
-                      Ao informar o CEP, tentamos preencher o endereço automaticamente.
-                    </p>
                   </div>
 
                   {cepLoading && (
@@ -996,7 +958,30 @@ export default function CheckoutIdentificacao() {
                   <Field label="CEP" required error={errors.cep} className="sm:col-span-2">
                     <input
                       value={form.cep}
-                      onChange={(e) => setField("cep", formatCEP(e.target.value))}
+                      onChange={(e) => {
+                        const nextCep = formatCEP(e.target.value);
+
+                        setForm((prev) => ({
+                          ...prev,
+                          cep: nextCep,
+                          street: "",
+                          neighborhood: "",
+                          city: "",
+                          state: "",
+                        }));
+
+                        setErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.cep;
+                          delete copy.street;
+                          delete copy.neighborhood;
+                          delete copy.city;
+                          delete copy.state;
+                          return copy;
+                        });
+
+                        setCepAutoFilled(false);
+                      }}
                       className={inputClass(errors.cep)}
                       placeholder="00000-000"
                       inputMode="numeric"
@@ -1077,24 +1062,6 @@ export default function CheckoutIdentificacao() {
                   </Field>
                 </div>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <InfoBadge
-                    Icon={Lock}
-                    title="Compra segura"
-                    text="Seus dados são usados apenas para processar o pedido."
-                  />
-                  <InfoBadge
-                    Icon={Truck}
-                    title="Entrega"
-                    text="O pedido segue com o frete selecionado na etapa anterior."
-                  />
-                  <InfoBadge
-                    Icon={Sparkles}
-                    title="Experiência Caléa"
-                    text="Checkout limpo, rápido e com menos atrito."
-                  />
-                </div>
-
                 <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <button
                     type="button"
@@ -1111,7 +1078,7 @@ export default function CheckoutIdentificacao() {
                     onClick={handleContinue}
                     disabled={!requiredOk || saving}
                     className="inline-flex h-12 min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[260px]"
-                    style={{ backgroundColor: CALEA.accent }}
+                    style={{ backgroundColor: CALEA.primary }}
                     title={!requiredOk ? "Preencha os campos obrigatórios" : ""}
                   >
                     {saving ? (
@@ -1256,9 +1223,6 @@ export default function CheckoutIdentificacao() {
                       className="mt-0.5 h-5 w-5 shrink-0"
                       style={{ color: CALEA.primary }}
                     />
-                    <p className="text-xs leading-5 text-[#8a8175]">
-                      Ao continuar, o pedido fica salvo como rascunho para finalizar o pagamento.
-                    </p>
                   </div>
                 </div>
               </div>

@@ -442,7 +442,7 @@ export default function ProductPage() {
             name={product.name}
             description={product.description || ""}
             price={price}
-            installmentText="em até 3x sem juros"
+            installmentText="Consulte as opções disponíveis"
             variants={variants}
             selectedVariant={selectedSku?.id ?? ""}
             onSelectVariant={setSelectedSkuId}

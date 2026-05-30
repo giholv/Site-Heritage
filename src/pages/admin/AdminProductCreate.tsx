@@ -1080,7 +1080,7 @@ function SkusManager({
       .order("created_at", { ascending: true });
 
     if (error) return { ok: false as const, error };
-    return { ok: true as const, data: (data ?? []) as SkuDbRow[] };
+    return { ok: true as const, data: (data ?? []) as unknown as SkuDbRow[] };
   }
   async function load() {
     setErr(null);
@@ -1176,7 +1176,7 @@ function SkusManager({
 
         if (error) throw new Error(error.message);
 
-        saved = data as SkuDbRow;
+        saved = data as unknown as SkuDbRow;
         setList((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
         setEditing(saved);
       } else {
@@ -1188,7 +1188,7 @@ function SkusManager({
 
         if (error) throw new Error(error.message);
 
-        saved = data as SkuDbRow;
+        saved = data as unknown as SkuDbRow;
         setList((prev) => [...prev, saved].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")));
       }
 
@@ -1306,7 +1306,15 @@ function SkusManager({
                   <button
                     type="button"
                     className="text-left min-w-0 flex-1"
-                    onClick={() => onSelectSku(s.id)}
+                    onClick={() => {
+                      onSelectSku(s.id);
+
+                      onSelectedSkuMeta({
+                        priceCents: Number(s.price_cents || 0),
+                        platingLabel: s.plating_type || null,
+                        ringSize: s.ring_size || null,
+                      });
+                    }}
                     title="Selecionar SKU"
                   >
                     <div className="flex items-center gap-2">
@@ -1388,7 +1396,7 @@ export default function AdminProductCreateUX() {
   const [primaryCategoryId, setPrimaryCategoryId] = useState("");
 
   const [materialBase, setMaterialBase] = useState("");
-  const [importantNotes, setImportantNotes] = useState("");
+  const [importantNotes] = useState("");
 
   // fornecedores
   const [supplierId, setSupplierId] = useState(""); // bruto (products.supplier_id)
@@ -1649,107 +1657,107 @@ export default function AdminProductCreateUX() {
   }
 
   async function saveProduct(nextStatus?: ProductStatus) {
-  setErr(null);
-  setOkMsg(null);
+    setErr(null);
+    setOkMsg(null);
 
-  const v = validateBasics();
-  if (!v.ok) {
-    setErr(v.msg);
-    scrollToId(v.section);
-    return null;
-  }
+    const v = validateBasics();
+    if (!v.ok) {
+      setErr(v.msg);
+      scrollToId(v.section);
+      return null;
+    }
 
-  setSaving(true);
+    setSaving(true);
 
-  try {
-    await ensureAuthenticatedSession();
+    try {
+      await ensureAuthenticatedSession();
 
-    const cleanName = name.trim();
-    const finalSlug = slug.trim()
-      ? await ensureUniqueSlug(slug.trim(), productId)
-      : await ensureUniqueSlug(cleanName, productId);
+      const cleanName = name.trim();
+      const finalSlug = slug.trim()
+        ? await ensureUniqueSlug(slug.trim(), productId)
+        : await ensureUniqueSlug(cleanName, productId);
 
-    const payload: any = {
-      name: cleanName,
-      slug: finalSlug,
-      description: description.trim() || null,
-      status: nextStatus ?? status,
-      primary_category_id: primaryCategoryId || null,
+      const payload: any = {
+        name: cleanName,
+        slug: finalSlug,
+        description: description.trim() || null,
+        status: nextStatus ?? status,
+        primary_category_id: primaryCategoryId || null,
 
-      material_base: materialBase.trim() || null,
-      important_notes: importantNotes.trim() || null,
+        material_base: materialBase.trim() || null,
+        important_notes: importantNotes.trim() || null,
 
-      supplier_id: supplierId || null,
-      plating_supplier_id: platingSupplierId || null,
+        supplier_id: supplierId || null,
+        plating_supplier_id: platingSupplierId || null,
 
-      supplier_order_number: supplierOrderNumber.trim() || null,
-      supplier_origin_code: supplierOriginCode.trim() || null,
-      galvanic_plating_code: galvanicPlatingCode.trim() || null,
+        supplier_order_number: supplierOrderNumber.trim() || null,
+        supplier_origin_code: supplierOriginCode.trim() || null,
+        galvanic_plating_code: galvanicPlatingCode.trim() || null,
 
-      seo_title: seoTitle.trim() || null,
-      seo_description: seoDescription.trim() || null,
-      seo_keywords: parseCsvList(seoKeywords),
-      search_tags: parseCsvList(searchTags),
-    };
+        seo_title: seoTitle.trim() || null,
+        seo_description: seoDescription.trim() || null,
+        seo_keywords: parseCsvList(seoKeywords),
+        search_tags: parseCsvList(searchTags),
+      };
 
-    if (!productId) {
-      const { data, error } = await supabase
+      if (!productId) {
+        const { data, error } = await supabase
+          .from(T.PRODUCTS)
+          .insert(payload)
+          .select("id,slug,status")
+          .single();
+
+        if (error) {
+          console.error("ERRO INSERT PRODUCTS:", error);
+          throw new Error(error.message);
+        }
+
+        try {
+          await syncProductLinks((data as any).id);
+        } catch (linkErr: any) {
+          console.error("ERRO SYNC LINKS:", linkErr);
+          throw new Error(linkErr?.message || "Erro ao vincular coleções/estilos.");
+        }
+
+        setProductId((data as any).id);
+        setSlug((data as any).slug);
+        setStatus((data as any).status as ProductStatus);
+        setSelectedSkuId(null);
+
+        setDirty(false);
+        setOkMsg("Produto salvo.");
+        return (data as any).id as string;
+      }
+
+      const { error } = await supabase
         .from(T.PRODUCTS)
-        .insert(payload)
-        .select("id,slug,status")
-        .single();
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq("id", productId);
 
       if (error) {
-        console.error("ERRO INSERT PRODUCTS:", error);
+        console.error("ERRO UPDATE PRODUCTS:", error);
         throw new Error(error.message);
       }
 
       try {
-        await syncProductLinks((data as any).id);
+        await syncProductLinks(productId);
       } catch (linkErr: any) {
         console.error("ERRO SYNC LINKS:", linkErr);
         throw new Error(linkErr?.message || "Erro ao vincular coleções/estilos.");
       }
 
-      setProductId((data as any).id);
-      setSlug((data as any).slug);
-      setStatus((data as any).status as ProductStatus);
-      setSelectedSkuId(null);
-
+      setSlug(finalSlug);
+      setStatus((nextStatus ?? status) as ProductStatus);
       setDirty(false);
       setOkMsg("Produto salvo.");
-      return (data as any).id as string;
+      return productId;
+    } catch (e: any) {
+      setErr(e?.message || "Erro ao salvar produto.");
+      return null;
+    } finally {
+      setSaving(false);
     }
-
-    const { error } = await supabase
-      .from(T.PRODUCTS)
-      .update({ ...payload, updated_at: new Date().toISOString() })
-      .eq("id", productId);
-
-    if (error) {
-      console.error("ERRO UPDATE PRODUCTS:", error);
-      throw new Error(error.message);
-    }
-
-    try {
-      await syncProductLinks(productId);
-    } catch (linkErr: any) {
-      console.error("ERRO SYNC LINKS:", linkErr);
-      throw new Error(linkErr?.message || "Erro ao vincular coleções/estilos.");
-    }
-
-    setSlug(finalSlug);
-    setStatus((nextStatus ?? status) as ProductStatus);
-    setDirty(false);
-    setOkMsg("Produto salvo.");
-    return productId;
-  } catch (e: any) {
-    setErr(e?.message || "Erro ao salvar produto.");
-    return null;
-  } finally {
-    setSaving(false);
   }
-}
 
 
   const sectionState = useMemo(() => {

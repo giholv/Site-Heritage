@@ -105,8 +105,6 @@ export default function ProductHero({
   shippingLoading = false,
   shippingError = "",
   shippingOptions = [],
-  selectedShippingId = "",
-  onSelectShipping,
 }: ProductHeroProps) {
   const [activeImage, setActiveImage] = useState(0);
 
