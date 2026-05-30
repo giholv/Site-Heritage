@@ -172,13 +172,7 @@ export default function ContaPage() {
           });
         }
 
-        const { data: customerData, error: customerError } = await supabase
-          .from("customers")
-          .select("id, user_id, full_name, email, phone, document, birth_date")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (customerError) throw customerError;
+        const customerData = await getOrLinkCustomer(user);
 
         const nextProfile = (customerData as CustomerProfile | null) || null;
 
@@ -192,7 +186,6 @@ export default function ContaPage() {
             birth_date: nextProfile?.birth_date || "",
           });
         }
-
         if (!customerData?.id) {
           if (mounted) {
             setOrders([]);
@@ -425,7 +418,68 @@ export default function ContaPage() {
       setSavingProfile(false);
     }
   }
+  async function getOrLinkCustomer(user: any) {
+    const userEmail = String(user.email || "").trim().toLowerCase();
 
+    if (!userEmail) return null;
+
+    // 1. Primeiro tenta achar pelo usuário logado
+    const { data: byUserId, error: byUserError } = await supabase
+      .from("customers")
+      .select("id, user_id, full_name, email, phone, document, birth_date")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (byUserError) throw byUserError;
+
+    if (byUserId) return byUserId;
+
+    // 2. Se não achou, tenta achar pelo mesmo e-mail usado na compra
+    const { data: byEmail, error: byEmailError } = await supabase
+      .from("customers")
+      .select("id, user_id, full_name, email, phone, document, birth_date")
+      .ilike("email", userEmail)
+      .maybeSingle();
+
+    if (byEmailError) throw byEmailError;
+
+    // 3. Se achou cliente antigo sem user_id, vincula ao login atual
+    if (byEmail?.id && !byEmail.user_id) {
+      const { data: linkedCustomer, error: linkError } = await supabase
+        .from("customers")
+        .update({
+          user_id: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", byEmail.id)
+        .is("user_id", null)
+        .select("id, user_id, full_name, email, phone, document, birth_date")
+        .single();
+
+      if (linkError) throw linkError;
+
+      return linkedCustomer;
+    }
+
+    // 4. Se achou pelo email, mas já tem user_id, retorna
+    if (byEmail?.id) return byEmail;
+
+    // 5. Se não existe customer, cria um novo
+    const { data: newCustomer, error: createError } = await supabase
+      .from("customers")
+      .insert({
+        user_id: user.id,
+        email: userEmail,
+        full_name: user.user_metadata?.full_name || null,
+        phone: user.phone || null,
+      })
+      .select("id, user_id, full_name, email, phone, document, birth_date")
+      .single();
+
+    if (createError) throw createError;
+
+    return newCustomer;
+  }
   return (
     <div className="min-h-screen" style={{ background: CALEA.bg }}>
       <Header />
