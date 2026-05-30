@@ -20,6 +20,24 @@ type MarketingPartner = {
   created_at: string;
 };
 
+type PartnerStats = {
+  partner_id: string;
+  partner_name: string;
+  partner_type: PartnerType;
+  instagram: string | null;
+  active: boolean;
+  commission_type: CommissionType;
+  commission_percent: number | null;
+  commission_cents: number | null;
+  total_orders: number;
+  subtotal_cents: number;
+  discount_cents: number;
+  shipping_cents: number;
+  revenue_cents: number;
+  average_ticket_cents: number;
+  commission_due_cents: number;
+};
+
 type PartnerForm = {
   name: string;
   type: PartnerType;
@@ -99,6 +117,7 @@ function commissionLabel(partner: MarketingPartner) {
 
 export default function AdminParcerias() {
   const [partners, setPartners] = useState<MarketingPartner[]>([]);
+  const [partnerStats, setPartnerStats] = useState<PartnerStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -121,6 +140,52 @@ export default function AdminParcerias() {
       );
     });
   }, [partners, search]);
+
+  const statsSummary = useMemo(() => {
+    const activePartners = partners.filter((partner) => partner.active).length;
+
+    const totalOrders = partnerStats.reduce(
+      (sum, item) => sum + Number(item.total_orders || 0),
+      0
+    );
+
+    const totalRevenue = partnerStats.reduce(
+      (sum, item) => sum + Number(item.revenue_cents || 0),
+      0
+    );
+
+    const totalDiscount = partnerStats.reduce(
+      (sum, item) => sum + Number(item.discount_cents || 0),
+      0
+    );
+
+    const totalCommission = partnerStats.reduce(
+      (sum, item) => sum + Number(item.commission_due_cents || 0),
+      0
+    );
+
+    const averageTicket =
+      totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+
+    return {
+      activePartners,
+      totalOrders,
+      totalRevenue,
+      totalDiscount,
+      totalCommission,
+      averageTicket,
+    };
+  }, [partners, partnerStats]);
+
+  const topPartners = useMemo(() => {
+    return [...partnerStats]
+      .sort((a, b) => Number(b.revenue_cents || 0) - Number(a.revenue_cents || 0))
+      .slice(0, 5);
+  }, [partnerStats]);
+
+  const noSalePartners = useMemo(() => {
+    return partnerStats.filter((item) => Number(item.total_orders || 0) === 0);
+  }, [partnerStats]);
 
   async function loadPartners() {
     setLoading(true);
@@ -161,6 +226,21 @@ export default function AdminParcerias() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setShowForm(true);
+  }
+
+  async function loadPartnerStats() {
+    const { data, error } = await supabase
+      .from("v_marketing_partner_stats")
+      .select("*")
+      .order("revenue_cents", { ascending: false });
+
+    if (error) {
+      console.error("Erro ao carregar stats de parcerias:", error);
+      setPartnerStats([]);
+      return;
+    }
+
+    setPartnerStats((data || []) as PartnerStats[]);
   }
 
   function openEditForm(partner: MarketingPartner) {
@@ -210,6 +290,8 @@ export default function AdminParcerias() {
     if (error) {
       console.error("Erro ao atualizar parceria:", error);
       alert("Erro ao atualizar parceria.");
+
+      loadPartnerStats();
 
       setPartners((current) =>
         current.map((item) =>
@@ -295,10 +377,12 @@ export default function AdminParcerias() {
 
     resetForm();
     loadPartners();
+    loadPartnerStats();
   }
 
   useEffect(() => {
     loadPartners();
+    loadPartnerStats();
   }, []);
 
   return (
@@ -325,6 +409,42 @@ export default function AdminParcerias() {
           >
             Nova parceria
           </button>
+        </div>
+      </section>
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-5 shadow-sm">
+          <p className="text-sm text-zinc-500">Parcerias ativas</p>
+          <p className="mt-2 text-3xl font-semibold text-[#2b554e]">
+            {statsSummary.activePartners}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-5 shadow-sm">
+          <p className="text-sm text-zinc-500">Pedidos gerados</p>
+          <p className="mt-2 text-3xl font-semibold text-[#2b554e]">
+            {statsSummary.totalOrders}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-5 shadow-sm">
+          <p className="text-sm text-zinc-500">Faturamento</p>
+          <p className="mt-2 text-3xl font-semibold text-[#2b554e]">
+            {moneyBRL(statsSummary.totalRevenue)}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-5 shadow-sm">
+          <p className="text-sm text-zinc-500">Descontos usados</p>
+          <p className="mt-2 text-3xl font-semibold text-[#2b554e]">
+            {moneyBRL(statsSummary.totalDiscount)}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-5 shadow-sm">
+          <p className="text-sm text-zinc-500">Comissão a pagar</p>
+          <p className="mt-2 text-3xl font-semibold text-[#2b554e]">
+            {moneyBRL(statsSummary.totalCommission)}
+          </p>
         </div>
       </section>
 
@@ -567,7 +687,104 @@ export default function AdminParcerias() {
           </form>
         </section>
       ) : null}
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white shadow-sm">
+          <div className="border-b border-[#e9e2d6] px-5 py-4">
+            <h2 className="text-xl font-semibold text-[#2b554e]">
+              Ranking de parcerias
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Ordenado por faturamento gerado.
+            </p>
+          </div>
 
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-[#f6f3ee] text-left text-[#2b554e]">
+                <tr>
+                  <th className="px-4 py-3">Parceria</th>
+                  <th className="px-4 py-3">Pedidos</th>
+                  <th className="px-4 py-3">Faturamento</th>
+                  <th className="px-4 py-3">Ticket médio</th>
+                  <th className="px-4 py-3">Comissão</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {topPartners.map((item) => (
+                  <tr key={item.partner_id} className="border-t border-[#e9e2d6]">
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-zinc-900">
+                        {item.partner_name}
+                      </div>
+                      <div className="text-xs text-zinc-500">
+                        {item.instagram || "Sem Instagram"}
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-4 text-zinc-700">
+                      {item.total_orders}
+                    </td>
+
+                    <td className="px-4 py-4 font-semibold text-[#2b554e]">
+                      {moneyBRL(item.revenue_cents)}
+                    </td>
+
+                    <td className="px-4 py-4 text-zinc-700">
+                      {moneyBRL(item.average_ticket_cents)}
+                    </td>
+
+                    <td className="px-4 py-4 text-zinc-700">
+                      {moneyBRL(item.commission_due_cents)}
+                    </td>
+                  </tr>
+                ))}
+
+                {topPartners.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-sm text-zinc-500">
+                      Nenhuma venda vinculada a parceria ainda.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-semibold text-[#2b554e]">
+            Parcerias sem venda
+          </h2>
+
+          <p className="mt-1 text-sm text-zinc-500">
+            Parceiros cadastrados sem pedido vinculado.
+          </p>
+
+          <div className="mt-4 space-y-3">
+            {noSalePartners.slice(0, 8).map((item) => (
+              <div
+                key={item.partner_id}
+                className="rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] p-4"
+              >
+                <div className="font-semibold text-zinc-800">
+                  {item.partner_name}
+                </div>
+
+                <div className="mt-1 text-xs text-zinc-500">
+                  {item.instagram || "Sem Instagram"}
+                </div>
+              </div>
+            ))}
+
+            {noSalePartners.length === 0 ? (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-700">
+                Todas as parcerias possuem venda vinculada.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </section>
       <section className="overflow-hidden rounded-3xl border border-[#e9e2d6] bg-white shadow-sm">
         <div className="border-b border-[#e9e2d6] px-5 py-4">
           <h2 className="text-xl font-semibold text-[#2b554e]">

@@ -107,6 +107,7 @@ type OrderItemProfitRow = {
 type PaidOrderRow = {
   id: string;
   total_cents: number | null;
+  discount_cents: number | null;
   created_at: string;
   status: string | null;
 };
@@ -484,14 +485,14 @@ export default function AdminEstatisticas() {
         applyOrdersDateFilter(
           supabase
             .from("orders")
-            .select("id, total_cents, created_at, status")
+            .select("id, total_cents, discount_cents, created_at, status")
             .eq("status", "paid")
         ),
 
         supabase
           .from("orders")
           .select(
-            "id, customer_id, external_customer_name, created_at, total_cents, status"
+            "id, customer_id, external_customer_name, created_at, total_cents, discount_cents, status"
           )
           .order("created_at", { ascending: false })
           .limit(5),
@@ -514,8 +515,7 @@ export default function AdminEstatisticas() {
 
       const paidOrders = (paidOrdersResult.data ?? []) as PaidOrderRow[];
 
-      const paidOrderIds = paidOrders.map((order: PaidOrderRow) => order.id);
-
+    
       const salesTotal = paidOrders.reduce(
         (acc: number, item: PaidOrderRow) => acc + (item.total_cents ?? 0),
         0
@@ -538,7 +538,7 @@ export default function AdminEstatisticas() {
         const label = days[date.getDay()];
         weekMap[label] += order.total_cents ?? 0;
       });
-      
+
       setWeeklySales([
         { label: "Seg", total: weekMap.Seg },
         { label: "Ter", total: weekMap.Ter },
@@ -627,8 +627,8 @@ export default function AdminEstatisticas() {
         criticalStock,
       });
 
-      await loadProfitAnalytics(paidOrderIds);
-      await loadBestSellers(paidOrderIds);
+      await loadProfitAnalytics(paidOrders);
+      await loadBestSellers(paidOrders);
     } catch (err: any) {
       console.error("Erro ao carregar estatísticas:", err);
       setError(err?.message || "Erro ao carregar estatísticas");
@@ -637,11 +637,13 @@ export default function AdminEstatisticas() {
     }
   }
 
-  async function loadBestSellers(paidOrderIds: string[]) {
-    if (paidOrderIds.length === 0) {
+  async function loadBestSellers(paidOrders: PaidOrderRow[]) {
+    if (paidOrders.length === 0) {
       setBestSellers([]);
       return;
     }
+
+    const paidOrderIds = paidOrders.map((order) => order.id);
 
     const { data: orderItemsData, error: orderItemsError } = await supabase
       .from("order_items")
@@ -723,8 +725,8 @@ export default function AdminEstatisticas() {
     setBestSellers(topProducts);
   }
 
-  async function loadProfitAnalytics(paidOrderIds: string[]) {
-    if (paidOrderIds.length === 0) {
+  async function loadProfitAnalytics(paidOrders: PaidOrderRow[]) {
+    if (paidOrders.length === 0) {
       setProfitMetrics({
         productRevenue: 0,
         cmv: 0,
@@ -742,7 +744,7 @@ export default function AdminEstatisticas() {
     const { data: orderItemsData, error: orderItemsError } = await supabase
       .from("order_items")
       .select("order_id, sku_id, quantity, unit_price_cents, line_total_cents")
-      .in("order_id", paidOrderIds)
+      .in("order_id", paidOrders.map((o) => o.id))
       .not("sku_id", "is", null);
 
     if (orderItemsError) throw orderItemsError;
@@ -802,18 +804,53 @@ export default function AdminEstatisticas() {
 
     const productMap = new Map<string, ProfitProduct>();
 
+    const discountByOrder = new Map<string, number>(
+      paidOrders.map((order) => [order.id, Number(order.discount_cents || 0)])
+    );
+
+    const rawRevenueByOrder = new Map<string, number>();
+
+    items.forEach((item) => {
+      const quantity = Number(item.quantity || 0);
+
+      const rawRevenue =
+        Number(item.line_total_cents || 0) > 0
+          ? Number(item.line_total_cents)
+          : Number(item.unit_price_cents || 0) * quantity;
+
+      rawRevenueByOrder.set(
+        item.order_id,
+        (rawRevenueByOrder.get(item.order_id) ?? 0) + rawRevenue
+      );
+    });
+
     items.forEach((item) => {
       if (!item.sku_id) return;
 
       const sku = skuMap.get(item.sku_id);
       const unitCost = getSkuCost(sku);
-      const itemRevenue =
-        item.line_total_cents ?? item.unit_price_cents * item.quantity;
-      const itemCost = unitCost * item.quantity;
+
+      const quantity = Number(item.quantity || 0);
+
+      const rawItemRevenue =
+        Number(item.line_total_cents || 0) > 0
+          ? Number(item.line_total_cents)
+          : Number(item.unit_price_cents || 0) * quantity;
+
+      const orderRawRevenue = rawRevenueByOrder.get(item.order_id) ?? 0;
+      const orderDiscount = discountByOrder.get(item.order_id) ?? 0;
+
+      const itemDiscount =
+        orderRawRevenue > 0
+          ? Math.round((rawItemRevenue / orderRawRevenue) * orderDiscount)
+          : 0;
+
+      const itemRevenue = Math.max(0, rawItemRevenue - itemDiscount);
+
+      const itemCost = unitCost * quantity;
       const itemProfit = itemRevenue - itemCost;
       const itemMargin = itemRevenue > 0 ? (itemProfit / itemRevenue) * 100 : 0;
       const missingCost = hasMissingCost(sku);
-
       productRevenue += itemRevenue;
       cmv += itemCost;
 
