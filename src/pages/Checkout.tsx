@@ -1156,12 +1156,12 @@ function OrderSummary({
       </div>
 
       <button
-        className="mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] py-4 text-sm font-semibold  tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={handleContinue}
         type="button"
         disabled={!canContinue}
       >
-        Continuar para identificação
+        Continuar
         <span className="text-lg leading-none">
 
         </span>

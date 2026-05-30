@@ -122,17 +122,7 @@ export default function CombineWith({ items }: Props) {
 
  return (
   <section className="mt-8">
-    <div className="mb-4 flex items-end justify-between gap-4">
-      <div>
-        <p className="text-[11px] uppercase tracking-[0.24em] text-[#b08d57]">
-          Curadoria Caléa
-        </p>
-
-        <h3 className="mt-1 text-lg font-light tracking-[-0.03em] text-[#2b554e]">
-          Combine com sua escolha
-        </h3>
-      </div>
-    </div>
+    <div className="mb-2" />
 
     {loading ? (
       <div className="flex gap-4 overflow-x-auto pb-2">

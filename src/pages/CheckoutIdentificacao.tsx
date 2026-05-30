@@ -1072,27 +1072,6 @@ export default function CheckoutIdentificacao() {
                     <Home className="h-4 w-4" />
                     Voltar para a loja
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={handleContinue}
-                    disabled={!requiredOk || saving}
-                    className="inline-flex h-12 min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[260px]"
-                    style={{ backgroundColor: CALEA.primary }}
-                    title={!requiredOk ? "Preencha os campos obrigatórios" : ""}
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Salvando...
-                      </>
-                    ) : (
-                      <>
-                        Continuar para pagamento
-                        <ChevronRight className="h-4 w-4" />
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             </div>
@@ -1166,6 +1145,38 @@ export default function CheckoutIdentificacao() {
 
                 <div className="my-5 h-px bg-[#eee5d8]" />
 
+                <div className="rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
+                  <p
+                    className="text-[11px] uppercase tracking-[0.20em]"
+                    style={{ color: CALEA.accent }}
+                  >
+                    Entrega
+                  </p>
+
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-[#766e64]">Transportadora</span>
+                      <span className="font-semibold text-[#2b554e]">
+                        {shippingName || "-"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-[#766e64]">Prazo</span>
+                      <span className="font-semibold text-[#2b554e]">
+                        {shippingDeadline || "-"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-[#766e64]">CEP</span>
+                      <span className="font-semibold text-[#2b554e]">
+                        {form.cep || "-"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-[#766e64]">Subtotal</span>
@@ -1218,6 +1229,24 @@ export default function CheckoutIdentificacao() {
                 </div>
 
                 <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
+                  <button
+                    type="button"
+                    onClick={handleContinue}
+                    disabled={!requiredOk || saving}
+                    className="mt-5 flex h-[58px] w-full items-center justify-center gap-2 rounded-full bg-[#2b554e] text-sm font-semibold text-white shadow-[0_14px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        Continuar para pagamento
+                        <ChevronRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
                   <div className="flex items-start gap-3">
                     <ShieldCheck
                       className="mt-0.5 h-5 w-5 shrink-0"
