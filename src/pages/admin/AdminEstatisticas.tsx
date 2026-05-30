@@ -107,6 +107,8 @@ type OrderItemProfitRow = {
 type PaidOrderRow = {
   id: string;
   total_cents: number | null;
+  subtotal_cents: number | null;
+  shipping_cents: number | null;
   discount_cents: number | null;
   created_at: string;
   status: string | null;
@@ -485,7 +487,7 @@ export default function AdminEstatisticas() {
         applyOrdersDateFilter(
           supabase
             .from("orders")
-            .select("id, total_cents, discount_cents, created_at, status")
+            .select("id, total_cents, subtotal_cents, shipping_cents, discount_cents, created_at, status")
             .eq("status", "paid")
         ),
 
@@ -515,7 +517,7 @@ export default function AdminEstatisticas() {
 
       const paidOrders = (paidOrdersResult.data ?? []) as PaidOrderRow[];
 
-    
+
       const salesTotal = paidOrders.reduce(
         (acc: number, item: PaidOrderRow) => acc + (item.total_cents ?? 0),
         0
@@ -741,6 +743,10 @@ export default function AdminEstatisticas() {
       return;
     }
 
+    const orderMap = new Map<string, PaidOrderRow>(
+      paidOrders.map((order) => [order.id, order])
+    );
+
     const { data: orderItemsData, error: orderItemsError } = await supabase
       .from("order_items")
       .select("order_id, sku_id, quantity, unit_price_cents, line_total_cents")
@@ -804,10 +810,6 @@ export default function AdminEstatisticas() {
 
     const productMap = new Map<string, ProfitProduct>();
 
-    const discountByOrder = new Map<string, number>(
-      paidOrders.map((order) => [order.id, Number(order.discount_cents || 0)])
-    );
-
     const rawRevenueByOrder = new Map<string, number>();
 
     items.forEach((item) => {
@@ -838,11 +840,23 @@ export default function AdminEstatisticas() {
           : Number(item.unit_price_cents || 0) * quantity;
 
       const orderRawRevenue = rawRevenueByOrder.get(item.order_id) ?? 0;
-      const orderDiscount = discountByOrder.get(item.order_id) ?? 0;
+      const order = orderMap.get(item.order_id);
+
+      const orderDiscount = Number(order?.discount_cents || 0);
+      const orderShipping = Number(order?.shipping_cents || 0);
+
+      /**
+       * Se o desconto for igual ao frete, é frete grátis.
+       * Nesse caso, NÃO desconta da receita dos produtos.
+       */
+      const productDiscount =
+        orderDiscount > 0 && orderDiscount !== orderShipping
+          ? orderDiscount
+          : 0;
 
       const itemDiscount =
         orderRawRevenue > 0
-          ? Math.round((rawItemRevenue / orderRawRevenue) * orderDiscount)
+          ? Math.round((rawItemRevenue / orderRawRevenue) * productDiscount)
           : 0;
 
       const itemRevenue = Math.max(0, rawItemRevenue - itemDiscount);
