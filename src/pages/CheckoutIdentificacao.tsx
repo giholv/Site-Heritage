@@ -1145,82 +1145,8 @@ export default function CheckoutIdentificacao() {
 
                 <div className="my-5 h-px bg-[#eee5d8]" />
 
-                <div className="rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
-                  <p
-                    className="text-[11px] uppercase tracking-[0.20em]"
-                    style={{ color: CALEA.accent }}
-                  >
-                    Entrega
-                  </p>
-
-                  <div className="mt-3 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-[#766e64]">Transportadora</span>
-                      <span className="font-semibold text-[#2b554e]">
-                        {shippingName || "-"}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="text-[#766e64]">Prazo</span>
-                      <span className="font-semibold text-[#2b554e]">
-                        {shippingDeadline || "-"}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="text-[#766e64]">CEP</span>
-                      <span className="font-semibold text-[#2b554e]">
-                        {form.cep || "-"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#766e64]">Subtotal</span>
-                    <span className="font-semibold text-[#3f3a34]">{moneyBRL(subtotal)}</span>
-                  </div>
-
-                  {giftWrap && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#766e64]">Embalagem presente</span>
-                      <span className="font-semibold text-[#3f3a34]">
-                        {moneyBRL(giftWrapPrice)}
-                      </span>
-                    </div>
-                  )}
-
-                  {shippingPrice > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#766e64]">
-                        Frete{shippingName ? ` (${shippingName})` : ""}
-                      </span>
-                      <span className="font-semibold text-[#3f3a34]">
-                        {moneyBRL(shippingPrice)}
-                      </span>
-                    </div>
-                  )}
-
-                  {checkoutDraft?.discount_cents ? (
-                    <div className="flex items-center justify-between text-emerald-700">
-                      <span>Desconto</span>
-                      <span className="font-semibold">
-                        -{moneyBRL(Number(checkoutDraft.discount_cents) / 100)}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="my-5 h-px bg-[#eee5d8]" />
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#766e64]">Subtotal</span>
-                    <span className="font-semibold text-[#3f3a34]">{moneyBRL(subtotal)}</span>
-                  </div>
-
+                
                   {shippingPrice > 0 && (
                     <div className="flex items-center justify-between">
                       <span className="text-[#766e64]">
