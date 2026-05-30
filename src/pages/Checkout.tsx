@@ -682,7 +682,11 @@ function CuradoriaCalea({ items }: { items: any[] }) {
     <div className="mt-7 rounded-[26px] border border-[#eadfce] bg-[#fcfaf6] p-4 sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-base font-semibold text-[#2b554e]">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-[#b08d57]">
+            Curadoria Caléa
+          </p>
+
+          <h3 className="mt-1 text-base font-semibold text-[#2b554e]">
             Combine com sua escolha
           </h3>
 
@@ -1152,12 +1156,15 @@ function OrderSummary({
       </div>
 
       <button
-        className="mt-6 hidden w-full rounded-full bg-[#2b554e] py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 lg:block"
+        className="mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={handleContinue}
         type="button"
         disabled={!canContinue}
       >
-        Continuar
+        Continuar para identificação
+        <span className="text-lg leading-none">
+
+        </span>
       </button>
 
       {!canContinue && (
