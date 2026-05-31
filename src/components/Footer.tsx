@@ -59,7 +59,7 @@ const Footer: React.FC = () => {
                 aria-label="Ir para Home"
               >
                 <img
-                  src="/logo_fundo_escuro.svg"
+                  src="/logo_fundo_escuro_mobile.png"
                   alt="Caléa Logo"
                   className="h-[95px] w-auto object-contain"
                 />
@@ -111,7 +111,7 @@ const Footer: React.FC = () => {
             </h3>
 
             <ul className="space-y-2 text-sm text-[#FCFAF6]/75">
-              <li>• 5% OFF no PIX</li>
+              <li>• 10% OFF na primeira compra: <strong>BOASVINDAS</strong></li>
               <li>• Troca fácil</li>
               <li>• Atendimento pelo WhatsApp</li>
             </ul>

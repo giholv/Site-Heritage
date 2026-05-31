@@ -150,7 +150,7 @@ export default function Checkout() {
   const items = state.items ?? [];
 
   const [giftWrap, setGiftWrap] = useState(false);
-  const giftWrapPrice = 25.0;
+  const giftWrapPrice = 15.0;
 
   const [cep, setCep] = useState("");
   const [shippingLoading, setShippingLoading] = useState(false);
@@ -849,7 +849,7 @@ function GiftWrapCard({
               </p>
 
               <p className="mt-1 text-sm leading-5 text-[#7a746c]">
-                Caixa premium + finalização especial.
+                Caixinha para sua Jóia + finalização especial.
               </p>
             </div>
 

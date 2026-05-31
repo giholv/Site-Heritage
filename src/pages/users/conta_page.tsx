@@ -49,8 +49,10 @@ type Address = {
 
 type Order = {
   id: string;
+  order_number: string | null;
   created_at: string;
   status: string | null;
+  payment_status: string | null;
   subtotal_cents: number | null;
   shipping_cents: number | null;
   discount_cents: number | null;
@@ -116,9 +118,6 @@ const CALEA = {
 
 export default function ContaPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("pedidos");
-  const [orderFilter, setOrderFilter] = useState<
-    "todos" | "abertos" | "concluidos" | "cancelados"
-  >("todos");
 
   const [loading, setLoading] = useState(true);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -198,9 +197,11 @@ export default function ContaPage() {
         const { data: ordersData, error: ordersError } = await supabase
           .from("orders")
           .select(
-            "id, created_at, status, subtotal_cents, shipping_cents, discount_cents, total_cents, payment_method"
+            "id, order_number, created_at, status, payment_status, subtotal_cents, shipping_cents, discount_cents, total_cents, payment_method"
           )
           .eq("customer_id", customerData.id)
+          .eq("payment_status", "paid")
+          .eq("status", "paid")
           .order("created_at", { ascending: false });
 
         if (ordersError) throw ordersError;
@@ -307,36 +308,10 @@ export default function ContaPage() {
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const status = String(order.status || "").toLowerCase();
-
-      if (orderFilter === "todos") return true;
-
-      if (orderFilter === "abertos") {
-        return ["draft", "pending_payment", "processing", "shipped"].includes(
-          status
-        );
-      }
-
-      if (orderFilter === "concluidos") {
-        return ["paid", "delivered"].includes(status);
-      }
-
-      if (orderFilter === "cancelados") {
-        return ["canceled", "cancelled", "refunded"].includes(status);
-      }
-
-      return true;
-    });
-  }, [orders, orderFilter]);
-
-  const openOrdersCount = useMemo(() => {
-    return orders.filter((order) =>
-      ["draft", "pending_payment", "processing", "shipped"].includes(
-        String(order.status || "").toLowerCase()
-      )
-    ).length;
+    return orders;
   }, [orders]);
+
+
 
   const menuItems: Array<{
     key: TabKey;
@@ -511,8 +486,8 @@ export default function ContaPage() {
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-              <SummaryCard label="Pedidos" value={String(orders.length)} />
-              <SummaryCard label="Em aberto" value={String(openOrdersCount)} />
+              <SummaryCard label="Pedidos pagos" value={String(orders.length)} />
+              <SummaryCard label="Status" value="Pagos" />
               <SummaryCard label="Total" value={formatBRL(loyalty.totalSpentCents)} />
             </div>
           </div>
@@ -570,35 +545,6 @@ export default function ContaPage() {
                       description="Veja os pedidos realizados e acompanhe o andamento da compra."
                     />
 
-                    <div className="mt-6 flex gap-3 overflow-x-auto pb-1">
-                      <OrderFilterButton
-                        active={orderFilter === "todos"}
-                        onClick={() => setOrderFilter("todos")}
-                      >
-                        Todos
-                      </OrderFilterButton>
-
-                      <OrderFilterButton
-                        active={orderFilter === "abertos"}
-                        onClick={() => setOrderFilter("abertos")}
-                      >
-                        Abertos
-                      </OrderFilterButton>
-
-                      <OrderFilterButton
-                        active={orderFilter === "concluidos"}
-                        onClick={() => setOrderFilter("concluidos")}
-                      >
-                        Concluídos
-                      </OrderFilterButton>
-
-                      <OrderFilterButton
-                        active={orderFilter === "cancelados"}
-                        onClick={() => setOrderFilter("cancelados")}
-                      >
-                        Cancelados
-                      </OrderFilterButton>
-                    </div>
 
                     <div className="mt-6 space-y-4">
                       {filteredOrders.length === 0 ? (
@@ -913,31 +859,6 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function OrderFilterButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "min-h-[46px] shrink-0 rounded-full border px-5 text-sm transition",
-        active
-          ? "border-[#2b554e] bg-[#2b554e] text-white"
-          : "border-[#e9e2d6] bg-white text-[#2b554e] hover:bg-[#f6f3ee]",
-      ].join(" ")}
-    >
-      {children}
-    </button>
-  );
-}
-
 function OrderCard({ order, items }: { order: Order; items: OrderItem[] }) {
   const visibleItems = items.slice(0, 3);
   const moreItems = Math.max(items.length - visibleItems.length, 0);
@@ -953,7 +874,7 @@ function OrderCard({ order, items }: { order: Order; items: OrderItem[] }) {
             <StatusPill status={order.status} />
 
             <span className="text-sm text-[#6f6558]">
-              Pedido #{order.id.slice(0, 8)}
+              {order.order_number || `Pedido #${order.id.slice(0, 8).toUpperCase()}`}
             </span>
           </div>
 
