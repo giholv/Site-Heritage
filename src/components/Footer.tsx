@@ -59,7 +59,7 @@ const Footer: React.FC = () => {
                 aria-label="Ir para Home"
               >
                 <img
-                  src="/logo_fundo_escuro_mobile.png"
+                  src="/logo_fundo_escuro.svg"
                   alt="Caléa Logo"
                   className="h-[95px] w-auto object-contain"
                 />

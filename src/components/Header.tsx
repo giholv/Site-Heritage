@@ -176,7 +176,7 @@ const Header: React.FC<HeaderProps> = ({
           >
             <div className="flex h-8 items-center justify-center px-3">
               <span className="truncate text-center text-[11px] leading-none tracking-[0.04em] opacity-95">
-                Frete grátis a partir de <strong>R$299</strong> · 10% OFF na primeira compra: <strong>BOASVINDAS</strong>
+                Frete grátis a partir de <strong>R$299</strong> · 10% OFF cupom <strong>BOASVINDAS</strong>
               </span>
             </div>
           </div>
