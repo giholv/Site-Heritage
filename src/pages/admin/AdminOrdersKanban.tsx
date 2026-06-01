@@ -33,8 +33,10 @@ type OrderItemRow = {
 
 type OrderRow = {
   id: string;
+  order_number: string | null;
   created_at: string;
   updated_at: string;
+  delivered_at?: string | null;
 
   status?: string | null;
   order_status: string | null;
@@ -67,30 +69,31 @@ type OrderRow = {
 };
 
 type KanbanColumnKey =
-  | "pending_payment"
   | "paid"
   | "picking"
   | "packed"
   | "shipped"
-  | "delivered"
-  | "cancelled";
+  | "delivered";
 
 const CALEA = {
   primary: "#2b554e",
+  primaryDark: "#1f3f3a",
   accent: "#b08d57",
   bg: "#FCFAF6",
   line: "#e9e2d6",
   soft: "#f6f3ee",
+  card: "#ffffff",
+  muted: "#71717a",
+  text: "#18181b",
+  shadow: "0 18px 45px rgba(43,85,78,0.08)",
 };
 
 const COLUMNS: { key: KanbanColumnKey; title: string }[] = [
-  { key: "pending_payment", title: "Pagamento pendente" },
   { key: "paid", title: "Pago" },
   { key: "picking", title: "Separando" },
   { key: "packed", title: "Embalado" },
   { key: "shipped", title: "Enviado" },
   { key: "delivered", title: "Entregue" },
-  { key: "cancelled", title: "Cancelado" },
 ];
 
 function moneyBRL(value?: number | null) {
@@ -109,26 +112,67 @@ function shortId(id: string) {
   return String(id || "").slice(0, 8).toUpperCase();
 }
 
+function displayOrderNumber(order: OrderRow) {
+  return order.order_number || `PED-${shortId(order.id)}`;
+}
+
+function isWithinLastDays(value?: string | null, days = 7) {
+  if (!value) return false;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const limit = new Date();
+  limit.setDate(limit.getDate() - days);
+
+  return date >= limit;
+}
+
 function normalizeOrderStatus(value?: string | null) {
   if (!value || value === "draft") return "pending_payment";
   if (value === "canceled") return "cancelled";
   return value;
 }
 
-function resolveKanbanColumn(order: OrderRow): KanbanColumnKey {
+function resolveKanbanColumn(order: OrderRow): KanbanColumnKey | null {
   const orderStatus = normalizeOrderStatus(order.order_status || order.status);
   const paymentStatus = order.payment_status;
   const fulfillmentStatus = order.fulfillment_status;
 
+  // Cancelados não aparecem no Kanban
   if (
     orderStatus === "cancelled" ||
+    orderStatus === "canceled" ||
     paymentStatus === "cancelled" ||
-    fulfillmentStatus === "cancelled"
+    paymentStatus === "canceled" ||
+    fulfillmentStatus === "cancelled" ||
+    fulfillmentStatus === "canceled"
   ) {
-    return "cancelled";
+    return null;
   }
 
-  if (fulfillmentStatus === "delivered") return "delivered";
+  // Pendentes de pagamento também não aparecem
+  if (
+    orderStatus === "pending_payment" ||
+    paymentStatus === "pending" ||
+    paymentStatus === "authorized" ||
+    paymentStatus === "failed" ||
+    paymentStatus === "expired"
+  ) {
+    return null;
+  }
+
+  // Entregues aparecem só dos últimos 7 dias
+  if (fulfillmentStatus === "delivered") {
+    const deliveredDate = order.delivered_at || order.updated_at;
+
+    if (!isWithinLastDays(deliveredDate, 7)) {
+      return null;
+    }
+
+    return "delivered";
+  }
+
   if (fulfillmentStatus === "shipped") return "shipped";
 
   if (
@@ -139,14 +183,6 @@ function resolveKanbanColumn(order: OrderRow): KanbanColumnKey {
   }
 
   if (fulfillmentStatus === "picking") return "picking";
-
-  if (
-    orderStatus === "pending_payment" ||
-    paymentStatus === "pending" ||
-    paymentStatus === "authorized"
-  ) {
-    return "pending_payment";
-  }
 
   return "paid";
 }
@@ -336,25 +372,47 @@ function ColumnHeader({ title, count }: { title: string; count: number }) {
       style={{
         position: "sticky",
         top: 0,
-        zIndex: 1,
-        background: CALEA.soft,
-        paddingBottom: 10,
+        zIndex: 2,
+        background: "linear-gradient(180deg, #f6f3ee 80%, rgba(246,243,238,0))",
+        paddingBottom: 12,
       }}
     >
       <div
         style={{
+          height: 44,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 12,
+          gap: 10,
+          padding: "0 4px",
         }}
       >
-        <strong style={{ fontSize: 14, color: CALEA.primary }}>{title}</strong>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 999,
+              background: CALEA.primary,
+              boxShadow: "0 0 0 4px rgba(43,85,78,0.08)",
+            }}
+          />
+
+          <strong
+            style={{
+              fontSize: 14,
+              color: CALEA.primary,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {title}
+          </strong>
+        </div>
 
         <span
           style={{
-            minWidth: 28,
-            height: 28,
+            minWidth: 30,
+            height: 30,
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
@@ -362,8 +420,9 @@ function ColumnHeader({ title, count }: { title: string; count: number }) {
             background: "#fff",
             border: `1px solid ${CALEA.line}`,
             fontSize: 12,
-            fontWeight: 700,
-            color: "#3f3f46",
+            fontWeight: 800,
+            color: CALEA.primary,
+            boxShadow: "0 6px 16px rgba(43,85,78,0.06)",
           }}
         >
           {count}
@@ -380,6 +439,9 @@ function OrderCard({
   order: OrderRow;
   onOpen: (order: OrderRow) => void;
 }) {
+  const customerName =
+    order.customer_name || order.external_customer_name || "Cliente sem nome";
+
   return (
     <button
       type="button"
@@ -389,36 +451,100 @@ function OrderCard({
         textAlign: "left",
         background: "#fff",
         border: `1px solid ${CALEA.line}`,
-        borderRadius: 20,
+        borderRadius: 22,
         padding: 16,
-        boxShadow: "0 8px 22px rgba(43,85,78,0.06)",
+        boxShadow: "0 10px 28px rgba(43,85,78,0.07)",
         cursor: "pointer",
+        transition: "transform 0.18s ease, box-shadow 0.18s ease, border 0.18s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 18px 38px rgba(43,85,78,0.12)";
+        e.currentTarget.style.border = `1px solid rgba(43,85,78,0.25)`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 10px 28px rgba(43,85,78,0.07)";
+        e.currentTarget.style.border = `1px solid ${CALEA.line}`;
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-        <strong style={{ fontSize: 14, color: "#18181b" }}>
-          #{shortId(order.id)}
+        <strong
+          style={{
+            fontSize: 13,
+            color: CALEA.primary,
+            letterSpacing: "0.02em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {displayOrderNumber(order)}
         </strong>
 
-        <span style={{ fontSize: 11, color: "#71717a" }}>
+        <span
+          style={{
+            fontSize: 11,
+            color: "#8a8f98",
+            whiteSpace: "nowrap",
+          }}
+        >
           {new Date(order.created_at).toLocaleDateString("pt-BR")}
         </span>
       </div>
 
-      <div style={{ marginTop: 8, fontWeight: 700, color: "#27272a" }}>
-        {order.customer_name || order.external_customer_name || "Cliente sem nome"}
+      <div
+        style={{
+          marginTop: 10,
+          fontWeight: 800,
+          color: CALEA.text,
+          fontSize: 15,
+          lineHeight: 1.35,
+          minHeight: 40,
+        }}
+      >
+        {customerName}
       </div>
 
-      <div style={{ marginTop: 6, fontSize: 15, color: CALEA.primary, fontWeight: 700 }}>
+      <div
+        style={{
+          marginTop: 8,
+          fontSize: 17,
+          color: CALEA.primary,
+          fontWeight: 900,
+          letterSpacing: "-0.02em",
+        }}
+      >
         {moneyBRL(order.total_cents)}
       </div>
 
-      <div style={{ marginTop: 4, fontSize: 12, color: "#71717a" }}>
-        {order.payment_method || "Sem pagamento"}{" "}
-        {order.sales_channel ? `• ${order.sales_channel}` : ""}
+      <div
+        style={{
+          marginTop: 5,
+          fontSize: 12,
+          color: CALEA.muted,
+          display: "flex",
+          gap: 6,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <span>{order.payment_method || "Sem pagamento"}</span>
+
+        {order.sales_channel ? (
+          <>
+            <span style={{ color: "#d4c8b8" }}>•</span>
+            <span>{order.sales_channel}</span>
+          </>
+        ) : null}
       </div>
 
-      <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div
+        style={{
+          marginTop: 14,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 7,
+        }}
+      >
         <Badge tone={statusTone(order.payment_status)}>
           Pagto: {order.payment_status || "-"}
         </Badge>
@@ -471,6 +597,30 @@ function ActionButton({
   );
 }
 
+const summaryCardStyle: React.CSSProperties = {
+  background: "#fff",
+  border: `1px solid ${CALEA.line}`,
+  borderRadius: 22,
+  padding: "16px 18px",
+  boxShadow: "0 12px 30px rgba(43,85,78,0.06)",
+};
+
+const summaryLabelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  color: CALEA.muted,
+  fontWeight: 700,
+  marginBottom: 7,
+};
+
+const summaryValueStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 22,
+  color: CALEA.primary,
+  fontWeight: 900,
+  letterSpacing: "-0.03em",
+};
+
 export default function AdminOrdersKanban() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -480,7 +630,8 @@ export default function AdminOrdersKanban() {
   const [selected, setSelected] = useState<OrderRow | null>(null);
   const [selectedItems, setSelectedItems] = useState<OrderItemRow[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
+  const [trackingCodeInput, setTrackingCodeInput] = useState("");
+  const [carrierInput, setCarrierInput] = useState("");
   async function loadOrders() {
     try {
       setLoading(true);
@@ -514,6 +665,7 @@ export default function AdminOrdersKanban() {
     return orders.filter((order) => {
       const haystack = [
         order.id,
+        order.order_number,
         order.customer_name,
         order.external_customer_name,
         order.external_customer_phone,
@@ -538,22 +690,41 @@ export default function AdminOrdersKanban() {
 
   const grouped = useMemo(() => {
     const base: Record<KanbanColumnKey, OrderRow[]> = {
-      pending_payment: [],
       paid: [],
       picking: [],
       packed: [],
       shipped: [],
       delivered: [],
-      cancelled: [],
     };
 
     for (const order of filteredOrders) {
       const key = resolveKanbanColumn(order);
+
+      if (!key) continue;
+
       base[key].push(order);
     }
 
     return base;
   }, [filteredOrders]);
+
+  const summary = useMemo(() => {
+    const totalVisible = Object.values(grouped).reduce(
+      (sum, list) => sum + list.length,
+      0
+    );
+
+    const totalValue = Object.values(grouped)
+      .flat()
+      .reduce((sum, order) => sum + Number(order.total_cents || 0), 0);
+
+    return {
+      totalVisible,
+      totalValue,
+      paid: grouped.paid.length,
+      delivered: grouped.delivered.length,
+    };
+  }, [grouped]);
 
   async function openOrder(order: OrderRow) {
     setSelected(order);
@@ -567,6 +738,7 @@ export default function AdminOrdersKanban() {
         .select(
           `
           id,
+          order_number,
           status,
           order_status,
           payment_status,
@@ -596,6 +768,8 @@ export default function AdminOrdersKanban() {
       } as OrderRow;
 
       setSelected(mergedOrder);
+      setTrackingCodeInput(mergedOrder.tracking_code || "");
+      setCarrierInput(mergedOrder.carrier || "");
 
       const { data: orderItems, error: itemsError } = await supabase
         .from("order_items")
@@ -719,9 +893,9 @@ export default function AdminOrdersKanban() {
         prev.map((item) =>
           item.id === order.id
             ? {
-                ...item,
-                ...(orderDetails || {}),
-              }
+              ...item,
+              ...(orderDetails || {}),
+            }
             : item
         )
       );
@@ -770,6 +944,58 @@ export default function AdminOrdersKanban() {
     }
   }
 
+  async function sendOrderStatusEmail(orderId: string, status: string) {
+    const { error } = await supabase.functions.invoke("send-order-status-email", {
+      body: {
+        order_id: orderId,
+        status,
+      },
+    });
+
+    if (error) {
+      console.error("Erro ao enviar e-mail de status:", error);
+    }
+  }
+
+  async function updateFulfillmentStatus(
+    orderId: string,
+    newStatus: "picking" | "packed" | "shipped" | "delivered" | "cancelled",
+    extra?: {
+      trackingCode?: string | null;
+      carrier?: string | null;
+      notes?: string | null;
+    }
+  ) {
+    try {
+      setSaving(true);
+      setErrorMsg(null);
+
+      const { data, error } = await supabase.rpc(
+        "admin_update_order_fulfillment_status",
+        {
+          p_order_id: orderId,
+          p_new_status: newStatus,
+          p_tracking_code: extra?.trackingCode || null,
+          p_carrier: extra?.carrier || null,
+          p_notes: extra?.notes || "Status atualizado pelo Kanban",
+        }
+      );
+
+      if (error) throw error;
+
+      if (data?.changed) {
+        await sendOrderStatusEmail(orderId, newStatus);
+      }
+
+      await loadOrders();
+      await refreshSelected(orderId);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err?.message || "Erro ao atualizar status do pedido.");
+    } finally {
+      setSaving(false);
+    }
+  }
   async function handleSetPaymentPaid() {
     if (!selected) return;
 
@@ -802,43 +1028,62 @@ export default function AdminOrdersKanban() {
   async function handleSetPicking() {
     if (!selected) return;
 
-    await patchOrder(selected.id, {
-      fulfillment_status: "picking",
-      picked_at: new Date().toISOString(),
+    await updateFulfillmentStatus(selected.id, "picking", {
+      notes: "Pedido marcado como separando pelo admin",
     });
   }
 
   async function handleSetPacked() {
     if (!selected) return;
 
-    await patchOrder(selected.id, {
-      fulfillment_status: "packed",
-      packed_at: new Date().toISOString(),
+    await updateFulfillmentStatus(selected.id, "packed", {
+      notes: "Pedido marcado como embalado pelo admin",
     });
   }
 
   async function handleSetShipped() {
     if (!selected) return;
 
-    await patchOrder(selected.id, {
-      fulfillment_status: "shipped",
-      shipping_status: "posted",
-      shipped_at: new Date().toISOString(),
+    const trackingCode = trackingCodeInput.trim();
+    const carrier = carrierInput.trim();
+
+    if (!trackingCode) {
+      setErrorMsg("Informe o código de rastreio antes de marcar como enviado.");
+      return;
+    }
+
+    if (!carrier) {
+      setErrorMsg("Informe a transportadora antes de marcar como enviado.");
+      return;
+    }
+
+    await updateFulfillmentStatus(selected.id, "shipped", {
+      trackingCode,
+      carrier,
+      notes: "Pedido marcado como enviado pelo admin",
     });
   }
 
   async function handleSetDelivered() {
     if (!selected) return;
 
-    await patchOrder(selected.id, {
-      fulfillment_status: "delivered",
-      shipping_status: "delivered",
-      delivered_at: new Date().toISOString(),
+    await updateFulfillmentStatus(selected.id, "delivered", {
+      notes: "Pedido marcado como entregue pelo admin",
     });
   }
 
   async function handleCancelOrder() {
     if (!selected) return;
+
+    const confirmCancel = window.confirm(
+      "Tem certeza que deseja cancelar este pedido?"
+    );
+
+    if (!confirmCancel) return;
+
+    await updateFulfillmentStatus(selected.id, "cancelled", {
+      notes: "Pedido cancelado manualmente pelo admin",
+    });
 
     await patchOrder(selected.id, {
       status: "canceled",
@@ -849,7 +1094,6 @@ export default function AdminOrdersKanban() {
         selected.service_order_status === "not_required"
           ? "not_required"
           : "cancelled",
-      fulfillment_status: "cancelled",
       shipping_status:
         selected.shipping_status === "delivered"
           ? selected.shipping_status
@@ -859,57 +1103,100 @@ export default function AdminOrdersKanban() {
       canceled_reason: "Cancelado manualmente pelo admin",
     });
   }
-
   const drawerOpen = !!selected;
 
   return (
     <div
       style={{
         minHeight: "100%",
-        background: CALEA.bg,
-        padding: 20,
+        background:
+          "radial-gradient(circle at top left, rgba(176,141,87,0.10), transparent 32%), #FCFAF6",
+        padding: 24,
+        overflowX: "hidden",
       }}
     >
       <div
         style={{
-          marginBottom: 18,
+          marginBottom: 22,
           display: "flex",
-          gap: 12,
+          gap: 18,
           flexWrap: "wrap",
-          alignItems: "center",
+          alignItems: "flex-end",
           justifyContent: "space-between",
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, color: CALEA.primary }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "7px 12px",
+              borderRadius: 999,
+              background: "rgba(43,85,78,0.08)",
+              color: CALEA.primary,
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 12,
+            }}
+          >
+            Kanban de pedidos
+          </div>
+
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 34,
+              lineHeight: 1.1,
+              color: CALEA.primary,
+              letterSpacing: "-0.04em",
+            }}
+          >
             Pedidos
           </h1>
 
-          <p style={{ margin: "6px 0 0", color: "#71717a" }}>
-            Operação por status em quadro kanban.
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: CALEA.muted,
+              fontSize: 15,
+            }}
+          >
+            Acompanhe a operação por etapa.
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
           <div
             style={{
-              minWidth: 300,
+              width: 340,
+              maxWidth: "100%",
+              height: 48,
               display: "flex",
               alignItems: "center",
               gap: 10,
               background: "#fff",
               border: `1px solid ${CALEA.line}`,
-              borderRadius: 18,
-              padding: "0 14px",
-              boxShadow: "0 8px 24px rgba(43,85,78,0.05)",
+              borderRadius: 999,
+              padding: "0 16px",
+              boxShadow: "0 12px 30px rgba(43,85,78,0.06)",
             }}
           >
-            <Search size={16} color="#71717a" />
+            <Search size={17} color="#8a8f98" />
 
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por cliente, id, status, rastreio..."
+              placeholder="Buscar cliente, pedido, rastreio..."
               style={{
                 width: "100%",
                 height: 44,
@@ -917,6 +1204,7 @@ export default function AdminOrdersKanban() {
                 outline: "none",
                 background: "transparent",
                 fontSize: 14,
+                color: CALEA.text,
               }}
             />
           </div>
@@ -925,22 +1213,52 @@ export default function AdminOrdersKanban() {
             type="button"
             onClick={loadOrders}
             style={{
-              height: 44,
+              height: 48,
               display: "inline-flex",
               alignItems: "center",
-              gap: 8,
-              borderRadius: 18,
+              gap: 9,
+              borderRadius: 999,
               border: `1px solid ${CALEA.line}`,
               background: "#fff",
-              padding: "0 16px",
+              padding: "0 18px",
               cursor: "pointer",
-              fontWeight: 700,
+              fontWeight: 800,
               color: CALEA.primary,
+              boxShadow: "0 12px 30px rgba(43,85,78,0.06)",
             }}
           >
             <RefreshCcw size={16} />
             Atualizar
           </button>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(160px, 1fr))",
+          gap: 14,
+          marginBottom: 20,
+        }}
+      >
+        <div style={summaryCardStyle}>
+          <span style={summaryLabelStyle}>Pedidos visíveis</span>
+          <strong style={summaryValueStyle}>{summary.totalVisible}</strong>
+        </div>
+
+        <div style={summaryCardStyle}>
+          <span style={summaryLabelStyle}>Total no Kanban</span>
+          <strong style={summaryValueStyle}>{moneyBRL(summary.totalValue)}</strong>
+        </div>
+
+        <div style={summaryCardStyle}>
+          <span style={summaryLabelStyle}>Pagos</span>
+          <strong style={summaryValueStyle}>{summary.paid}</strong>
+        </div>
+
+        <div style={summaryCardStyle}>
+          <span style={summaryLabelStyle}>Entregues 7 dias</span>
+          <strong style={summaryValueStyle}>{summary.delivered}</strong>
         </div>
       </div>
 
@@ -965,7 +1283,7 @@ export default function AdminOrdersKanban() {
             background: "#fff",
             border: `1px solid ${CALEA.line}`,
             borderRadius: 20,
-            padding: 20,
+            padding: 16,
             color: "#71717a",
           }}
         >
@@ -975,7 +1293,8 @@ export default function AdminOrdersKanban() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(7, minmax(280px, 1fr))",
+            gridTemplateColumns: "repeat(5, minmax(240px, 1fr))",
+            width: "100%",
             gap: 16,
             alignItems: "start",
             overflowX: "auto",
@@ -986,10 +1305,10 @@ export default function AdminOrdersKanban() {
             <div
               key={column.key}
               style={{
-                minWidth: 280,
+                minWidth: 220,
                 background: CALEA.soft,
                 border: `1px solid ${CALEA.line}`,
-                borderRadius: 24,
+                borderRadius: 28,
                 padding: 14,
                 maxHeight: "calc(100vh - 180px)",
                 overflowY: "auto",
@@ -1006,7 +1325,7 @@ export default function AdminOrdersKanban() {
                     style={{
                       borderRadius: 18,
                       border: `1px dashed ${CALEA.line}`,
-                      padding: 16,
+                      padding: 12,
                       color: "#71717a",
                       fontSize: 13,
                       background: "#fff",
@@ -1077,7 +1396,7 @@ export default function AdminOrdersKanban() {
                     letterSpacing: 1,
                   }}
                 >
-                  #{shortId(selected.id)}
+                  {displayOrderNumber(selected)}
                 </h2>
               </div>
 
@@ -1293,11 +1612,10 @@ export default function AdminOrdersKanban() {
                                 }}
                               >
                                 {item.stock_location_code
-                                  ? `${item.stock_location_code}${
-                                      item.stock_location_name
-                                        ? ` - ${item.stock_location_name}`
-                                        : ""
-                                    }`
+                                  ? `${item.stock_location_code}${item.stock_location_name
+                                    ? ` - ${item.stock_location_name}`
+                                    : ""
+                                  }`
                                   : "Não informado"}
                               </div>
                             </div>
@@ -1333,9 +1651,8 @@ export default function AdminOrdersKanban() {
 
                   {!!selected.discount_cents && (
                     <ValueRow
-                      label={`Desconto${
-                        selected.coupon_code ? ` (${selected.coupon_code})` : ""
-                      }`}
+                      label={`Desconto${selected.coupon_code ? ` (${selected.coupon_code})` : ""
+                        }`}
                       value={`- ${moneyBRL(selected.discount_cents)}`}
                       green
                     />
@@ -1359,6 +1676,96 @@ export default function AdminOrdersKanban() {
                   />
 
                   <ValueRow label="Total" value={moneyBRL(selected.total_cents)} strong />
+                </div>
+              </DrawerCard>
+
+              <DrawerCard title="Dados de envio" icon={<Truck size={18} />}>
+                <div style={{ display: "grid", gap: 12 }}>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: CALEA.primary,
+                        marginBottom: 6,
+                      }}
+                    >
+                      Código de rastreio
+                    </label>
+
+                    <input
+                      value={trackingCodeInput}
+                      onChange={(e) => setTrackingCodeInput(e.target.value)}
+                      placeholder="Ex: BR123456789BR"
+                      style={{
+                        width: "100%",
+                        height: 44,
+                        borderRadius: 14,
+                        border: `1px solid ${CALEA.line}`,
+                        padding: "0 12px",
+                        outline: "none",
+                        fontSize: 14,
+                        background: "#fff",
+                        color: CALEA.text,
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: CALEA.primary,
+                        marginBottom: 6,
+                      }}
+                    >
+                      Transportadora
+                    </label>
+
+                    <input
+                      value={carrierInput}
+                      onChange={(e) => setCarrierInput(e.target.value)}
+                      placeholder="Ex: Correios, Jadlog, Melhor Envio"
+                      style={{
+                        width: "100%",
+                        height: 44,
+                        borderRadius: 14,
+                        border: `1px solid ${CALEA.line}`,
+                        padding: "0 12px",
+                        outline: "none",
+                        fontSize: 14,
+                        background: "#fff",
+                        color: CALEA.text,
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!selected) return;
+
+                      await patchOrder(selected.id, {
+                        tracking_code: trackingCodeInput.trim() || null,
+                        carrier: carrierInput.trim() || null,
+                      });
+                    }}
+                    disabled={saving}
+                    style={{
+                      height: 44,
+                      borderRadius: 999,
+                      border: `1px solid ${CALEA.primary}`,
+                      background: "#fff",
+                      color: CALEA.primary,
+                      fontWeight: 800,
+                      cursor: saving ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Salvar dados de envio
+                  </button>
                 </div>
               </DrawerCard>
 

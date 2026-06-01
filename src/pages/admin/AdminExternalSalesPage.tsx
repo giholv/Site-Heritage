@@ -143,25 +143,38 @@ export default function AdminExternalSalesPage() {
 
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData.user?.id ?? null;
+const nowIso = new Date().toISOString();
 
-      const orderPayload = {
-        customer_id: EXTERNAL_CUSTOMER_ID,
-        origin: "external",
-        sales_channel: form.sales_channel,
-        status: form.status,
-        seller_name: form.seller_name || null,
-        external_customer_name: form.external_customer_name,
-        external_customer_phone: form.external_customer_phone || null,
-        external_customer_email: form.external_customer_email || null,
-        external_customer_document: form.external_customer_document || null,
-        notes: form.notes || null,
-        subtotal_cents: subtotalCents,
-        discount_cents: discountCents,
-        shipping_cents: shippingCents,
-        total_cents: totalCents,
-        payment_method: form.payment_method,
-        created_by: userId,
-      };
+const orderPayload = {
+  customer_id: EXTERNAL_CUSTOMER_ID,
+  origin: "external",
+  sales_channel: form.sales_channel,
+
+  status: "delivered",
+  order_status: "paid",
+  payment_status: "paid",
+  service_order_status: "not_required",
+  fulfillment_status: "delivered",
+  shipping_status: "delivered",
+
+  paid_at: nowIso,
+  created_at: nowIso,
+  delivered_at: nowIso,
+
+  seller_name: form.seller_name || null,
+  external_customer_name: form.external_customer_name,
+  external_customer_phone: form.external_customer_phone || null,
+  external_customer_email: form.external_customer_email || null,
+  external_customer_document: form.external_customer_document || null,
+  notes: form.notes || null,
+
+  subtotal_cents: subtotalCents,
+  discount_cents: discountCents,
+  shipping_cents: shippingCents,
+  total_cents: totalCents,
+  payment_method: form.payment_method,
+  created_by: userId,
+};
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -267,23 +280,7 @@ export default function AdminExternalSalesPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm mb-1">Status</label>
-                <select
-                  className="w-full rounded-xl border px-3 py-2"
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                >
-                  <option value="draft">Rascunho</option>
-                  <option value="pending_payment">Pendente pagamento</option>
-                  <option value="paid">Pago</option>
-                  <option value="processing">Em processamento</option>
-                  <option value="shipped">Enviado</option>
-                  <option value="delivered">Entregue</option>
-                  <option value="canceled">Cancelado</option>
-                  <option value="refunded">Reembolsado</option>
-                </select>
-              </div>
+            
 
               <div>
                 <label className="block text-sm mb-1">Forma de pagamento</label>
