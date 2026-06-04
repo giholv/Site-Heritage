@@ -39,6 +39,12 @@ type ShippingOption = {
   deadline: string;
   original_price?: number;
   posting_type?: string;
+
+  carrier?: string;
+  carrier_code?: string;
+  delivery_time?: number;
+  allow_buy_label?: boolean;
+  raw?: any;
 };
 
 type AppliedCoupon = {
@@ -397,9 +403,14 @@ export default function Checkout() {
         ? {
           id: selectedShipping.id,
           name: selectedShipping.name,
+          carrier: selectedShipping.carrier || null,
+          carrier_code: selectedShipping.carrier_code || null,
           price: shippingPrice,
           original_price: originalShippingPrice,
           deadline: selectedShipping.deadline,
+          delivery_time: selectedShipping.delivery_time || null,
+          allow_buy_label: selectedShipping.allow_buy_label || false,
+          raw: selectedShipping.raw || null,
           free_shipping_applied: hasAutomaticFreeShipping,
         }
         : null,
@@ -987,6 +998,7 @@ function DeliverySection({
                       </div>
 
                       <div className="mt-1 text-xs text-[#7a746c]">
+                        {option.carrier ? `${option.carrier} • ` : ""}
                         {option.deadline || "Prazo indisponível"}
                       </div>
                     </div>

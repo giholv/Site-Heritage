@@ -1,4 +1,5 @@
 // netlify/functions/shipping-quote.ts
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -17,6 +18,11 @@ function onlyDigits(value: string) {
   return String(value ?? "").replace(/\D/g, "");
 }
 
+function toNumber(value: unknown, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 export default async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -30,64 +36,79 @@ export default async (req: Request) => {
   }
 
   try {
-    const token = process.env.SUPERFRETE_TOKEN;
-    const fromCep = onlyDigits(process.env.SUPERFRETE_FROM_CEP ?? "06053020");
-    const userAgent =
-      process.env.SUPERFRETE_USER_AGENT ?? "Calea/1.0 (contato@calea.com.br)";
+    const token = process.env.FRENET_TOKEN;
+    const fromCep = onlyDigits(process.env.FRENET_FROM_CEP ?? "06053020");
 
     if (!token) {
-      return json({ error: "SUPERFRETE_TOKEN não definido" }, 500);
+      return json({ error: "FRENET_TOKEN não definido" }, 500);
     }
 
     if (fromCep.length !== 8) {
-      return json({ error: "SUPERFRETE_FROM_CEP inválido" }, 500);
+      return json({ error: "FRENET_FROM_CEP inválido" }, 500);
     }
 
-    const body = await req.json();
+    const body = (await req.json()) as {
+      to_postcode?: string;
+      insurance_value?: number | string;
+      weight?: number | string;
+      services?: string;
+    };
 
-    const to_postcode = onlyDigits(body.to_postcode);
+    const to_postcode = onlyDigits(body.to_postcode ?? "");
+
     if (to_postcode.length !== 8) {
       return json({ error: "CEP inválido" }, 400);
     }
 
-    const insurance_value = Number(body.insurance_value ?? 0);
+    const insurance_value = toNumber(body.insurance_value ?? 0, 0);
 
-    // Seu padrão:
-    // caixa fixa 16x12x8 e peso configurável
-    const weight = Math.max(0.001, Number(body.weight ?? 0.03));
+    /**
+     * Mantive compatível com seu frontend atual:
+     * - to_postcode
+     * - insurance_value
+     * - weight
+     *
+     * Caixa padrão da Caléa:
+     * 16 x 12 x 8 cm
+     */
+    const weight = Math.max(
+      0.001,
+      toNumber(body.weight ?? 0.03, 0.03)
+    );
 
-    const superfretePayload = {
-      from: { postal_code: fromCep },
-      to: { postal_code: to_postcode },
-      services: String(body.services ?? "1,2,17,3"),
-      options: {
-        own_hand: false,
-        receipt: false,
-        insurance_value,
-        use_insurance_value: insurance_value > 0,
-      },
-      package: {
-        length: 16,
-        width: 12,
-        height: 8,
-        weight,
-      },
+    const frenetPayload = {
+      SellerCEP: fromCep,
+      RecipientCEP: to_postcode,
+      ShipmentInvoiceValue: insurance_value,
+      ShippingServiceCode: null,
+      RecipientCountry: "BR",
+      ShippingItemArray: [
+        {
+          Height: 8,
+          Length: 16,
+          Width: 12,
+          Weight: weight,
+          Quantity: 1,
+          SKU: "CALEA-PACKAGE",
+          Category: "Semijoias",
+        },
+      ],
     };
 
-    const resp = await fetch("https://api.superfrete.com/api/v0/calculator", {
+    const resp = await fetch("https://api.frenet.com.br/shipping/quote", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
-        "User-Agent": userAgent,
-        accept: "application/json",
-        "content-type": "application/json",
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        token,
       },
-      body: JSON.stringify(superfretePayload),
+      body: JSON.stringify(frenetPayload),
     });
 
     const text = await resp.text();
 
     let data: any = null;
+
     try {
       data = text ? JSON.parse(text) : null;
     } catch {
@@ -97,67 +118,55 @@ export default async (req: Request) => {
     if (!resp.ok) {
       return json(
         {
-          error: "Erro ao consultar SuperFrete",
+          error: "Erro ao consultar Frenet",
           details: data,
         },
         resp.status
       );
     }
 
-    const raw = Array.isArray(data?.services)
-      ? data.services
-      : Array.isArray(data?.options)
-      ? data.options
-      : Array.isArray(data)
-      ? data
-      : [];
+    const raw = Array.isArray(data?.ShippingSevicesArray)
+      ? data.ShippingSevicesArray
+      : Array.isArray(data?.ShippingServicesArray)
+        ? data.ShippingServicesArray
+        : [];
 
     const options = raw
+      .filter((s: any) => s?.Error !== true)
       .map((s: any) => {
-        const price = Number(
-          s.price_with_discount ??
-            s.discounted_price ??
-            s.price_discounted ??
-            s.final_price ??
-            s.total ??
-            s.price ??
-            s.value ??
-            0
-        );
-
-        const original_price = Number(
-          s.original_price ??
-            s.list_price ??
-            s.price_without_discount ??
-            s.price_original ??
-            NaN
-        );
-
-        const d = Number(s.delivery_time ?? s.deadline ?? s.time ?? NaN);
-
-        const deadline =
-          Number.isFinite(d) && d > 0
-            ? `Até ${d} dias úteis`
-            : String(s.deadline ?? s.delivery_time ?? s.time ?? "");
+        const price = toNumber(s.ShippingPrice, 0);
+        const original_price = toNumber(s.OriginalShippingPrice, NaN);
+        const deliveryTime = toNumber(s.DeliveryTime, NaN);
 
         return {
-          id: String(s.id ?? s.service_id ?? s.service ?? s.code ?? s.name),
-          name: String(s.name ?? s.service_name ?? "Frete"),
+          id: String(s.ServiceCode ?? ""),
+          name: String(s.ServiceDescription ?? "Frete"),
+          carrier: String(s.Carrier ?? ""),
+          carrier_code: String(s.CarrierCode ?? ""),
           price,
           original_price:
             Number.isFinite(original_price) && original_price > price
               ? original_price
               : undefined,
-          deadline,
-          posting_type: String(
-            s.posting_type ?? s.posting ?? s.dropoff ?? ""
-          ),
+          deadline:
+            Number.isFinite(deliveryTime) && deliveryTime > 0
+              ? `Até ${deliveryTime} dias úteis`
+              : "",
+          delivery_time: Number.isFinite(deliveryTime)
+            ? deliveryTime
+            : undefined,
+          allow_buy_label: Boolean(s.AllowBuyLabel),
+          posting_type: "",
+          raw: s,
         };
       })
       .filter((x: any) => Number.isFinite(x.price) && x.price > 0)
       .sort((a: any, b: any) => a.price - b.price);
 
-    return json({ options });
+    return json({
+      options,
+      raw: data,
+    });
   } catch (err: any) {
     return json({ error: err?.message ?? "Erro interno" }, 500);
   }

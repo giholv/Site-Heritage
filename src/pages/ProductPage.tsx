@@ -57,6 +57,12 @@ export type ShippingOption = {
   deadline: string;
   original_price?: number;
   posting_type?: string;
+
+  carrier?: string;
+  carrier_code?: string;
+  delivery_time?: number;
+  allow_buy_label?: boolean;
+  raw?: any;
 };
 
 function resolveImageUrl(path: string) {
@@ -356,7 +362,6 @@ export default function ProductPage() {
         weight: Number(Math.max(0.03, 0.03 * quantity).toFixed(2)),
         services: "1,2,17,3",
       };
-
       console.log("Calculando frete:", payload);
 
       const res = await fetch("/.netlify/functions/shipping-quote", {

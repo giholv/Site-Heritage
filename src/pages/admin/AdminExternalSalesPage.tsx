@@ -143,38 +143,38 @@ export default function AdminExternalSalesPage() {
 
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData.user?.id ?? null;
-const nowIso = new Date().toISOString();
+      const nowIso = new Date().toISOString();
 
-const orderPayload = {
-  customer_id: EXTERNAL_CUSTOMER_ID,
-  origin: "external",
-  sales_channel: form.sales_channel,
+      const orderPayload = {
+        customer_id: EXTERNAL_CUSTOMER_ID,
+        origin: "external",
+        sales_channel: form.sales_channel,
 
-  status: "delivered",
-  order_status: "paid",
-  payment_status: "paid",
-  service_order_status: "not_required",
-  fulfillment_status: "delivered",
-  shipping_status: "delivered",
+        status: "delivered",
+        order_status: "paid",
+        payment_status: "paid",
+        service_order_status: "not_required",
+        fulfillment_status: "delivered",
+        shipping_status: "delivered",
 
-  paid_at: nowIso,
-  created_at: nowIso,
-  delivered_at: nowIso,
+        paid_at: nowIso,
+        created_at: nowIso,
+        delivered_at: nowIso,
 
-  seller_name: form.seller_name || null,
-  external_customer_name: form.external_customer_name,
-  external_customer_phone: form.external_customer_phone || null,
-  external_customer_email: form.external_customer_email || null,
-  external_customer_document: form.external_customer_document || null,
-  notes: form.notes || null,
+        seller_name: form.seller_name || null,
+        external_customer_name: form.external_customer_name,
+        external_customer_phone: form.external_customer_phone || null,
+        external_customer_email: form.external_customer_email || null,
+        external_customer_document: form.external_customer_document || null,
+        notes: form.notes || null,
 
-  subtotal_cents: subtotalCents,
-  discount_cents: discountCents,
-  shipping_cents: shippingCents,
-  total_cents: totalCents,
-  payment_method: form.payment_method,
-  created_by: userId,
-};
+        subtotal_cents: subtotalCents,
+        discount_cents: discountCents,
+        shipping_cents: shippingCents,
+        total_cents: totalCents,
+        payment_method: form.payment_method,
+        created_by: userId,
+      };
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -198,7 +198,21 @@ const orderPayload = {
 
       if (itemsError) throw itemsError;
 
-      alert("Venda externa criada com sucesso.");
+      const { error: stockError } = await supabase.rpc(
+        "decrease_stock_for_external_sale",
+        {
+          p_order_id: order.id,
+        }
+      );
+
+      if (stockError) {
+        console.error("Erro ao baixar estoque da venda externa:", stockError);
+        throw new Error(
+          stockError.message || "Venda criada, mas houve erro ao baixar estoque."
+        );
+      }
+
+     alert("Venda externa criada com sucesso e estoque baixado.");
 
       setForm({
         sales_channel: "whatsapp",
@@ -280,7 +294,7 @@ const orderPayload = {
                 </select>
               </div>
 
-            
+
 
               <div>
                 <label className="block text-sm mb-1">Forma de pagamento</label>
