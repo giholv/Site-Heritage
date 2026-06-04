@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
@@ -35,6 +35,36 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkSession() {
+      const { data } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      if (data.session?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("user_id", data.session.user.id)
+          .maybeSingle();
+
+        if (profile?.role === "admin") {
+          navigate("/admin");
+        } else {
+          navigate("/minha-conta");
+        }
+      }
+    }
+
+    checkSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
 
   const errors = useMemo(() => {
     const e: Partial<Record<keyof FormState, string>> = {};
@@ -95,14 +125,15 @@ export default function LoginPage() {
         console.log("profileError:", profileError);
       }
 
-      if (profileError || !profile) {
-        await supabase.auth.signOut();
-        setServerError("Seu perfil não foi encontrado. Contate o suporte.");
-        return;
+      if (profileError) {
+        console.log("profileError:", profileError);
       }
 
-      if (profile.role === "admin") navigate("/admin");
-      else navigate("/minha-conta");
+      if (profile?.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/minha-conta");
+      }
     } catch {
       setServerError("Falha de rede ou servidor. Tente novamente.");
     } finally {
@@ -200,11 +231,10 @@ export default function LoginPage() {
                     autoComplete="email"
                     inputMode="email"
                     aria-invalid={!!shouldShowError("email")}
-                    className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 text-sm outline-none transition placeholder:text-[#2b554e]/35 ${
-                      shouldShowError("email")
+                    className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 text-sm outline-none transition placeholder:text-[#2b554e]/35 ${shouldShowError("email")
                         ? "border border-red-400 focus:ring-4 focus:ring-red-100"
                         : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
-                    }`}
+                      }`}
                   />
                   {shouldShowError("email") && (
                     <p className="mt-2 text-xs text-red-600">{errors.email}</p>
@@ -230,11 +260,10 @@ export default function LoginPage() {
                       placeholder="Sua senha"
                       autoComplete="current-password"
                       aria-invalid={!!shouldShowError("password")}
-                      className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 pr-24 text-sm outline-none transition placeholder:text-[#2b554e]/35 ${
-                        shouldShowError("password")
+                      className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 pr-24 text-sm outline-none transition placeholder:text-[#2b554e]/35 ${shouldShowError("password")
                           ? "border border-red-400 focus:ring-4 focus:ring-red-100"
                           : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
-                      }`}
+                        }`}
                     />
 
                     <button

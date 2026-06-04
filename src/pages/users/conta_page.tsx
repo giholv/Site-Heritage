@@ -15,6 +15,7 @@ import {
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { supabase } from "../../lib/supabase";
+import { useNavigate } from "react-router-dom";
 
 type TabKey = "pedidos" | "perfil" | "enderecos" | "trocas" | "fidelidade";
 
@@ -459,10 +460,10 @@ export default function ContaPage() {
     <div className="min-h-screen" style={{ background: CALEA.bg }}>
       <Header />
 
-      <main className="mx-auto w-full max-w-[1560px] px-4 pb-20 pt-[190px] md:px-8 md:pt-[220px]">
-        <div className="mb-6 overflow-hidden rounded-[28px] border bg-white shadow-sm md:mb-8">
+      <main className="mx-auto w-full max-w-[1560px] px-3 pb-16 pt-[120px] sm:px-4 sm:pt-[150px] md:px-8 md:pt-[220px]">
+        <div className="mb-4 overflow-hidden rounded-[22px] border bg-white shadow-sm sm:rounded-[28px] md:mb-8">
           <div
-            className="grid gap-5 p-6 md:grid-cols-[1.2fr_0.8fr] md:p-8"
+            className="grid gap-4 p-4 sm:p-6 md:grid-cols-[1.2fr_0.8fr] md:p-8"
             style={{ borderColor: CALEA.line }}
           >
             <div>
@@ -474,18 +475,18 @@ export default function ContaPage() {
               </p>
 
               <h1
-                className="text-[34px] font-normal leading-tight md:text-[48px]"
+                className="mt-3 max-w-2xl text-base md:text-lg"
                 style={{ color: CALEA.primary }}
               >
                 Olá, {getFirstName(profile?.full_name) || "cliente"}.
               </h1>
 
-              <p className="mt-3 max-w-2xl text-base md:text-lg" style={{ color: CALEA.textSoft }}>
+              <p className="mt-2 max-w-2xl text-sm leading-6 sm:text-base md:text-lg" style={{ color: CALEA.textSoft }}>
                 Acompanhe seus pedidos, dados cadastrais, endereços e histórico de compras.
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
               <SummaryCard label="Pedidos pagos" value={String(orders.length)} />
               <SummaryCard label="Status" value="Pagos" />
               <SummaryCard label="Total" value={formatBRL(loyalty.totalSpentCents)} />
@@ -496,7 +497,7 @@ export default function ContaPage() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="xl:sticky xl:top-24 xl:h-fit">
             <div
-              className="flex gap-3 overflow-x-auto rounded-[24px] border p-2 xl:block xl:overflow-hidden xl:p-0"
+              className="flex gap-2 overflow-x-auto rounded-[20px] border p-2 xl:block xl:overflow-hidden xl:rounded-[24px] xl:p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               style={{
                 borderColor: CALEA.line,
                 background: CALEA.soft,
@@ -512,7 +513,7 @@ export default function ContaPage() {
                     type="button"
                     onClick={() => setActiveTab(item.key)}
                     className={[
-                      "flex shrink-0 items-center gap-3 rounded-[18px] px-5 py-4 text-left text-sm transition xl:w-full xl:rounded-none xl:px-6 xl:py-5 xl:text-base",
+                      "flex shrink-0 items-center gap-2 rounded-[16px] px-4 py-3 text-left text-xs transition sm:text-sm xl:w-full xl:rounded-none xl:px-6 xl:py-5 xl:text-base",
                       active ? "bg-white shadow-sm" : "bg-transparent hover:bg-white/70",
                       index !== 0 ? "xl:border-t" : "",
                     ].join(" ")}
@@ -743,29 +744,7 @@ export default function ContaPage() {
                 )}
 
                 {activeTab === "fidelidade" && (
-                  <div
-                    className="rounded-[28px] border bg-white p-6 shadow-sm md:p-8"
-                    style={{ borderColor: CALEA.line }}
-                  >
-                    <SectionTitle title="Indicações" />
-
-                    <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-                      <PlainInfoBox
-                        label="Compras concluídas"
-                        value={String(loyalty.totalOrders)}
-                      />
-
-                      <PlainInfoBox
-                        label="Total investido"
-                        value={formatBRL(loyalty.totalSpentCents)}
-                      />
-
-                      <PlainInfoBox
-                        label="Última compra"
-                        value={formatDate(loyalty.lastOrderDate)}
-                      />
-                    </div>
-                  </div>
+                  <ReferralPanel profile={profile} authUser={authUser} />
                 )}
               </>
             )}
@@ -828,18 +807,19 @@ function SectionHeader({
 }) {
   return (
     <div>
-      <h2 className="text-[34px] font-normal leading-tight text-[#2b554e] md:text-[44px]">
+      <h2 className="text-[26px] font-normal leading-tight text-[#2b554e] sm:text-[34px] md:text-[44px]">
         {title}
       </h2>
 
-      <p className="mt-2 max-w-2xl text-base text-[#6f6558]">{description}</p>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6f6558] sm:text-base">
+        {description}
+      </p>
     </div>
   );
 }
-
 function SectionTitle({ title }: { title: string }) {
   return (
-    <h2 className="text-[32px] font-normal leading-tight text-[#2b554e] md:text-[42px]">
+    <h2 className="text-[26px] font-normal leading-tight text-[#2b554e] sm:text-[32px] md:text-[42px]">
       {title}
     </h2>
   );
@@ -847,12 +827,15 @@ function SectionTitle({ title }: { title: string }) {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[20px] border bg-[#FCFAF6] p-4" style={{ borderColor: CALEA.line }}>
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#b08d57]">
+    <div
+      className="rounded-[16px] border bg-[#FCFAF6] p-3 sm:rounded-[20px] sm:p-4"
+      style={{ borderColor: CALEA.line }}
+    >
+      <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#b08d57] sm:text-xs">
         {label}
       </p>
 
-      <p className="mt-2 truncate text-lg font-medium text-[#2b554e] md:text-xl">
+      <p className="mt-1 truncate text-base font-medium text-[#2b554e] sm:mt-2 md:text-xl">
         {value}
       </p>
     </div>
@@ -860,65 +843,72 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 }
 
 function OrderCard({ order, items }: { order: Order; items: OrderItem[] }) {
-  const visibleItems = items.slice(0, 3);
+  const navigate = useNavigate();
+
+  const visibleItems = items.slice(0, 2);
   const moreItems = Math.max(items.length - visibleItems.length, 0);
 
   return (
     <article
-      className="overflow-hidden rounded-[28px] border bg-white shadow-sm"
+      className="overflow-hidden rounded-[26px] border bg-white shadow-[0_14px_38px_rgba(43,85,78,0.05)]"
       style={{ borderColor: CALEA.line }}
     >
-      <div className="grid gap-5 p-5 md:grid-cols-[1fr_auto] md:p-6">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <StatusPill status={order.status} />
+      <div className="p-4 sm:p-5 md:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill status={order.status} />
 
-            <span className="text-sm text-[#6f6558]">
-              {order.order_number || `Pedido #${order.id.slice(0, 8).toUpperCase()}`}
-            </span>
+              <span className="text-xs font-medium text-[#6f6558] sm:text-sm">
+                {order.order_number || `Pedido #${order.id.slice(0, 8).toUpperCase()}`}
+              </span>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-[#b08d57]">
+                  Total do pedido
+                </p>
+
+                <h3 className="mt-1 text-[28px] font-normal tracking-[-0.03em] text-[#2b554e] sm:text-[34px]">
+                  {formatBRL(order.total_cents)}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigate(`/minha-conta/pedidos/${order.id}`)}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:brightness-95 sm:w-auto"
+              >
+                Ver detalhes
+                <ChevronRight size={15} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-2 rounded-[20px] bg-[#fcfaf6] p-4 text-sm text-[#6f6558] sm:grid-cols-3">
+              <span className="inline-flex items-center gap-2">
+                <ShoppingBag size={15} />
+                {formatDateLong(order.created_at)}
+              </span>
+
+              <span className="inline-flex items-center gap-2">
+                <CreditCard size={15} />
+                {translatePaymentMethod(order.payment_method)}
+              </span>
+
+              <span className="inline-flex items-center gap-2">
+                <Truck size={15} />
+                Frete {formatBRL(order.shipping_cents)}
+              </span>
+            </div>
           </div>
-
-          <h3 className="mt-4 text-[24px] font-normal text-[#2b554e] md:text-[30px]">
-            {formatBRL(order.total_cents)}
-          </h3>
-
-          <div className="mt-3 grid gap-2 text-sm text-[#6f6558] md:grid-cols-3">
-            <span className="inline-flex items-center gap-2">
-              <ShoppingBag size={16} />
-              {formatDateLong(order.created_at)}
-            </span>
-
-            <span className="inline-flex items-center gap-2">
-              <CreditCard size={16} />
-              {translatePaymentMethod(order.payment_method)}
-            </span>
-
-            <span className="inline-flex items-center gap-2">
-              <Truck size={16} />
-              Frete {formatBRL(order.shipping_cents)}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center md:justify-end">
-          <a
-            href={`/conta/pedidos/${order.id}`}
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full border bg-white px-5 text-sm transition hover:bg-[#fcfaf6]"
-            style={{
-              borderColor: CALEA.accent,
-              color: CALEA.primary,
-            }}
-          >
-            Ver detalhes
-            <ChevronRight size={16} />
-          </a>
         </div>
       </div>
 
-      <div className="border-t px-5 py-5 md:px-6" style={{ borderColor: CALEA.line }}>
+      <div className="border-t bg-[#fffdf9] px-4 py-4 sm:px-5 md:px-6" style={{ borderColor: CALEA.line }}>
         {items.length === 0 ? (
           <p className="text-sm text-[#6f6558]">
-            Pedido encontrado. Os itens não foram retornados pela tabela de itens do pedido.
+            Pedido encontrado, mas os itens não foram carregados.
           </p>
         ) : (
           <div className="space-y-3">
@@ -926,11 +916,15 @@ function OrderCard({ order, items }: { order: Order; items: OrderItem[] }) {
               <OrderItemRow key={item.id || `${item.order_id}-${index}`} item={item} />
             ))}
 
-            {moreItems > 0 ? (
-              <p className="pt-1 text-sm text-[#6f6558]">
-                + {moreItems} item(ns) neste pedido
-              </p>
-            ) : null}
+            {moreItems > 0 && (
+              <button
+                type="button"
+                onClick={() => navigate(`/minha-conta/pedidos/${order.id}`)}
+                className="text-sm font-medium text-[#b08d57] transition hover:text-[#2b554e]"
+              >
+                Ver mais {moreItems} item(ns)
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -946,27 +940,29 @@ function OrderItemRow({ item }: { item: OrderItem }) {
   const total = item.line_total_cents ?? item.unit_price_cents * qty;
 
   return (
-    <div className="flex gap-4">
-      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] border bg-[#f6f3ee]">
+    <div className="flex items-center gap-3">
+      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[16px] border border-[#e9e2d6] bg-[#f6f3ee]">
         {image ? (
           <img src={image} alt={name} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[#b08d57]">
-            <Package size={22} />
+            <Package size={20} />
           </div>
         )}
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-medium text-[#2b554e]">{name}</p>
+        <p className="truncate text-sm font-semibold text-[#2b554e] sm:text-base">
+          {name}
+        </p>
 
-        <p className="mt-1 text-sm text-[#6f6558]">
+        <p className="mt-1 text-xs text-[#6f6558] sm:text-sm">
           {variant ? `${variant} • ` : ""}
           Qtd. {qty}
         </p>
       </div>
 
-      <div className="text-right text-sm font-medium text-[#2b554e]">
+      <div className="shrink-0 text-right text-sm font-semibold text-[#2b554e]">
         {formatBRL(total)}
       </div>
     </div>
@@ -1265,4 +1261,176 @@ function joinAddress(address: Address) {
   const zip = address.cep ? `CEP ${address.cep}` : "";
 
   return [line1, address.complement, line2, zip].filter(Boolean);
+}
+
+function ReferralPanel({
+  profile,
+  authUser,
+}: {
+  profile: CustomerProfile | null;
+  authUser: AuthUser | null;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const firstName =
+    getFirstName(profile?.full_name) ||
+    getFirstName(authUser?.email?.split("@")[0]) ||
+    "CLIENTE";
+
+  const couponCode = `CALEA${normalizeCouponName(firstName)}`;
+
+  const [savingCoupon, setSavingCoupon] = useState(false);
+  const [couponReady, setCouponReady] = useState(false);
+
+  useEffect(() => {
+    async function ensureReferralCoupon() {
+      if (!profile?.id || !couponCode) return;
+
+      try {
+        setSavingCoupon(true);
+
+        const { data: existingCoupon, error: findError } = await supabase
+          .from("coupons")
+          .select("id, code")
+          .eq("code", couponCode)
+          .maybeSingle();
+
+        if (findError) throw findError;
+
+        if (existingCoupon?.id) {
+          setCouponReady(true);
+          return;
+        }
+
+        const { error: insertError } = await supabase.from("coupons").insert({
+          code: couponCode,
+          active: true,
+          discount_type: "percent",
+          percent: 10,
+          amount_cents: null,
+          max_discount_cents: 3000,
+          min_subtotal_cents: 10000,
+          starts_at: new Date().toISOString(),
+          ends_at: null,
+          first_purchase_only: true,
+          referral_customer_id: profile.id,
+          referral_code: true,
+        });
+
+        if (insertError) throw insertError;
+
+        setCouponReady(true);
+      } catch (error) {
+        console.error("Erro ao criar cupom de indicação:", error);
+        setCouponReady(false);
+      } finally {
+        setSavingCoupon(false);
+      }
+    }
+
+    ensureReferralCoupon();
+  }, [profile?.id, couponCode]);
+
+  async function copyCoupon() {
+    await navigator.clipboard.writeText(couponCode);
+    setCopied(true);
+
+    window.setTimeout(() => {
+      setCopied(false);
+    }, 1800);
+  }
+
+  return (
+    <div
+      className="overflow-hidden rounded-[28px] border bg-white shadow-sm"
+      style={{ borderColor: CALEA.line }}
+    >
+      <div className="bg-[#2b554e] px-5 py-7 text-white sm:px-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d8c3a0]">
+          Indicações
+        </p>
+
+        <h2 className="mt-3 text-[30px] font-normal leading-tight sm:text-[42px]">
+          Indique a Caléa
+        </h2>
+
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75 sm:text-base">
+          Compartilhe seu cupom com amigas e familiares. Quando usarem o código,
+          elas ganham um benefício especial na compra.
+        </p>
+      </div>
+
+      <div className="grid gap-5 p-5 sm:p-8 lg:grid-cols-[1fr_340px]">
+        <div
+          className="rounded-[24px] border bg-[#fcfaf6] p-5 sm:p-6"
+          style={{ borderColor: CALEA.line }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b08d57]">
+            Seu cupom de indicação
+          </p>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex min-h-[58px] flex-1 items-center rounded-2xl border border-dashed border-[#b08d57] bg-white px-5">
+              <span className="text-[24px] font-semibold tracking-[0.08em] text-[#2b554e]">
+                {couponCode}
+              </span>
+            </div>
+<p className="mt-3 text-xs text-[#6f6558]">
+  {savingCoupon
+    ? "Preparando seu cupom..."
+    : couponReady
+      ? "Cupom ativo para uso no checkout."
+      : "Cupom ainda não disponível. Tente novamente em instantes."}
+</p>
+            <button
+              type="button"
+              onClick={copyCoupon}
+              className="min-h-[52px] rounded-full bg-[#2b554e] px-6 text-sm font-semibold text-white transition hover:brightness-95"
+            >
+              {copied ? "Copiado!" : "Copiar cupom"}
+            </button>
+          </div>
+
+          <p className="mt-4 text-sm leading-6 text-[#6f6558]">
+            Envie esse código para quem você quer indicar. Ele pode ser usado no
+            checkout como cupom promocional.
+          </p>
+        </div>
+
+        <div
+          className="rounded-[24px] border bg-white p-5 sm:p-6"
+          style={{ borderColor: CALEA.line }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b08d57]">
+            Como funciona
+          </p>
+
+          <div className="mt-4 space-y-4 text-sm leading-6 text-[#6f6558]">
+            <p>
+              1. Copie seu cupom personalizado.
+            </p>
+
+            <p>
+              2. Compartilhe com outra pessoa.
+            </p>
+
+            <p>
+              3. Ela usa o código no checkout.
+            </p>
+
+
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function normalizeCouponName(value?: string | null) {
+  return String(value || "CLIENTE")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 12);
 }

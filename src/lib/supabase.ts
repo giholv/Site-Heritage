@@ -10,8 +10,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,     // mantém logado
-    autoRefreshToken: true,   // renova token
+    persistSession: true,
+    autoRefreshToken: true,
     detectSessionInUrl: true,
+    storage: window.localStorage,
+    storageKey: "calea-auth-session",
   },
 });

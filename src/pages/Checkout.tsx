@@ -78,6 +78,16 @@ function formatCEP(value: string) {
   if (digits.length <= 5) return digits;
   return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
+function getCartSkuId(item: any) {
+  return (
+    item?.sku_id ||
+    item?.skuId ||
+    item?.sku ||
+    item?.variant_id ||
+    item?.variantId ||
+    null
+  );
+}
 
 function calculateCouponDiscountCents(params: {
   coupon: AppliedCoupon | null;
@@ -170,6 +180,9 @@ export default function Checkout() {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [stockBySku, setStockBySku] = useState<Record<string, number>>({});
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockError, setStockError] = useState<string | null>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
@@ -384,6 +397,67 @@ export default function Checkout() {
       setCouponLoading(false);
     }
   }
+  async function checkCartStock() {
+    if (!items.length) return true;
+
+    setStockLoading(true);
+    setStockError(null);
+
+    try {
+      const skuIds = items
+        .map((item) => getCartSkuId(item))
+        .filter(Boolean);
+
+      if (!skuIds.length) {
+        setStockError("Não foi possível validar o estoque dos itens.");
+        return false;
+      }
+
+      const { data, error } = await supabase
+        .from("sku_availability")
+        .select("sku_id, available_qty")
+        .in("sku_id", skuIds);
+
+      if (error) throw error;
+
+      const map: Record<string, number> = {};
+
+      data?.forEach((row: any) => {
+        map[row.sku_id] = Number(row.available_qty || 0);
+      });
+
+      setStockBySku(map);
+
+      const invalidItems = items.filter((item: any) => {
+        const skuId = getCartSkuId(item);
+        const availableQty = map[skuId] ?? 0;
+        const qty = item.qty ?? 1;
+
+        return qty > availableQty || availableQty <= 0;
+      });
+
+      if (invalidItems.length > 0) {
+        setStockError(
+          "Alguns itens da sacola não possuem estoque suficiente. Ajuste a quantidade para continuar."
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      console.error("Erro ao validar estoque:", error);
+      setStockError("Erro ao verificar estoque. Tente novamente.");
+      return false;
+    } finally {
+      setStockLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!items.length) return;
+
+    checkCartStock();
+  }, [items.length]);
 
   function removeCoupon() {
     setAppliedCoupon(null);
@@ -511,8 +585,12 @@ export default function Checkout() {
     }
   }
 
-  function handleContinue() {
-    if (!canContinue) return;
+  async function handleContinue() {
+    if (!canContinue || stockLoading) return;
+
+    const stockOk = await checkCartStock();
+
+    if (!stockOk) return;
 
     saveCheckoutDraft();
     navigate("/checkout/identificacao");
@@ -597,17 +675,60 @@ export default function Checkout() {
                       <CartItemRow
                         key={item.id}
                         item={item}
+                        availableQty={
+                          getCartSkuId(item) ? stockBySku[getCartSkuId(item) as string] : undefined
+                        }
                         onRemove={() => remove(item.id)}
                         onDecrease={() =>
                           setQty(item.id, Math.max(1, (item.qty ?? 1) - 1))
                         }
-                        onIncrease={() => setQty(item.id, (item.qty ?? 1) + 1)}
+                        onIncrease={async () => {
+                          const skuId = getCartSkuId(item);
+
+                          if (!skuId) {
+                            setStockError("Não foi possível validar o estoque deste item.");
+                            return;
+                          }
+
+                          const { data, error } = await supabase
+                            .from("sku_availability")
+                            .select("available_qty")
+                            .eq("sku_id", skuId)
+                            .maybeSingle();
+
+                          if (error) {
+                            console.error("Erro ao verificar estoque:", error);
+                            setStockError("Erro ao verificar estoque.");
+                            return;
+                          }
+
+                          const availableQty = Number(data?.available_qty || 0);
+                          const nextQty = (item.qty ?? 1) + 1;
+
+                          setStockBySku((prev) => ({
+                            ...prev,
+                            [skuId]: availableQty,
+                          }));
+
+                          if (nextQty > availableQty) {
+                            setStockError(`Estoque insuficiente. Disponível: ${availableQty}.`);
+                            return;
+                          }
+
+                          setQty(item.id, nextQty);
+                        }}
                       />
                     ))}
                   </div>
                 )}
 
                 {items.length > 0 && <CuradoriaCalea items={items} />}
+
+                {stockError && (
+                  <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">
+                    {stockError}
+                  </div>
+                )}
               </div>
 
               {items.length > 0 && (
@@ -649,6 +770,8 @@ export default function Checkout() {
                 total={total}
                 canContinue={canContinue}
                 handleContinue={handleContinue}
+                stockLoading={stockLoading}
+                stockError={stockError}
               />
             </aside>
           </div>
@@ -759,14 +882,16 @@ function EmptyCart({ onContinue }: { onContinue: () => void }) {
 
 function CartItemRow({
   item,
+  availableQty,
   onRemove,
   onDecrease,
   onIncrease,
 }: {
   item: any;
+  availableQty?: number;
   onRemove: () => void;
   onDecrease: () => void;
-  onIncrease: () => void;
+  onIncrease: () => void | Promise<void>;
 }) {
   return (
     <div className="grid grid-cols-[84px_1fr] gap-4 py-5 sm:grid-cols-[92px_1fr_auto] sm:items-center">
@@ -788,6 +913,20 @@ function CartItemRow({
         {item.variant ? (
           <p className="mt-1 text-sm text-[#8a8175]">{item.variant}</p>
         ) : null}
+
+        {typeof availableQty === "number" && availableQty <= 0 && (
+          <p className="mt-2 text-xs font-medium text-red-600">
+            Produto indisponível no estoque.
+          </p>
+        )}
+
+        {typeof availableQty === "number" &&
+          availableQty > 0 &&
+          (item.qty ?? 1) > availableQty && (
+            <p className="mt-2 text-xs font-medium text-red-600">
+              Estoque insuficiente. Disponível: {availableQty}.
+            </p>
+          )}
 
         <p className="mt-2 text-sm font-semibold text-[#b08d57] sm:hidden">
           {moneyBRL((item.price ?? 0) * (item.qty ?? 1))}
@@ -896,6 +1035,7 @@ function CheckoutPanel(props: any) {
       <CouponSection {...props} />
       <Divider />
       <OrderSummary {...props} />
+
     </div>
   );
 }
@@ -1009,12 +1149,19 @@ function DeliverySection({
                       {moneyBRL(option.price)}
                     </div>
 
-                    {option.original_price &&
-                      option.original_price > option.price ? (
-                      <div className="text-xs text-gray-400 line-through">
-                        {moneyBRL(option.original_price)}
-                      </div>
-                    ) : null}
+                    {(() => {
+                      const priceCents = Math.round(Number(option.price || 0) * 100);
+                      const originalPriceCents = Math.round(Number(option.original_price || 0) * 100);
+
+                      const hasDiscount =
+                        originalPriceCents > 0 && originalPriceCents > priceCents;
+
+                      return hasDiscount ? (
+                        <div className="text-xs text-gray-400 line-through">
+                          {moneyBRL(Number(option.original_price || 0))}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               </label>
@@ -1119,6 +1266,8 @@ function OrderSummary({
   total,
   canContinue,
   handleContinue,
+  stockLoading,
+  stockError,
 }: any) {
   return (
     <section>
@@ -1168,21 +1317,24 @@ function OrderSummary({
       </div>
 
       <button
-        className="mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] py-4 text-sm font-semibold  tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] py-4 text-sm font-semibold tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={handleContinue}
         type="button"
-        disabled={!canContinue}
+        disabled={!canContinue || stockLoading || Boolean(stockError)}
       >
-        Continuar
-        <span className="text-lg leading-none">
-
-        </span>
+        {stockLoading ? "Verificando estoque..." : "Continuar"}
       </button>
+
+      {stockError && (
+        <p className="mt-3 text-center text-xs text-red-600">
+          Ajuste os itens sem estoque para continuar.
+        </p>
+      )}
 
       {!canContinue && (
         <p className="mt-3 text-center text-xs text-[#8a8175]">
           Selecione uma opção de entrega para continuar.
-        </p>
+        </p >
       )}
 
       <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4">

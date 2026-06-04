@@ -38,6 +38,7 @@ import AmbientSound from "./components/AmbientSound";
 import AdminEstatisticas from "./pages/admin/AdminEstatisticas";
 import AdminCupons from "./pages/admin/AdminCupons";
 import AdminParcerias from "./pages/admin/AdminParcerias";
+import PedidoDetalhePage from "./pages/users/PedidoDetalhePage";
 
 
 
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/cadastro" element={<CadastroUsuariosPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/minha-conta" element={<MinhaContaRedirect />} />
+        <Route path="/minha-conta/pedidos/:orderId" element={<PedidoDetalhePage />} />
         <Route path="/conta" element={<ContaPage />} />
         <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
         <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />

@@ -221,7 +221,7 @@ const Header: React.FC<HeaderProps> = ({
                   <img
                     src="/logo_fundo_escuro_mobile.png"
                     alt="Logo da loja"
-                    className="h-14 w-auto object-contain"
+                    className="h-8 w-auto object-contain sm:h-10 md:h-12"
                   />
                 </button>
               </div>
