@@ -532,15 +532,14 @@ async function sendPaymentConfirmedEmail(params: {
   const { data: order, error } = await supabase
     .from("orders")
     .select(`
-      id,
-      order_number,
-      total_cents,
-      email,
-      full_name,
-      external_customer_email,
-      customer_name,
-      payment_confirmed_email_sent_at
-    `)
+  id,
+  order_number,
+  total_cents,
+  external_customer_email,
+  external_customer_name,
+  pagarme_payload,
+  payment_confirmed_email_sent_at
+`)
     .eq("id", orderId)
     .maybeSingle();
 
@@ -562,21 +561,19 @@ async function sendPaymentConfirmedEmail(params: {
     };
   }
 
-  const customerEmail =
-    order.email ||
-    order.external_customer_email ||
+  const pagarmeCustomer =
+    order.pagarme_payload?.data?.customer ||
+    order.pagarme_payload?.data?.charges?.[0]?.customer ||
     null;
 
-  if (!customerEmail) {
-    return {
-      sent: false,
-      warning: "Pedido sem e-mail do cliente.",
-    };
-  }
+  const customerEmail =
+    order.external_customer_email ||
+    pagarmeCustomer?.email ||
+    null;
 
   const customerName =
-    order.full_name ||
-    order.customer_name ||
+    order.external_customer_name ||
+    pagarmeCustomer?.name ||
     "cliente";
 
   const emailResponse = await fetch(
