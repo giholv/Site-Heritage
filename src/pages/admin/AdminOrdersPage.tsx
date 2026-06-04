@@ -24,6 +24,8 @@ type OrderRow = {
   payment_method: string | null;
   shipping_label_generated: boolean | null;
   tracking_code: string | null;
+  shipping_label_url: string | null;
+  shipping_error: string | null;
 };
 
 type CustomerRow = {
@@ -45,6 +47,8 @@ type OrderItem = {
   payment_method: string | null;
   shipping_label_generated: boolean;
   tracking_code: string | null;
+  shipping_label_url: string | null;
+  shipping_error: string | null;
 };
 
 const salesNavigation: {
@@ -222,6 +226,7 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [generatingLabelId, setGeneratingLabelId] = useState<string | null>(null);
 
   async function loadOrders() {
     try {
@@ -231,7 +236,7 @@ export default function AdminOrdersPage() {
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(
-          "id, order_number, customer_id, external_customer_name, status, payment_status, total_cents, created_at, origin, sales_channel, payment_method, shipping_label_generated, tracking_code"
+          "id, order_number, customer_id, external_customer_name, status, payment_status, total_cents, created_at, origin, sales_channel, payment_method, shipping_label_generated, tracking_code, shipping_label_url, shipping_error"
         )
 
         .order("created_at", { ascending: false });
@@ -277,6 +282,8 @@ export default function AdminOrdersPage() {
           payment_method: order.payment_method,
           shipping_label_generated: Boolean(order.shipping_label_generated),
           tracking_code: order.tracking_code,
+          shipping_label_url: order.shipping_label_url,
+          shipping_error: order.shipping_error,
         })
       );
 
@@ -331,7 +338,56 @@ export default function AdminOrdersPage() {
       setError(err?.message || "Erro ao atualizar informações da etiqueta.");
     }
   }
+  async function generateShippingLabel(orderId: string) {
+    try {
+      setError("");
+      setGeneratingLabelId(orderId);
 
+      const res = await fetch("/.netlify/functions/generate-shipping-label", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+        }),
+      });
+
+      const text = await res.text();
+
+      let data: any = {};
+
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {
+          error: text || "Resposta inválida da função de etiqueta.",
+        };
+      }
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(
+          data?.error ||
+          data?.details?.message ||
+          data?.details?.error ||
+          `Erro ao gerar etiqueta Frenet (${res.status})`
+        );
+      }
+
+      await loadOrders();
+
+      if (data?.label_url) {
+        window.open(data.label_url, "_blank");
+      }
+
+      alert("Etiqueta gerada com sucesso.");
+    } catch (err: any) {
+      setError(err?.message || "Erro ao gerar etiqueta Frenet.");
+      alert(err?.message || "Erro ao gerar etiqueta Frenet.");
+    } finally {
+      setGeneratingLabelId(null);
+    }
+  }
   const counters = useMemo(() => {
     return {
       orders: orders.filter(isPaidOrder).length,
@@ -564,19 +620,41 @@ export default function AdminOrdersPage() {
                       {activeSection === "labels" && (
                         <>
                           <td className="px-5 py-4">
-                            <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
-                              <input
-                                type="checkbox"
-                                checked={order.shipping_label_generated}
-                                onChange={(e) =>
-                                  updateShippingInfo(order.id, {
-                                    shipping_label_generated: e.target.checked,
-                                  })
-                                }
-                                className="h-4 w-4 rounded border-slate-300 text-[#2b554e] focus:ring-[#2b554e]"
-                              />
-                              Gerada
-                            </label>
+                            <div className="flex flex-col gap-2">
+                              {order.shipping_label_generated ? (
+                                <>
+                                  <span className="inline-flex w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                    Gerada
+                                  </span>
+
+                                  {order.shipping_label_url && (
+                                    <a
+                                      href={order.shipping_label_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-xs font-semibold text-[#2b554e] underline"
+                                    >
+                                      Abrir etiqueta
+                                    </a>
+                                  )}
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => generateShippingLabel(order.id)}
+                                  disabled={generatingLabelId === order.id}
+                                  className="inline-flex h-9 w-fit items-center justify-center rounded-xl bg-[#2b554e] px-3 text-xs font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {generatingLabelId === order.id ? "Gerando..." : "Gerar etiqueta"}
+                                </button>
+                              )}
+
+                              {order.shipping_error && (
+                                <span className="max-w-[220px] text-xs text-rose-600">
+                                  {order.shipping_error}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           <td className="px-5 py-4">

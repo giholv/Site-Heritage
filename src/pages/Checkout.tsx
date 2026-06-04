@@ -466,7 +466,7 @@ export default function Checkout() {
 
       const payload = {
         to_postcode: cleanCep,
-        insurance_value: 0,
+        insurance_value: Number(subtotal.toFixed(2)),
         weight: Number(totalWeight.toFixed(2)),
         services: "1,2,17,3",
       };

@@ -167,6 +167,20 @@ export const handler: Handler = async (event) => {
     let stockReleased = false;
     let stockReleaseWarning: string | null = null;
 
+    let paymentEmailSent = false;
+    let paymentEmailWarning: string | null = null;
+
+    if (orderStatus === "paid") {
+      const emailResult = await sendPaymentConfirmedEmail({
+        supabase,
+        supabaseUrl,
+        orderId: updateResult.orderId,
+      });
+
+      paymentEmailSent = emailResult.sent;
+      paymentEmailWarning = emailResult.warning;
+    }
+
     if (newStatus === "payment_failed" || newStatus === "canceled") {
       const releaseResult = await releaseReservedStock({
         supabase,
@@ -195,6 +209,8 @@ export const handler: Handler = async (event) => {
       status: newStatus,
       stockReleased,
       stockReleaseWarning,
+      paymentEmailSent,
+      paymentEmailWarning,
     });
   } catch (error: any) {
     console.error("Erro ao processar webhook:", error);
@@ -501,6 +517,113 @@ async function releaseReservedStock(params: {
 
   return {
     released: true,
+    warning: null,
+  };
+}
+
+
+async function sendPaymentConfirmedEmail(params: {
+  supabase: any;
+  supabaseUrl: string;
+  orderId: string;
+}) {
+  const { supabase, supabaseUrl, orderId } = params;
+
+  const { data: order, error } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      order_number,
+      total_cents,
+      email,
+      full_name,
+      external_customer_email,
+      customer_name,
+      payment_confirmed_email_sent_at
+    `)
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!order) {
+    return {
+      sent: false,
+      warning: "Pedido não encontrado para envio de e-mail.",
+    };
+  }
+
+  if (order.payment_confirmed_email_sent_at) {
+    return {
+      sent: false,
+      warning: "E-mail de pagamento confirmado já havia sido enviado.",
+    };
+  }
+
+  const customerEmail =
+    order.email ||
+    order.external_customer_email ||
+    null;
+
+  if (!customerEmail) {
+    return {
+      sent: false,
+      warning: "Pedido sem e-mail do cliente.",
+    };
+  }
+
+  const customerName =
+    order.full_name ||
+    order.customer_name ||
+    "cliente";
+
+  const emailResponse = await fetch(
+    `${supabaseUrl}/functions/v1/send-payment-confirmed-email`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        to: customerEmail,
+        customer_name: customerName,
+        order_number: order.order_number,
+        total_cents: order.total_cents,
+      }),
+    }
+  );
+
+  const emailData = (await emailResponse.json().catch(() => null)) as {
+    ok?: boolean;
+    message?: string;
+    error?: string;
+    details?: any;
+  } | null;
+
+  if (!emailResponse.ok || !emailData?.ok) {
+    return {
+      sent: false,
+      warning: "Erro ao enviar e-mail de pagamento confirmado.",
+      details: emailData,
+    };
+  }
+
+  const { error: updateEmailError } = await supabase
+    .from("orders")
+    .update({
+      payment_confirmed_email_sent_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId);
+
+  if (updateEmailError) {
+    throw updateEmailError;
+  }
+
+  return {
+    sent: true,
     warning: null,
   };
 }

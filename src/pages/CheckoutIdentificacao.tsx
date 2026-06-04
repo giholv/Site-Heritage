@@ -72,8 +72,15 @@ type CheckoutDraft = {
   shipping?: {
     id?: string;
     name?: string;
+    carrier?: string | null;
+    carrier_code?: string | null;
     price?: number;
+    original_price?: number;
     deadline?: string;
+    delivery_time?: number | null;
+    allow_buy_label?: boolean;
+    raw?: any;
+    free_shipping_applied?: boolean;
   } | null;
   shippingPrice?: number;
   total?: number;
@@ -635,16 +642,29 @@ export default function CheckoutIdentificacao() {
       checkoutDraft?.coupon?.code ||
       null;
 
+    const selectedShipping = checkoutDraft?.shipping || null;
+
+    if (!selectedShipping?.id) {
+      throw new Error("Pedido sem serviço de frete escolhido.");
+    }
     const orderPayload = {
       customer_id: customerId,
       shipping_address_id: addressId,
       status: "draft",
+
       subtotal_cents: merchandiseSubtotalCents,
       shipping_cents: shippingCents,
       gift_wrap_cents: giftWrapCents,
       total_cents: totalCents,
       coupon_code: couponCode,
       discount_cents: discountCents,
+
+      carrier: selectedShipping.carrier || null,
+      shipping_service_code: selectedShipping.id || null,
+      shipping_service_description: selectedShipping.name || null,
+      shipping_delivery_time: selectedShipping.delivery_time || null,
+      shipping_quote_raw: selectedShipping.raw || selectedShipping,
+
       updated_at: now,
     };
 
@@ -731,9 +751,17 @@ export default function CheckoutIdentificacao() {
       order_id: orderId,
       order_number:
         orderNumber || sessionStorage.getItem("calea_order_number") || null,
+
       coupon_code: couponCode,
       discount_cents: discountCents,
       total_cents: totalCents,
+
+      shipping_service_code: selectedShipping.id || null,
+      shipping_service_description: selectedShipping.name || null,
+      shipping_delivery_time: selectedShipping.delivery_time || null,
+      carrier: selectedShipping.carrier || null,
+      shipping: selectedShipping,
+
       updatedAt: now,
     };
 
@@ -1146,7 +1174,7 @@ export default function CheckoutIdentificacao() {
                 <div className="my-5 h-px bg-[#eee5d8]" />
 
                 <div className="space-y-3 text-sm">
-                
+
                   {shippingPrice > 0 && (
                     <div className="flex items-center justify-between">
                       <span className="text-[#766e64]">
