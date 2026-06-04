@@ -135,7 +135,10 @@ export default async (req: Request) => {
       .filter((s: any) => s?.Error !== true)
       .map((s: any) => {
         const price = toNumber(s.ShippingPrice, 0);
-        const original_price = toNumber(s.OriginalShippingPrice, NaN);
+        const original_price = toNumber(
+          s.OriginalShippingPrice ?? s.ShippingPrice,
+          NaN
+        );
         const deliveryTime = toNumber(s.DeliveryTime, NaN);
 
         return {

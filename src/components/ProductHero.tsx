@@ -31,6 +31,11 @@ type ShippingOption = {
   deadline: string;
   original_price?: number;
   posting_type?: string;
+  carrier?: string;
+  carrier_code?: string;
+  delivery_time?: number;
+  allow_buy_label?: boolean;
+  raw?: any;
 };
 
 type ProductHeroProps = {
@@ -399,6 +404,7 @@ export default function ProductHero({
                                 </p>
 
                                 <p className="mt-1 text-xs text-[#697671]">
+                                  {option.carrier ? `${option.carrier} • ` : ""}
                                   {option.deadline || "Prazo indisponível"}
                                 </p>
                               </div>
@@ -408,11 +414,12 @@ export default function ProductHero({
                                   {formatBRL(option.price)}
                                 </p>
 
-                                {option.original_price && option.original_price > option.price && (
+                                {option.original_price &&
+                                  Number(option.original_price) - Number(option.price) > 0.01 ? (
                                   <p className="mt-0.5 text-xs text-[#9a9187] line-through">
                                     {formatBRL(option.original_price)}
                                   </p>
-                                )}
+                                ) : null}
                               </div>
                             </div>
                           </button>
