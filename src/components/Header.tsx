@@ -221,7 +221,7 @@ const Header: React.FC<HeaderProps> = ({
                 : "border-transparent bg-[#FCFAF6]",
             ].join(" ")}
           >
-            <div className="grid h-[58px] grid-cols-[40px_1fr_132px] items-center px-4">
+            <div className="grid h-[58px] grid-cols-[40px_1fr_150px] items-center px-4">
               <button
                 type="button"
                 onClick={() => setIsOpen((v) => !v)}
