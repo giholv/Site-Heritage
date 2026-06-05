@@ -33,6 +33,7 @@ type Coupon = {
   campaign_name: string | null;
   source_channel: string | null;
   internal_notes: string | null;
+  free_shipping: boolean;
 
   marketing_partners?: {
     name: string;
@@ -57,10 +58,12 @@ type CouponForm = {
   stackable: boolean;
   active: boolean;
 
+
   partner_id: string;
   campaign_name: string;
   source_channel: string;
   internal_notes: string;
+  free_shipping: boolean;
 };
 
 const EMPTY_FORM: CouponForm = {
@@ -84,6 +87,7 @@ const EMPTY_FORM: CouponForm = {
   campaign_name: "",
   source_channel: "",
   internal_notes: "",
+  free_shipping: false,
 };
 
 function moneyBRLFromCents(cents: number | null | undefined) {
@@ -141,15 +145,21 @@ function formatDate(value: string | null) {
 }
 
 function discountLabel(coupon: Coupon) {
+  let label = "";
+
   if (coupon.discount_type === "percent") {
-    return `${coupon.percent || 0}%`;
+    label = `${coupon.percent || 0}%`;
   }
 
   if (coupon.discount_type === "fixed") {
-    return moneyBRLFromCents(coupon.amount_cents);
+    label = moneyBRLFromCents(coupon.amount_cents);
   }
 
-  return "Frete grátis";
+  if (coupon.free_shipping) {
+    label = label ? `${label} + Frete grátis` : "Frete grátis";
+  }
+
+  return label || "-";
 }
 
 function statusLabel(coupon: Coupon) {
@@ -264,6 +274,9 @@ export default function AdminCupons() {
         campaign_name,
         source_channel,
         internal_notes,
+        discount_type,
+        free_shipping,
+        percent,
         marketing_partners (
           name,
           type
@@ -329,6 +342,7 @@ export default function AdminCupons() {
       campaign_name: coupon.campaign_name || "",
       source_channel: coupon.source_channel || "",
       internal_notes: coupon.internal_notes || "",
+      free_shipping: coupon.free_shipping,
     });
   }
 
@@ -443,6 +457,7 @@ export default function AdminCupons() {
       campaign_name: form.campaign_name.trim() || null,
       source_channel: form.source_channel || null,
       internal_notes: form.internal_notes.trim() || null,
+      free_shipping: form.free_shipping,
 
       updated_at: new Date().toISOString(),
     };
@@ -605,8 +620,23 @@ export default function AdminCupons() {
               >
                 <option value="percent">Percentual</option>
                 <option value="fixed">Valor fixo</option>
-                <option value="free_shipping">Frete grátis</option>
               </select>
+              <label className="flex items-center gap-3 rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] p-4">
+                <input
+                  type="checkbox"
+                  checked={form.free_shipping}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      free_shipping: event.target.checked,
+                    }))
+                  }
+                />
+
+                <span className="text-sm text-zinc-700">
+                  Aplicar frete grátis
+                </span>
+              </label>
             </label>
 
             {form.discount_type === "percent" ? (
