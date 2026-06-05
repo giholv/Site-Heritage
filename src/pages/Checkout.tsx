@@ -50,7 +50,8 @@ type ShippingOption = {
 type AppliedCoupon = {
   id: string;
   code: string;
-  discount_type: "percent" | "fixed" | "free_shipping";
+  discount_type: "percent" | "fixed";
+  free_shipping?: boolean;
   percent: number | null;
   amount_cents: number | null;
   max_discount_cents: number | null;
@@ -98,27 +99,36 @@ function calculateCouponDiscountCents(params: {
 
   if (!coupon) return 0;
 
+  let discount = 0;
+
   if (coupon.discount_type === "percent") {
-    let discount = Math.round(
+    discount = Math.round(
       subtotalCents * (Number(coupon.percent || 0) / 100)
     );
 
     if (coupon.max_discount_cents) {
-      discount = Math.min(discount, Number(coupon.max_discount_cents));
+      discount = Math.min(
+        discount,
+        Number(coupon.max_discount_cents)
+      );
     }
-
-    return Math.min(discount, subtotalCents);
   }
 
   if (coupon.discount_type === "fixed") {
-    return Math.min(Number(coupon.amount_cents || 0), subtotalCents);
+    discount = Math.min(
+      Number(coupon.amount_cents || 0),
+      subtotalCents
+    );
   }
 
-  if (coupon.discount_type === "free_shipping") {
-    return Math.max(shippingCents, 0);
+  if (coupon.free_shipping) {
+    discount += shippingCents;
   }
 
-  return 0;
+  return Math.min(
+    discount,
+    subtotalCents + shippingCents
+  );
 }
 
 function Step({
@@ -216,7 +226,7 @@ export default function Checkout() {
   }, [appliedCoupon, subtotalCents, originalShippingCents]);
 
   const effectiveDiscountCents =
-    hasAutomaticFreeShipping && appliedCoupon?.discount_type === "free_shipping"
+    hasAutomaticFreeShipping && appliedCoupon?.free_shipping
       ? 0
       : discountCents;
 
@@ -246,7 +256,7 @@ export default function Checkout() {
     setSelectedShipping(null);
     setShippingError(null);
 
-    if (appliedCoupon?.discount_type === "free_shipping") {
+   if (appliedCoupon?.free_shipping) {
       setCouponSuccess(null);
       setCouponError("Recalcule o frete e reaplique o cupom de frete grátis.");
       setAppliedCoupon(null);
@@ -294,6 +304,7 @@ export default function Checkout() {
           code,
           active,
           discount_type,
+          free_shipping,
           percent,
           amount_cents,
           max_discount_cents,
@@ -346,7 +357,7 @@ export default function Checkout() {
         return;
       }
 
-      if (coupon.discount_type === "free_shipping" && !selectedShipping) {
+      if (coupon.free_shipping && !selectedShipping) {
         setAppliedCoupon(null);
         setCouponError("Selecione o frete antes de aplicar este cupom.");
         return;
@@ -359,6 +370,7 @@ export default function Checkout() {
         percent: coupon.percent === null ? null : Number(coupon.percent),
         amount_cents:
           coupon.amount_cents === null ? null : Number(coupon.amount_cents),
+          free_shipping: Boolean(coupon.free_shipping),
         max_discount_cents:
           coupon.max_discount_cents === null
             ? null
@@ -375,7 +387,7 @@ export default function Checkout() {
 
       if (
         nextDiscountCents <= 0 &&
-        normalizedCoupon.discount_type !== "free_shipping"
+        !normalizedCoupon.free_shipping
       ) {
         setAppliedCoupon(null);
         setCouponError("Este cupom não gerou desconto para este pedido.");
@@ -526,7 +538,7 @@ export default function Checkout() {
     setShippingOptions([]);
     setSelectedShipping(null);
 
-    if (appliedCoupon?.discount_type === "free_shipping") {
+   if (appliedCoupon?.free_shipping) {
       setAppliedCoupon(null);
       setCouponSuccess(null);
       setCouponError("Reaplique o cupom após recalcular o frete.");

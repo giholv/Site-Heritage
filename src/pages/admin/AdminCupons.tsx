@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
-type DiscountType = "percent" | "fixed" | "free_shipping";
+type DiscountType = "percent" | "fixed";
 
 type MarketingPartner = {
   id: string;
@@ -274,9 +274,7 @@ export default function AdminCupons() {
         campaign_name,
         source_channel,
         internal_notes,
-        discount_type,
         free_shipping,
-        percent,
         marketing_partners (
           name,
           type
@@ -408,7 +406,7 @@ export default function AdminCupons() {
     if (form.discount_type === "percent") {
       const percent = Number(form.percent.replace(",", "."));
 
-      if (!percent || percent <= 0 || percent > 100) {
+     if (percent < 0 || percent > 100 || Number.isNaN(percent)) {
         alert("Informe um percentual entre 1 e 100.");
         return;
       }
@@ -621,22 +619,6 @@ export default function AdminCupons() {
                 <option value="percent">Percentual</option>
                 <option value="fixed">Valor fixo</option>
               </select>
-              <label className="flex items-center gap-3 rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] p-4">
-                <input
-                  type="checkbox"
-                  checked={form.free_shipping}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      free_shipping: event.target.checked,
-                    }))
-                  }
-                />
-
-                <span className="text-sm text-zinc-700">
-                  Aplicar frete grátis
-                </span>
-              </label>
             </label>
 
             {form.discount_type === "percent" ? (
@@ -644,6 +626,7 @@ export default function AdminCupons() {
                 <span className="text-sm font-medium text-zinc-700">
                   Percentual *
                 </span>
+
                 <input
                   value={form.percent}
                   onChange={(event) =>
@@ -657,6 +640,24 @@ export default function AdminCupons() {
                 />
               </label>
             ) : null}
+
+            <label className="flex items-center gap-3 rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] p-4">
+              <input
+                type="checkbox"
+                checked={form.free_shipping}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    free_shipping: event.target.checked,
+                  }))
+                }
+              />
+
+              <span className="text-sm text-zinc-700">
+                Aplicar frete grátis
+              </span>
+            </label>
+
 
             {form.discount_type === "fixed" ? (
               <label className="space-y-1">
