@@ -568,16 +568,21 @@ export default function Checkout() {
     try {
       const totalWeight = Math.max(
         0.03,
-        items.reduce((acc, item) => acc + 0.03 * (item.qty ?? 1), 0)
+        items.reduce((acc, item) => acc + 0.03 * Number(item.qty ?? 1), 0)
       );
 
       const payload = {
         to_postcode: cleanCep,
         insurance_value: Number(subtotal.toFixed(2)),
-        weight: Number(totalWeight.toFixed(2)),
+
+        // Caixa padrão Caléa
+        weight: Number(totalWeight.toFixed(3)),
+        height: 8,
+        width: 12,
+        length: 16,
+
         services: "1,2,17,3",
       };
-
       const res = await fetch("/.netlify/functions/shipping-quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

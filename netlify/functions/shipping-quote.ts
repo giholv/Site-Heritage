@@ -51,42 +51,42 @@ export default async (req: Request) => {
       to_postcode?: string;
       insurance_value?: number | string;
       weight?: number | string;
+      height?: number | string;
+      width?: number | string;
+      length?: number | string;
       services?: string;
     };
 
-    const to_postcode = onlyDigits(body.to_postcode ?? "");
+    const toPostcode = onlyDigits(body.to_postcode ?? "");
 
-    if (to_postcode.length !== 8) {
+    if (toPostcode.length !== 8) {
       return json({ error: "CEP inválido" }, 400);
     }
 
-    const insurance_value = toNumber(body.insurance_value ?? 0, 0);
+    const insuranceValue = toNumber(body.insurance_value ?? 0, 0);
 
-    /**
-     * Mantive compatível com seu frontend atual:
-     * - to_postcode
-     * - insurance_value
-     * - weight
-     *
-     * Caixa padrão da Caléa:
-     * 16 x 12 x 8 cm
-     */
-    const weight = Math.max(
-      0.001,
-      toNumber(body.weight ?? 0.03, 0.03)
-    );
+    // Caixa padrão Caléa
+    const weight = Math.max(0.03, toNumber(body.weight ?? 0.03, 0.03));
+    const height = Math.ceil(Math.max(1, toNumber(body.height ?? 8, 8)));
+    const width = Math.ceil(Math.max(1, toNumber(body.width ?? 12, 12)));
+    const length = Math.ceil(Math.max(1, toNumber(body.length ?? 16, 16)));
 
+    const services =
+      body.services === null || body.services === undefined
+        ? ""
+        : String(body.services).trim();
+        
     const frenetPayload = {
       SellerCEP: fromCep,
-      RecipientCEP: to_postcode,
-      ShipmentInvoiceValue: insurance_value,
-      ShippingServiceCode: null,
+      RecipientCEP: toPostcode,
+      ShipmentInvoiceValue: insuranceValue,
+      ShippingServiceCode: services || null,
       RecipientCountry: "BR",
       ShippingItemArray: [
         {
-          Height: 8,
-          Length: 16,
-          Width: 12,
+          Height: height,
+          Length: length,
+          Width: width,
           Weight: weight,
           Quantity: 1,
           SKU: "CALEA-PACKAGE",
@@ -94,6 +94,8 @@ export default async (req: Request) => {
         },
       ],
     };
+
+    console.log("FRENET PAYLOAD:", JSON.stringify(frenetPayload));
 
     const resp = await fetch("https://api.frenet.com.br/shipping/quote", {
       method: "POST",
@@ -115,11 +117,14 @@ export default async (req: Request) => {
       data = { raw: text };
     }
 
+    console.log("FRENET RESPONSE:", JSON.stringify(data));
+
     if (!resp.ok) {
       return json(
         {
           error: "Erro ao consultar Frenet",
           details: data,
+          sentPayload: frenetPayload,
         },
         resp.status
       );
@@ -135,10 +140,12 @@ export default async (req: Request) => {
       .filter((s: any) => s?.Error !== true)
       .map((s: any) => {
         const price = toNumber(s.ShippingPrice, 0);
-        const original_price = toNumber(
+
+        const originalPrice = toNumber(
           s.OriginalShippingPrice ?? s.ShippingPrice,
           NaN
         );
+
         const deliveryTime = toNumber(s.DeliveryTime, NaN);
 
         return {
@@ -148,8 +155,8 @@ export default async (req: Request) => {
           carrier_code: String(s.CarrierCode ?? ""),
           price,
           original_price:
-            Number.isFinite(original_price) && original_price > price
-              ? original_price
+            Number.isFinite(originalPrice) && originalPrice > price
+              ? originalPrice
               : undefined,
           deadline:
             Number.isFinite(deliveryTime) && deliveryTime > 0
@@ -169,8 +176,14 @@ export default async (req: Request) => {
     return json({
       options,
       raw: data,
+      sentPayload: frenetPayload,
     });
   } catch (err: any) {
-    return json({ error: err?.message ?? "Erro interno" }, 500);
+    return json(
+      {
+        error: err?.message ?? "Erro interno",
+      },
+      500
+    );
   }
 };

@@ -487,293 +487,82 @@ export default function CheckoutIdentificacao() {
     return e;
   }
 
-  async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
-    const now = new Date().toISOString();
+async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
+  const checkoutDraftRaw = sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
 
-    const cleanEmail = currentForm.email.trim().toLowerCase();
-    const cleanPhone = onlyDigits(currentForm.phone);
-    const cleanDocument = onlyDigits(currentForm.document);
-    const cleanCep = onlyDigits(currentForm.cep);
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const user = session?.user ?? null;
-
-    let customerId = sessionStorage.getItem(CUSTOMER_ID_KEY);
-    let addressId = sessionStorage.getItem(ADDRESS_ID_KEY);
-    let orderId = sessionStorage.getItem(ORDER_ID_KEY);
-    let orderNumber = sessionStorage.getItem("calea_order_number");
-
-    const customerPayload = {
-      user_id: user?.id ?? null,
-      email: cleanEmail,
-      full_name: currentForm.name.trim(),
-      phone: cleanPhone,
-      document: cleanDocument,
-      updated_at: now,
-    };
-
-    if (customerId) {
-      const { error } = await supabase
-        .from("customers")
-        .update(customerPayload)
-        .eq("id", customerId);
-
-      if (error) throw error;
-    } else {
-      let existingCustomerId: string | null = null;
-
-      if (user?.id) {
-        const { data, error } = await supabase
-          .from("customers")
-          .select("id")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (error) throw error;
-        existingCustomerId = data?.id ?? null;
-      } else {
-        const { data, error } = await supabase
-          .from("customers")
-          .select("id")
-          .eq("email", cleanEmail)
-          .eq("document", cleanDocument)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (error) throw error;
-        existingCustomerId = data?.id ?? null;
-      }
-
-      if (existingCustomerId) {
-        customerId = existingCustomerId;
-
-        const { error } = await supabase
-          .from("customers")
-          .update(customerPayload)
-          .eq("id", customerId);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("customers")
-          .insert({
-            ...customerPayload,
-            created_at: now,
-          })
-          .select("id")
-          .single();
-
-        if (error) throw error;
-        customerId = data.id;
-      }
-    }
-
-    if (!customerId) {
-      throw new Error("Não foi possível salvar o cliente.");
-    }
-
-    sessionStorage.setItem(CUSTOMER_ID_KEY, customerId);
-
-    const addressPayload = {
-      customer_id: customerId,
-      label: "Entrega",
-      recipient_name: currentForm.name.trim(),
-      phone: cleanPhone,
-      cep: cleanCep,
-      street: currentForm.street.trim(),
-      number: currentForm.number.trim(),
-      complement: currentForm.complement.trim() || null,
-      neighborhood: currentForm.neighborhood.trim() || null,
-      city: currentForm.city.trim(),
-      state: currentForm.state.trim().toUpperCase(),
-      country: "BR",
-      is_default: true,
-      updated_at: now,
-    };
-
-    if (addressId) {
-      const { error } = await supabase
-        .from("addresses")
-        .update(addressPayload)
-        .eq("id", addressId);
-
-      if (error) throw error;
-    } else {
-      const { data, error } = await supabase
-        .from("addresses")
-        .insert({
-          ...addressPayload,
-          created_at: now,
-        })
-        .select("id")
-        .single();
-
-      if (error) throw error;
-      addressId = data.id;
-    }
-
-    if (!addressId) {
-      throw new Error("Não foi possível salvar o endereço.");
-    }
-
-    sessionStorage.setItem(ADDRESS_ID_KEY, addressId);
-
-    const merchandiseSubtotalCents = cartItems.reduce((acc: number, it: any) => {
-      return acc + toCents(getItemPrice(it)) * getItemQty(it);
-    }, 0);
-
-    const shippingCents = toCents(shippingPrice);
-    const giftWrapCents = giftWrap ? toCents(giftWrapPrice) : 0;
-    const discountCents = Number(checkoutDraft?.discount_cents || 0);
-
-    const totalCents = Math.max(
-      merchandiseSubtotalCents + shippingCents + giftWrapCents - discountCents,
-      0
-    );
-
-    const couponCode =
-      checkoutDraft?.couponCode ||
-      checkoutDraft?.coupon?.code ||
-      null;
-
-    const selectedShipping = checkoutDraft?.shipping || null;
-
-    if (!selectedShipping?.id) {
-      throw new Error("Pedido sem serviço de frete escolhido.");
-    }
-    const orderPayload = {
-      customer_id: customerId,
-      shipping_address_id: addressId,
-      status: "draft",
-
-      subtotal_cents: merchandiseSubtotalCents,
-      shipping_cents: shippingCents,
-      gift_wrap_cents: giftWrapCents,
-      total_cents: totalCents,
-      coupon_code: couponCode,
-      discount_cents: discountCents,
-
-      carrier: selectedShipping.carrier || null,
-      shipping_service_code: selectedShipping.id || null,
-      shipping_service_description: selectedShipping.name || null,
-      shipping_delivery_time: selectedShipping.delivery_time || null,
-      shipping_quote_raw: selectedShipping.raw || selectedShipping,
-
-      updated_at: now,
-    };
-
-    if (orderId) {
-      const { error } = await supabase
-        .from("orders")
-        .update(orderPayload)
-        .eq("id", orderId);
-
-      if (error) throw error;
-
-      if (!orderNumber) {
-        const { data: existingOrder, error: orderNumberError } = await supabase
-          .from("orders")
-          .select("order_number")
-          .eq("id", orderId)
-          .limit(1)
-          .maybeSingle();
-
-        if (orderNumberError) throw orderNumberError;
-
-        if (existingOrder?.order_number) {
-          orderNumber = existingOrder.order_number;
-          sessionStorage.setItem("calea_order_number", existingOrder.order_number);
-        }
-      }
-    } else {
-      const { data, error } = await supabase
-        .from("orders")
-        .insert({
-          ...orderPayload,
-          created_at: now,
-        })
-        .select("id, order_number")
-        .single();
-
-      if (error) throw error;
-
-      orderId = data.id;
-
-      if (data.order_number) {
-        orderNumber = data.order_number;
-        sessionStorage.setItem("calea_order_number", data.order_number);
-      }
-    }
-
-    if (!orderId) {
-      throw new Error("Não foi possível criar o pedido.");
-    }
-
-    sessionStorage.setItem(ORDER_ID_KEY, orderId);
-
-    const { error: deleteItemsError } = await supabase
-      .from("order_items")
-      .delete()
-      .eq("order_id", orderId);
-
-    if (deleteItemsError) throw deleteItemsError;
-
-    const orderItemsPayload = cartItems
-      .map((it: any) => ({
-        order_id: orderId,
-        sku_id: getItemSkuId(it),
-        unit_price_cents: toCents(getItemPrice(it)),
-        quantity: getItemQty(it),
-      }))
-      .filter((item: any) => item.sku_id);
-
-    if (orderItemsPayload.length > 0) {
-      const { error: insertItemsError } = await supabase
-        .from("order_items")
-        .insert(orderItemsPayload);
-
-      if (insertItemsError) throw insertItemsError;
-    }
-
-    const identificationPayload = {
-      ...currentForm,
-      phone: cleanPhone,
-      document: cleanDocument,
-      cep: cleanCep,
-      customer_id: customerId,
-      address_id: addressId,
-      order_id: orderId,
-      order_number:
-        orderNumber || sessionStorage.getItem("calea_order_number") || null,
-
-      coupon_code: couponCode,
-      discount_cents: discountCents,
-      total_cents: totalCents,
-
-      shipping_service_code: selectedShipping.id || null,
-      shipping_service_description: selectedShipping.name || null,
-      shipping_delivery_time: selectedShipping.delivery_time || null,
-      carrier: selectedShipping.carrier || null,
-      shipping: selectedShipping,
-
-      updatedAt: now,
-    };
-
-    localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(currentForm));
-
-    sessionStorage.setItem(
-      CHECKOUT_IDENTIFICACAO_KEY,
-      JSON.stringify(identificationPayload)
-    );
-
-    return { customerId, addressId, orderId };
+  if (!checkoutDraftRaw) {
+    throw new Error("Dados do checkout não encontrados. Volte para a sacola e calcule o frete novamente.");
   }
+
+  const currentCheckoutDraft = JSON.parse(checkoutDraftRaw);
+
+  const response = await fetch("/.netlify/functions/save-checkout", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      form: currentForm,
+      items: cartItems,
+      checkoutDraft: currentCheckoutDraft,
+      customerId: sessionStorage.getItem(CUSTOMER_ID_KEY),
+      addressId: sessionStorage.getItem(ADDRESS_ID_KEY),
+      orderId: sessionStorage.getItem(ORDER_ID_KEY),
+      orderNumber: sessionStorage.getItem("calea_order_number"),
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || "Erro ao salvar checkout.");
+  }
+
+  sessionStorage.setItem(CUSTOMER_ID_KEY, data.customerId);
+  sessionStorage.setItem(ADDRESS_ID_KEY, data.addressId);
+  sessionStorage.setItem(ORDER_ID_KEY, data.orderId);
+
+  if (data.orderNumber) {
+    sessionStorage.setItem("calea_order_number", data.orderNumber);
+  }
+
+  const identificationPayload = {
+    ...currentForm,
+    phone: onlyDigits(currentForm.phone),
+    document: onlyDigits(currentForm.document),
+    cep: onlyDigits(currentForm.cep),
+
+    customer_id: data.customerId,
+    address_id: data.addressId,
+    order_id: data.orderId,
+    order_number: data.orderNumber || null,
+
+    coupon_code: data.couponCode || null,
+    discount_cents: data.discountCents || 0,
+    total_cents: data.totalCents || 0,
+
+    shipping_service_code: data.selectedShipping?.id || null,
+    shipping_service_description: data.selectedShipping?.name || null,
+    shipping_delivery_time: data.selectedShipping?.delivery_time || null,
+    carrier: data.selectedShipping?.carrier || null,
+    shipping: data.selectedShipping || null,
+
+    updatedAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(currentForm));
+
+  sessionStorage.setItem(
+    CHECKOUT_IDENTIFICACAO_KEY,
+    JSON.stringify(identificationPayload)
+  );
+
+  return {
+    customerId: data.customerId,
+    addressId: data.addressId,
+    orderId: data.orderId,
+  };
+}
 
   async function handleContinue() {
     const e = validate();
