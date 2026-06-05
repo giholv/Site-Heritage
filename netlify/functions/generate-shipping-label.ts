@@ -323,7 +323,7 @@ export default async (req: Request) => {
 
     const endpoint =
       process.env.FRENET_URL ||
-      "https://whitelabel.apifrenet.com.br/v1/shipments/oneclick";
+       "https://whitelabel.apifrenet.com.br/v1/orders/oneclick";
 
     const packageWeight = items.reduce((acc: number, item: any) => {
       const sku = Array.isArray(item.skus) ? item.skus[0] : item.skus;

@@ -793,10 +793,13 @@ export default function CheckoutIdentificacao() {
       console.error("Erro ao salvar checkout:", error);
 
       alert(
-        "Não foi possível continuar com o pedido. Confira os dados e tente novamente."
+        error?.message ||
+        error?.details ||
+        error?.hint ||
+        "Não foi possível continuar com o pedido."
       );
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
