@@ -283,23 +283,16 @@ const Header: React.FC<HeaderProps> = ({
                   >
                     <User className="h-6 w-6" strokeWidth={1.8} />
 
-                    <span className="text-[15px] font-medium">
-                      Minha conta
-                    </span>
-
-                    <ChevronDown className="h-4 w-4" />
+                    <User className="h-[21px] w-[21px]" strokeWidth={1.8} />
                   </button>
 
                   {accountMenuOpen && (
                     <div
                       className="
-        absolute right-0 top-[115%] z-50
-        w-[270px] overflow-hidden
-        rounded-[28px]
-        border border-[#ece3d7]
-        bg-white
-        shadow-[0_30px_80px_rgba(0,0,0,0.12)]
-      "
+  inline-flex h-10 w-10 items-center justify-center
+  rounded-full text-[#2b554e]
+  transition hover:text-[#b08d57] active:scale-95
+"
                     >
                       <button
                         onClick={() => {
