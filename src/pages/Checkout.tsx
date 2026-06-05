@@ -580,8 +580,6 @@ export default function Checkout() {
         height: 8,
         width: 12,
         length: 16,
-
-        services: "1,2,17,3",
       };
       const res = await fetch("/.netlify/functions/shipping-quote", {
         method: "POST",
