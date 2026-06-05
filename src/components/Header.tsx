@@ -276,23 +276,24 @@ const Header: React.FC<HeaderProps> = ({
                     type="button"
                     onClick={() => setAccountMenuOpen((v) => !v)}
                     className="
-      flex h-[52px] items-center gap-3 rounded-2xl
-      px-4 text-[#2b554e]
-      transition hover:bg-[#f7f2ea]
+      inline-flex h-10 w-10 items-center justify-center
+      rounded-full text-[#2b554e]
+      transition hover:text-[#b08d57] active:scale-95
     "
                   >
-                    <User className="h-6 w-6" strokeWidth={1.8} />
-
                     <User className="h-[21px] w-[21px]" strokeWidth={1.8} />
                   </button>
 
                   {accountMenuOpen && (
                     <div
                       className="
-  inline-flex h-10 w-10 items-center justify-center
-  rounded-full text-[#2b554e]
-  transition hover:text-[#b08d57] active:scale-95
-"
+        absolute right-0 top-[120%] z-50
+        w-[240px] overflow-hidden
+        rounded-[24px]
+        border border-[#ece3d7]
+        bg-white
+        shadow-[0_30px_80px_rgba(0,0,0,0.12)]
+      "
                     >
                       <button
                         onClick={() => {
@@ -301,8 +302,8 @@ const Header: React.FC<HeaderProps> = ({
                         }}
                         className="
           flex w-full items-center gap-3
-          px-6 py-5 text-left
-          text-[15px] text-[#2b554e]
+          px-5 py-4 text-left
+          text-[14px] text-[#2b554e]
           transition hover:bg-[#fcfaf6]
         "
                       >
@@ -315,13 +316,13 @@ const Header: React.FC<HeaderProps> = ({
                         target="_blank"
                         className="
           flex items-center gap-3
-          px-6 py-5
-          text-[15px] text-[#2b554e]
+          px-5 py-4
+          text-[14px] text-[#2b554e]
           transition hover:bg-[#fcfaf6]
         "
                       >
                         <MessageCircle className="h-5 w-5" />
-                        Suporte no WhatsApp
+                        Suporte
                       </a>
 
                       {isLoggedIn && (
@@ -332,12 +333,12 @@ const Header: React.FC<HeaderProps> = ({
                             window.location.href = "/login";
                           }}
                           className="
-      flex w-full items-center gap-3
-      border-t border-[#f1ebe3]
-      px-6 py-5 text-left
-      text-[15px] text-[#a35a5a]
-      transition hover:bg-[#fcfaf6]
-    "
+            flex w-full items-center gap-3
+            border-t border-[#f1ebe3]
+            px-5 py-4 text-left
+            text-[14px] text-[#a35a5a]
+            transition hover:bg-[#fcfaf6]
+          "
                         >
                           <LogOut className="h-5 w-5" />
                           Sair
@@ -346,6 +347,7 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                   )}
                 </div>
+
               </div>
             </div>
           </div>
