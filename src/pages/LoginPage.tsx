@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { ArrowLeft } from "lucide-react";
 
 type FormState = {
   email: string;
@@ -198,7 +199,21 @@ export default function LoginPage() {
                 Caléa Blanc
               </p>
             </div>
-
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="
+    mb-6 inline-flex items-center gap-2
+    rounded-full border border-[#e7ded2]
+    bg-white px-5 py-3
+    text-sm font-medium text-[#2b554e]
+    shadow-sm
+    transition hover:bg-[#fcfaf6]
+  "
+            >
+              <ArrowLeft size={16} />
+              Voltar à loja
+            </button>
             <div className="mb-8">
               <h2 className="text-3xl font-semibold">Entrar</h2>
               <p className="mt-2 text-sm leading-6 text-[#2b554e]/70">
@@ -232,8 +247,8 @@ export default function LoginPage() {
                     inputMode="email"
                     aria-invalid={!!shouldShowError("email")}
                     className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 text-sm outline-none transition placeholder:text-[#2b554e]/35 ${shouldShowError("email")
-                        ? "border border-red-400 focus:ring-4 focus:ring-red-100"
-                        : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
+                      ? "border border-red-400 focus:ring-4 focus:ring-red-100"
+                      : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
                       }`}
                   />
                   {shouldShowError("email") && (
@@ -261,8 +276,8 @@ export default function LoginPage() {
                       autoComplete="current-password"
                       aria-invalid={!!shouldShowError("password")}
                       className={`h-12 w-full rounded-2xl bg-[#FCFAF6] px-4 pr-24 text-sm outline-none transition placeholder:text-[#2b554e]/35 ${shouldShowError("password")
-                          ? "border border-red-400 focus:ring-4 focus:ring-red-100"
-                          : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
+                        ? "border border-red-400 focus:ring-4 focus:ring-red-100"
+                        : "border border-[#2b554e]/12 focus:border-[#b08d57] focus:ring-4 focus:ring-[#b08d57]/10"
                         }`}
                     />
 

@@ -65,12 +65,25 @@ export type ShippingOption = {
   raw?: any;
 };
 
-function resolveImageUrl(path: string) {
+function resolveImageUrl(path: string, width = 1400) {
   if (!path) return FALLBACK_IMAGE;
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
 
   const cleanedPath = path.replace(/^\/+/, "");
-  const { data } = supabase.storage.from(SKU_IMAGES_BUCKET).getPublicUrl(cleanedPath);
+
+  const { data } = supabase.storage
+    .from(SKU_IMAGES_BUCKET)
+    .getPublicUrl(cleanedPath, {
+      transform: {
+        width,
+        quality: 90,
+        resize: "contain",
+      },
+    });
+
   return data.publicUrl || FALLBACK_IMAGE;
 }
 
@@ -179,7 +192,8 @@ export default function ProductPage() {
         if (skuIds.length > 0) {
           const { data: availabilityData, error: availabilityError } = await supabase
             .from("sku_availability")
-            .select("*");
+            .select("sku_id, available_qty")
+            .in("sku_id", skuIds);
 
           if (availabilityError) throw availabilityError;
 
@@ -256,7 +270,7 @@ export default function ProductPage() {
       const normalizedImages: ProductImage[] = ((data ?? []) as SkuImageRow[])
         .map((img, index) => ({
           id: String(img.id ?? `img-${index}`),
-          src: resolveImageUrl(String(img.path ?? "")),
+          src: resolveImageUrl(String(img.path ?? ""), 1400),
           alt: String(img.alt ?? product.name ?? "Produto"),
         }))
         .filter((img) => img.src);

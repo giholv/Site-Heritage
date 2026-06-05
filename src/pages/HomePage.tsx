@@ -1,12 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import Header from "../components/Header";
 import Hero from "../components/Hero";
-import EncontreSuaJoia from "../components/findyourjewelry";
-import About from "../components/About";
-import Faq from "../components/FAQ";
-import Contact from "../components/Contact";
 import Footer from "../components/Footer";
-import Semijoias from "../components/Semijoias";
+
+const EncontreSuaJoia = lazy(() => import("../components/findyourjewelry"));
+const Semijoias = lazy(() => import("../components/Semijoias"));
+const About = lazy(() => import("../components/About"));
+const Faq = lazy(() => import("../components/FAQ"));
+const Contact = lazy(() => import("../components/Contact"));
+
+function SectionLoading() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-10">
+      <div className="h-32 animate-pulse rounded-3xl bg-[#eee7dc]" />
+    </div>
+  );
+}
 
 export default function HomePage() {
   useEffect(() => {
@@ -16,14 +25,19 @@ export default function HomePage() {
   return (
     <div className="antialiased">
       <Header />
+
       <main className="pt-[160px] md:pt-[180px]">
         <Hero />
-        <EncontreSuaJoia />
-        <Semijoias />
-        <About />
-        <Faq />
-        <Contact />
+
+        <Suspense fallback={<SectionLoading />}>
+          <EncontreSuaJoia />
+          <Semijoias />
+          <About />
+          <Faq />
+          <Contact />
+        </Suspense>
       </main>
+
       <Footer />
     </div>
   );

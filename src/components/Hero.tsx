@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type Banner = { src: string; alt: string };
@@ -22,13 +22,15 @@ const Hero: React.FC = () => {
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    (async () => {
+    let active = true;
+
+    async function loadBanners() {
       const { data, error } = await supabase.storage.from(BUCKET).list(FOLDER, {
-        limit: 100,
+        limit: 10,
         sortBy: { column: "name", order: "asc" },
       });
 
-      if (error || !data?.length) return;
+      if (error || !data?.length || !active) return;
 
       const mapped = data
         .filter((file) => /\.(png|jpg|jpeg|webp|avif)$/i.test(file.name))
@@ -37,10 +39,14 @@ const Hero: React.FC = () => {
           alt: file.name,
         }));
 
-      if (mapped.length) {
-        setBanners(mapped);
-      }
-    })();
+      if (mapped.length && active) setBanners(mapped);
+    }
+
+    loadBanners();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -52,10 +58,24 @@ const Hero: React.FC = () => {
 
     const id = window.setInterval(() => {
       setIdx((v) => (v + 1) % banners.length);
-    }, 3200);
+    }, 4000);
 
     return () => window.clearInterval(id);
   }, [banners.length]);
+
+  const currentBanner = banners[idx];
+
+  const nextBanner = useMemo(() => {
+    if (banners.length <= 1) return null;
+    return banners[(idx + 1) % banners.length];
+  }, [banners, idx]);
+
+  useEffect(() => {
+    if (!nextBanner?.src) return;
+
+    const img = new Image();
+    img.src = nextBanner.src;
+  }, [nextBanner]);
 
   const prev = () => {
     setIdx((v) => (v - 1 + banners.length) % banners.length);
@@ -66,30 +86,24 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section
-
-      id="home"
-      className="bg-[#FCFAF6] pt-3 md:pt-6"
-    >
-
+    <section id="home" className="bg-[#FCFAF6] pt-3 md:pt-6">
       <div className="container mx-auto px-4 md:px-6">
         <div className="relative overflow-hidden rounded-2xl">
           <div className="relative h-[420px] md:h-[560px]">
-            {banners.map((b, i) => (
-              <img
-                key={`${b.src}-${i}`}
-                src={b.src}
-                alt={b.alt}
-                className={[
-                  "absolute inset-0 block h-full w-full object-cover rounded-2xl transition-opacity duration-700",
-                  i === idx ? "opacity-100" : "opacity-0",
-                ].join(" ")}
-                style={{
-                  objectPosition: i === 0 ? "50% 35%" : "50% 30%",
-                }}
-                loading={i === 0 ? "eager" : "lazy"}
-              />
-            ))}
+            <img
+              key={currentBanner.src}
+              src={currentBanner.src}
+              alt={currentBanner.alt}
+              className="block h-full w-full rounded-2xl object-cover"
+              style={{
+                objectPosition: idx === 0 ? "50% 35%" : "50% 30%",
+              }}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              width={1600}
+              height={700}
+            />
           </div>
 
           {banners.length > 1 && (

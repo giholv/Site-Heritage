@@ -404,9 +404,9 @@ export default function ProductHero({
                                 </p>
 
                                 <p className="mt-1 text-xs text-[#697671]">
-                                  {option.carrier ? `${option.carrier} • ` : ""}
-                                  {option.deadline || "Prazo indisponível"}
-                                </p>
+  {option.carrier ? `${option.carrier} • ` : ""}
+  {option.deadline || "Prazo indisponível"}
+</p>
                               </div>
 
                               <div className="text-right">

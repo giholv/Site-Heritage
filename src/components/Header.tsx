@@ -1,8 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { Menu, X, Search, ShoppingBag, User } from "lucide-react";
+import {
+  Menu,
+  X,
+  Search,
+  ShoppingBag,
+  User,
+  ChevronDown,
+  Home,
+  MessageCircle,
+  LogOut,
+} from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import CartDrawer from "./CartDrawer";
 import { useCart } from "../context/CartContext";
+import { supabase } from "../lib/supabase";
 
 type HeaderProps = {
   searchValue?: string;
@@ -21,6 +32,9 @@ const Header: React.FC<HeaderProps> = ({
   const [cartOpen, setCartOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [qLocal, setQLocal] = useState("");
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const q = searchValue ?? qLocal;
 
@@ -155,6 +169,23 @@ const Header: React.FC<HeaderProps> = ({
     };
   }, [isOpen]);
 
+
+  useEffect(() => {
+    async function checkUser() {
+      const { data } = await supabase.auth.getUser();
+      setIsLoggedIn(!!data.user);
+    }
+
+    checkUser();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session?.user);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
   return (
     <>
       <header
@@ -213,7 +244,7 @@ const Header: React.FC<HeaderProps> = ({
                   type="button"
                   onClick={() => {
                     setIsOpen(false);
-                    navigate("/");
+                    navigate("/login");
                   }}
                   className="inline-flex items-center justify-center"
                   aria-label="Ir para Home"
@@ -240,32 +271,88 @@ const Header: React.FC<HeaderProps> = ({
                   <Search className="h-[21px] w-[21px]" strokeWidth={1.8} />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={onLogin}
-                  aria-label="Login"
-                  className="
-                    inline-flex h-10 w-10 items-center justify-center
-                    rounded-full text-[#2b554e]
-                    transition hover:text-[#b08d57] active:scale-95
-                  "
-                >
-                  <User className="h-[21px] w-[21px]" strokeWidth={1.8} />
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAccountMenuOpen((v) => !v)}
+                    className="
+      flex h-[52px] items-center gap-3 rounded-2xl
+      px-4 text-[#2b554e]
+      transition hover:bg-[#f7f2ea]
+    "
+                  >
+                    <User className="h-6 w-6" strokeWidth={1.8} />
 
-                <button
-                  type="button"
-                  onClick={openCart}
-                  aria-label="Carrinho"
-                  className="
-                    relative inline-flex h-10 w-10 items-center justify-center
-                    rounded-full text-[#2b554e]
-                    transition hover:text-[#b08d57] active:scale-95
-                  "
-                >
-                  <ShoppingBag className="h-[21px] w-[21px]" strokeWidth={1.8} />
-                  {badge(count, true)}
-                </button>
+                    <span className="text-[15px] font-medium">
+                      Minha conta
+                    </span>
+
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+
+                  {accountMenuOpen && (
+                    <div
+                      className="
+        absolute right-0 top-[115%] z-50
+        w-[270px] overflow-hidden
+        rounded-[28px]
+        border border-[#ece3d7]
+        bg-white
+        shadow-[0_30px_80px_rgba(0,0,0,0.12)]
+      "
+                    >
+                      <button
+                        onClick={() => {
+                          navigate(isLoggedIn ? "/conta" : "/login");
+                          setAccountMenuOpen(false);
+                        }}
+                        className="
+          flex w-full items-center gap-3
+          px-6 py-5 text-left
+          text-[15px] text-[#2b554e]
+          transition hover:bg-[#fcfaf6]
+        "
+                      >
+                        <Home className="h-5 w-5" />
+                        Minha conta
+                      </button>
+
+                      <a
+                        href="https://wa.me/5511999999999"
+                        target="_blank"
+                        className="
+          flex items-center gap-3
+          px-6 py-5
+          text-[15px] text-[#2b554e]
+          transition hover:bg-[#fcfaf6]
+        "
+                      >
+                        <MessageCircle className="h-5 w-5" />
+                        Suporte no WhatsApp
+                      </a>
+
+                      {isLoggedIn && (
+                        <button
+                          onClick={async () => {
+                            await supabase.auth.signOut();
+                            setAccountMenuOpen(false);
+                            window.location.href = "/login";
+                          }}
+                          className="
+      flex w-full items-center gap-3
+      border-t border-[#f1ebe3]
+      px-6 py-5 text-left
+      text-[15px] text-[#a35a5a]
+      transition hover:bg-[#fcfaf6]
+    "
+                        >
+                          <LogOut className="h-5 w-5" />
+                          Sair
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -492,27 +579,98 @@ const Header: React.FC<HeaderProps> = ({
                   </form>
                 </div>
 
-                <div className="flex items-center justify-end gap-4">
-                  <button
-                    type="button"
-                    onClick={onLogin}
-                    aria-label="Login"
-                    className="
-                      inline-flex h-12 w-12 items-center justify-center
-                      text-[#2b554e] transition-colors hover:text-[#b08d57]
-                    "
-                  >
-                    <User className="h-7 w-7" strokeWidth={1.8} />
-                  </button>
+                <div className="relative flex items-center justify-end gap-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setAccountMenuOpen((v) => !v)}
+                      className="
+        flex h-[52px] items-center gap-3 rounded-2xl
+        px-4 text-[#2b554e]
+        transition hover:bg-[#f7f2ea]
+      "
+                    >
+                      <User className="h-6 w-6" strokeWidth={1.8} />
 
+                      <span className="text-[15px] font-medium">
+                        Minha conta
+                      </span>
+
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+
+                    {accountMenuOpen && (
+                      <div
+                        className="
+      absolute right-0 top-[115%] z-50
+      w-[270px] overflow-hidden
+      rounded-[28px]
+      border border-[#ece3d7]
+      bg-white
+      shadow-[0_30px_80px_rgba(0,0,0,0.12)]
+    "
+                      >
+                        <button
+                          onClick={() => {
+                            navigate(isLoggedIn ? "/conta" : "/login");
+                            setAccountMenuOpen(false);
+                          }}
+                          className="
+        flex w-full items-center gap-3
+        px-6 py-5 text-left
+        text-[15px] text-[#2b554e]
+        transition hover:bg-[#fcfaf6]
+      "
+                        >
+                          <Home className="h-5 w-5" />
+                          Minha conta
+                        </button>
+
+                        <a
+                          href="https://wa.me/5511999999999"
+                          target="_blank"
+                          className="
+        flex items-center gap-3
+        px-6 py-5
+        text-[15px] text-[#2b554e]
+        transition hover:bg-[#fcfaf6]
+      "
+                        >
+                          <MessageCircle className="h-5 w-5" />
+                          Suporte no WhatsApp
+                        </a>
+
+                        {isLoggedIn && (
+                          <button
+                            onClick={async () => {
+                              await supabase.auth.signOut();
+                              setAccountMenuOpen(false);
+                              window.location.href = "/login";
+                            }}
+                            className="
+          flex w-full items-center gap-3
+          border-t border-[#f1ebe3]
+          px-6 py-5 text-left
+          text-[15px] text-[#a35a5a]
+          transition hover:bg-[#fcfaf6]
+        "
+                          >
+                            <LogOut className="h-5 w-5" />
+                            Sair
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={openCart}
                     aria-label="Carrinho"
                     className="
-                      relative inline-flex h-12 w-12 items-center justify-center
-                      text-[#2b554e] transition-colors hover:text-[#b08d57]
-                    "
+      relative inline-flex h-12 w-12 items-center justify-center
+      rounded-2xl text-[#2b554e]
+      transition hover:bg-[#f7f2ea]
+    "
                   >
                     <ShoppingBag className="h-7 w-7" strokeWidth={1.8} />
                     {badge(count)}
