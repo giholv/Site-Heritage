@@ -107,9 +107,6 @@ const Header: React.FC<HeaderProps> = ({
     navigate(`/joias?q=${encodeURIComponent(term)}`);
   };
 
-  const onLogin = () => {
-    navigate("/login");
-  };
 
   const openCart = () => {
     setIsOpen(false);
@@ -244,7 +241,7 @@ const Header: React.FC<HeaderProps> = ({
                   type="button"
                   onClick={() => {
                     setIsOpen(false);
-                    navigate("/login");
+                    navigate("/");
                   }}
                   className="inline-flex items-center justify-center"
                   aria-label="Ir para Home"
@@ -252,7 +249,7 @@ const Header: React.FC<HeaderProps> = ({
                   <img
                     src="/logo_fundo_escuro_mobile.png"
                     alt="Logo da loja"
-                    className="h-8 w-auto object-contain sm:h-10 md:h-12"
+                    className="h-7 w-auto object-contain sm:h-10 md:h-10"
                   />
                 </button>
               </div>
@@ -284,8 +281,10 @@ const Header: React.FC<HeaderProps> = ({
                     <User className="h-[21px] w-[21px]" strokeWidth={1.8} />
                   </button>
 
+
                   {accountMenuOpen && (
                     <div
+
                       className="
         absolute right-0 top-[120%] z-50
         w-[240px] overflow-hidden
@@ -347,7 +346,19 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                   )}
                 </div>
-
+                <button
+                  type="button"
+                  onClick={openCart}
+                  aria-label="Carrinho"
+                  className="
+    relative inline-flex h-10 w-10 items-center justify-center
+    rounded-full text-[#2b554e]
+    transition hover:text-[#b08d57] active:scale-95
+  "
+                >
+                  <ShoppingBag className="h-[21px] w-[21px]" strokeWidth={1.8} />
+                  {badge(count, true)}
+                </button>
               </div>
             </div>
           </div>
@@ -364,124 +375,108 @@ const Header: React.FC<HeaderProps> = ({
               aria-label="Fechar menu"
               onClick={() => setIsOpen(false)}
               className={[
-                "absolute inset-0 bg-black/30 transition-opacity",
+                "absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity",
                 isOpen ? "opacity-100" : "opacity-0",
               ].join(" ")}
             />
 
             <div
               className={[
-                "absolute right-0 top-0 h-full w-[88%] max-w-[380px]",
-                "bg-[#2b554e] text-[#f3f0e0] shadow-2xl",
+                "absolute right-0 top-0 h-full w-[86%] max-w-[360px]",
+                "bg-[#fcfaf6] text-[#2b554e] shadow-2xl",
                 "transition-transform duration-300",
                 isOpen ? "translate-x-0" : "translate-x-full",
               ].join(" ")}
             >
-              <div className="flex items-center justify-between px-6 pt-6">
-                <span className="text-sm tracking-[0.18em] opacity-90">
-                  MENU
-                </span>
+              <div className="border-b border-[#e9e2d6] px-6 py-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-[0.28em] text-[#b08d57]">
+                    Menu
+                  </span>
 
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  aria-label="Fechar"
-                  className="
-                    inline-flex h-12 w-12 items-center justify-center
-                    rounded-full text-[#f3f0e0]/80 hover:text-white
-                  "
-                >
-                  <X className="h-6 w-6" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsOpen(false)}
+                    aria-label="Fechar"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#2b554e] shadow-sm"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <p className="mt-4 text-sm leading-6 text-[#6f6558]">
+                  Navegue pela Caléa e encontre sua próxima joia.
+                </p>
               </div>
 
-              <div className="px-6 pt-8">
-                <form onSubmit={handleSearchSubmit} className="mb-8">
+              <div className="px-6 py-6">
+                <form onSubmit={handleSearchSubmit}>
                   <div className="relative">
                     <input
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
-                      placeholder="Buscar por nome ou código"
-                      className="
-                        h-12 w-full rounded-md border border-white/25
-                        bg-transparent pl-4 pr-12 text-[#f3f0e0]
-                        placeholder:text-[#f3f0e0]/60
-                        focus:outline-none focus:ring-2 focus:ring-[#b08d57]/50
-                      "
+                      placeholder="Buscar joias"
+                      className="h-12 w-full rounded-2xl border border-[#e9e2d6] bg-white pl-4 pr-12 text-sm text-[#2b554e] outline-none focus:border-[#b08d57] focus:ring-2 focus:ring-[#b08d57]/15"
                     />
 
                     <button
                       type="submit"
                       aria-label="Pesquisar"
-                      className="
-                        absolute right-3 top-1/2 -translate-y-1/2
-                        text-[#f3f0e0]/90 hover:text-white
-                      "
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#2b554e]"
                     >
-                      <Search className="h-6 w-6" />
+                      <Search className="h-5 w-5" />
                     </button>
                   </div>
                 </form>
 
-                <div className="flex flex-col gap-6">
+                <div className="mt-7 space-y-1">
                   {menuItems.map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => goSection(item.id)}
-                      className="
-                        text-left text-xl font-medium text-[#f3f0e0]
-                        hover:text-[#e7d3a8]
-                      "
+                      className="flex w-full items-center justify-between rounded-2xl px-4 py-4 text-left text-[15px] font-medium text-[#2b554e] transition hover:bg-white"
                     >
                       {item.label}
+                      <span className="text-[#b08d57]">›</span>
                     </button>
                   ))}
                 </div>
 
-                <div className="mt-8 grid grid-cols-2 gap-3">
+                <div className="mt-7 grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setIsOpen(false);
-                      onLogin();
+                      navigate(isLoggedIn ? "/conta" : "/login");
                     }}
-                    className="
-                      h-12 rounded-xl bg-white font-medium text-[#2b554e]
-                      transition active:scale-[0.98]
-                    "
+                    className="h-12 rounded-2xl bg-[#2b554e] text-sm font-semibold text-white"
                   >
-                    Entrar
+                    {isLoggedIn ? "Minha conta" : "Entrar"}
                   </button>
 
                   <button
                     type="button"
                     onClick={openCart}
-                    className="
-                      relative h-12 rounded-xl border border-white/30
-                      font-medium text-white transition active:scale-[0.98]
-                    "
+                    className="relative h-12 rounded-2xl border border-[#2b554e]/15 bg-white text-sm font-semibold text-[#2b554e]"
                   >
-                    Sacola
-
-                    {count > 0 && (
-                      <span
-                        className="
-                          absolute -right-2 -top-2
-                          flex h-[18px] min-w-[18px] items-center justify-center
-                          rounded-full bg-[#b08d57] px-1
-                          text-[10px] leading-none text-white
-                        "
-                      >
-                        {count > 99 ? "99+" : count}
-                      </span>
-                    )}
+                    Sacola {count > 0 ? `(${count})` : ""}
                   </button>
                 </div>
 
-                <p className="mt-6 text-xs text-white/60">
-                  Caléa • Elegância sem esforço.
-                </p>
+                {isLoggedIn && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      window.location.href = "/login";
+                    }}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm font-medium text-[#a35a5a]"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sair da conta
+                  </button>
+                )}
               </div>
             </div>
           </div>
