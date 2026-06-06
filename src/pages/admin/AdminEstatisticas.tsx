@@ -130,7 +130,7 @@ function formatDateBR(value: string) {
 }
 
 function shortOrderId(id: string) {
-  return `#${id.slice(0, 6)}`;
+  return id;
 }
 
 function initials(name: string) {
@@ -487,23 +487,23 @@ export default function AdminEstatisticas() {
         applyOrdersDateFilter(
           supabase
             .from("orders")
-            .select("id, total_cents, subtotal_cents, shipping_cents, discount_cents, created_at, status")
-            .eq("status", "paid")
+            .select("id, total_cents, subtotal_cents, shipping_cents, discount_cents, created_at, status,payment_status")
+            .eq("payment_status", "paid")
         ),
 
         supabase
           .from("orders")
           .select(
-            "id, customer_id, external_customer_name, created_at, total_cents, discount_cents, status"
+            "id, customer_id, external_customer_name, created_at, total_cents, discount_cents, status,payment_status"
           )
-          .order("created_at", { ascending: false })
-          .limit(5),
+          .order("created_at", { ascending: false }),
+          
 
         supabase
           .from("customers")
           .select("id, full_name, email")
           .order("created_at", { ascending: false })
-          .limit(3),
+      ,
 
         supabase.from("stock_movements").select("sku_id, type, quantity"),
       ]);
@@ -722,7 +722,7 @@ export default function AdminEstatisticas() {
     const topProducts = Array.from(qtyByProduct.entries())
       .map(([name, qty]) => ({ name, qty }))
       .sort((a, b) => b.qty - a.qty)
-      .slice(0, 3);
+  ;
 
     setBestSellers(topProducts);
   }
@@ -927,14 +927,13 @@ export default function AdminEstatisticas() {
   }, [weeklySales]);
 
   const topProfitProducts = useMemo(() => {
-    return profitProducts.slice(0, 5);
+    return profitProducts;
   }, [profitProducts]);
 
   const lowMarginProducts = useMemo(() => {
     return profitProducts
       .filter((item) => item.missing_cost || item.margin_percent < 40)
-      .sort((a, b) => a.margin_percent - b.margin_percent)
-      .slice(0, 5);
+      .sort((a, b) => a.margin_percent - b.margin_percent) ;
   }, [profitProducts]);
 
   return (
@@ -1347,7 +1346,7 @@ export default function AdminEstatisticas() {
 
             <div className="grid gap-6">
               <SectionCard title="Top Lucro" actionPath="/admin/produtos">
-                <div className="space-y-3">
+                <div className="max-h-[520px] space-y-3 overflow-y-auto pr-2">
                   {topProfitProducts.map((item, idx) => (
                     <div
                       key={item.product_id}
