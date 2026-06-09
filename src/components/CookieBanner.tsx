@@ -21,25 +21,42 @@ export default function CookieBanner() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-[9999] md:inset-x-auto md:right-6 md:bottom-6 md:max-w-md">
-      <div className="rounded-[24px] border border-[#2b554e]/10 bg-[#FCFAF6]/95 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-[#2b554e]">
-              Usamos cookies
-            </p>
-            <p className="mt-2 text-sm leading-relaxed text-[#2b554e]/75">
-              Utilizamos cookies para melhorar sua navegação, analisar acessos e
-              oferecer uma experiência mais fluida no site.
-            </p>
-          </div>
-        </div>
+    <div
+      className="
+        fixed left-3 right-3 bottom-3 z-[9999]
+        md:left-auto md:right-6 md:bottom-6 md:w-[400px]
+      "
+    >
+      <div
+        className="
+          rounded-[20px]
+          border border-[#2b554e]/10
+          bg-[#FCFAF6]/95
+          p-4
+          shadow-[0_10px_35px_rgba(0,0,0,0.14)]
+          backdrop-blur-xl
+          md:p-5
+        "
+      >
+        <p className="text-[13px] font-semibold text-[#2b554e] md:text-sm">
+          Usamos cookies
+        </p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <p className="mt-1.5 text-[12px] leading-relaxed text-[#2b554e]/70 md:text-sm">
+          Utilizamos cookies para melhorar sua experiência no site.
+        </p>
+
+        <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
             onClick={reject}
-            className="h-10 rounded-xl border border-[#2b554e]/15 px-4 text-sm font-medium text-[#2b554e] hover:bg-[#2b554e]/5 transition"
+            className="
+              h-9 flex-1 rounded-xl
+              border border-[#2b554e]/15
+              px-3 text-[12px] font-medium text-[#2b554e]
+              transition hover:bg-[#2b554e]/5
+              md:text-sm
+            "
           >
             Recusar
           </button>
@@ -47,18 +64,29 @@ export default function CookieBanner() {
           <button
             type="button"
             onClick={accept}
-            className="h-10 rounded-xl bg-[#2b554e] px-5 text-sm font-semibold text-[#FCFAF6] hover:bg-[#23463f] transition"
+            className="
+              h-9 flex-1 rounded-xl
+              bg-[#2b554e]
+              px-3 text-[12px] font-semibold text-[#FCFAF6]
+              transition hover:bg-[#23463f]
+              md:text-sm
+            "
           >
             Aceitar
           </button>
-
-          <a
-            href="/politica-de-privacidade"
-            className="text-sm font-medium text-[#b08d57] hover:underline underline-offset-4"
-          >
-            Política de Privacidade
-          </a>
         </div>
+
+        <a
+          href="/politica-de-privacidade"
+          className="
+            mt-2 block text-center
+            text-[11px] font-medium text-[#b08d57]
+            underline-offset-4 hover:underline
+            md:text-xs
+          "
+        >
+          Política de Privacidade
+        </a>
       </div>
     </div>
   );

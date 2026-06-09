@@ -86,10 +86,10 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section id="home" className="bg-[#FCFAF6] pt-3 md:pt-6">
+    <section id="home" className="bg-[#FCFAF6] -mt-6 md:mt-0">
       <div className="container mx-auto px-4 md:px-6">
         <div className="relative overflow-hidden rounded-2xl">
-          <div className="relative h-[420px] md:h-[560px]">
+          <div className="relative h-[400px] md:h-[560px]">
             <img
               key={currentBanner.src}
               src={currentBanner.src}
@@ -100,7 +100,6 @@ const Hero: React.FC = () => {
               }}
               loading="eager"
               decoding="async"
-              fetchPriority="high"
               width={1600}
               height={700}
             />

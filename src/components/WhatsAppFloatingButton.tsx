@@ -1,7 +1,17 @@
 import { buildWhatsAppLink } from "./whatsapp";
 
-export function WhatsAppFloatingButton({ orderCode }: { orderCode?: string }) {
+type WhatsAppFloatingButtonProps = {
+  orderCode?: string;
+  hidden?: boolean;
+};
+
+export function WhatsAppFloatingButton({
+  orderCode,
+  hidden = false,
+}: WhatsAppFloatingButtonProps) {
   const href = buildWhatsAppLink({ orderCode });
+
+  if (hidden) return null;
 
   return (
     <a

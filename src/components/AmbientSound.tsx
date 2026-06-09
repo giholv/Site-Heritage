@@ -12,13 +12,18 @@ const TRACKS = [
   },
 ];
 
-export default function AmbientSound() {
+type AmbientSoundProps = {
+  hidden?: boolean;
+};
+
+export default function AmbientSound({ hidden = false }: AmbientSoundProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [trackIndex, setTrackIndex] = useState(0);
 
   const currentTrack = TRACKS[trackIndex];
+  if (hidden) return null;
 
   async function playAudio() {
     const audio = audioRef.current;

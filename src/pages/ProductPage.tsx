@@ -17,7 +17,7 @@ const FALLBACK_IMAGE =
       <rect width="100%" height="100%" fill="#f3efe8"/>
       <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
         font-family="Arial, sans-serif" font-size="32" fill="#7c8884">
-        Imagem indisponível
+        Aguarde...
       </text>
     </svg>
   `);
@@ -467,8 +467,8 @@ export default function ProductPage() {
     <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
       <Header />
 
-      <main className="pt-[94px] pb-[150px] md:pt-[240px] md:pb-0">
-        <section className="mx-auto w-full max-w-[1440px] px-0 pb-16 md:px-6 lg:px-8">
+      <main className="pt-[90px] pb-[118px] md:pt-[240px] md:pb-0">
+        <section className="mx-auto w-full max-w-[1440px] px-0 pb-8 md:px-6 md:pb-16 lg:px-8">
           <div className="mb-4 hidden items-center gap-2 px-1 text-[12px] text-[#8b8175] md:flex">
             <button
               type="button"
@@ -486,7 +486,6 @@ export default function ProductPage() {
             name={product.name}
             description={product.description || ""}
             price={price}
-            installmentText="Consulte as opções disponíveis"
             variants={variants}
             selectedVariant={selectedSku?.id ?? ""}
             onSelectVariant={setSelectedSkuId}

@@ -3,11 +3,11 @@ import { Phone, MapPin, Instagram, ArrowRight, Clock3, ShieldCheck, RefreshCcw, 
 
 const Contact: React.FC = () => {
   return (
-    <section id="contact" className="py-20 bg-[#FCFAF6] scroll-mt-[140px]">
+    <section id="contact" className="pt-8 pb-12 md:pt-16 md:pb-20 bg-[#FCFAF6] scroll-mt-[140px]">
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 items-stretch">
           {/* BLOCO PRINCIPAL */}
-          <div className="bg-white rounded-[28px] border border-[#2b554e]/10 shadow-sm p-8 md:p-10 flex flex-col justify-between">
+          <div className="bg-white rounded-[24px] border border-[#2b554e]/10 shadow-sm p-5 md:p-10 flex flex-col justify-between">
             <div>
               <span className="inline-block text-xs tracking-[0.22em] uppercase text-[#b08d57] font-semibold mb-4">
                 Atendimento
@@ -18,8 +18,7 @@ const Contact: React.FC = () => {
               </h2>
 
               <p className="mt-4 text-base md:text-lg text-[#2b554e]/72 max-w-xl">
-                Dúvidas sobre banho, tamanhos, trocas ou envio? Nosso atendimento
-                é rápido e direto.
+                Dúvidas sobre banho, tamanhos, trocas ou envio? Entre em contato.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3">

@@ -97,7 +97,7 @@ export default function EncontreSuaJoia() {
   }, [cats.length]);
 
   return (
-    <section id="categorias" className="bg-[#FCFAF6] py-10">
+    <section id="categorias" className="bg-[#FCFAF6] pt-4 pb-8 md:pt-10 md:pb-12">
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -121,7 +121,7 @@ export default function EncontreSuaJoia() {
         </div>
 
         {/* CAROUSEL */}
-        <div className="relative mt-8">
+        <div className="relative mt-5 md:mt-8">
           {/* botão esquerda */}
           {canLeft && (
             <button
@@ -200,7 +200,7 @@ export default function EncontreSuaJoia() {
           </div>
         </div>
 
-        <div className="mt-8 md:hidden">
+        <div className="mt-5 md:hidden">
           <Link
             to="/joias"
             className="inline-flex w-full h-11 items-center justify-center rounded-2xl bg-[#2b554e] text-white text-sm font-semibold"

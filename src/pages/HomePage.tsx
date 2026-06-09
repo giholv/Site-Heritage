@@ -23,10 +23,10 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="antialiased">
+    <div className="min-h-screen bg-[#FCFAF6] antialiased">
       <Header />
 
-      <main className="pt-[160px] md:pt-[180px]">
+      <main className="pt-[120px] md:pt-[180px]">
         <Hero />
 
         <Suspense fallback={<SectionLoading />}>

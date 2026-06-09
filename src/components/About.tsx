@@ -32,7 +32,7 @@ export default function About() {
   ];
 
   return (
-    <section id="about" className="py-24 bg-[#FCFAF6] scroll-mt-[140px]">
+    <section id="about" className="pt-8 pb-16 md:pt-16 md:pb-24 bg-[#FCFAF6] scroll-mt-[140px]">
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-14 items-center">
           {/* TEXTO */}

@@ -92,7 +92,6 @@ export default function ProductHero({
   name,
   description,
   price,
-  installmentText = "em até 3x sem juros",
   variants = [],
   selectedVariant = "",
   onSelectVariant,
@@ -220,16 +219,16 @@ export default function ProductHero({
                   Caléa Blanc
                 </p>
 
-                <h1 className="mt-3 text-[34px] font-light leading-[1.03] tracking-[-0.045em] text-[#2b554e] md:text-[46px] lg:text-[52px]">
+                <h1 className="mt-2 text-[28px] font-light leading-[1.03] tracking-[-0.045em] text-[#2b554e] md:text-[46px] lg:text-[52px]">
                   {name}
                 </h1>
 
-                <div className="mt-5 border-b border-[#ece3d8] pb-6">
-                  <span className="text-[38px] font-semibold tracking-[-0.045em] text-[#2b554e] md:text-[48px]">
+                <div className="mt-3 border-b border-[#ece3d8] pb-4 md:mt-5 md:pb-6">
+                  <span className="text-[30px] font-semibold tracking-[-0.045em] text-[#2b554e] md:text-[48px]">
                     {formatBRL(price)}
                   </span>
                   <p className="mt-1 text-sm text-[#7b746b]">
-                    {installmentText}
+                   
                   </p>
                 </div>
 
@@ -271,7 +270,7 @@ export default function ProductHero({
                       Quantidade
                     </p>
 
-                    <div className="flex h-[56px] w-[150px] items-center justify-between rounded-full border border-[#ddd5ca] bg-white px-5">
+                <div className="flex h-[48px] w-[138px] items-center justify-between rounded-full border border-[#ddd5ca] bg-white px-4">
                       <button type="button" onClick={onDecreaseQuantity} className="text-[#2b554e]">
                         <Minus size={16} />
                       </button>
@@ -404,9 +403,9 @@ export default function ProductHero({
                                 </p>
 
                                 <p className="mt-1 text-xs text-[#697671]">
-  {option.carrier ? `${option.carrier} • ` : ""}
-  {option.deadline || "Prazo indisponível"}
-</p>
+                                  {option.carrier ? `${option.carrier} • ` : ""}
+                                  {option.deadline || "Prazo indisponível"}
+                                </p>
                               </div>
 
                               <div className="text-right">
@@ -434,8 +433,8 @@ export default function ProductHero({
         </div>
       </section>
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#e8dfd3] bg-[#fcfaf6]/92 px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-3 shadow-[0_-10px_30px_rgba(43,85,78,0.08)] backdrop-blur-xl lg:hidden">
-        <div className="mb-3 flex items-center justify-between">
+     <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#e8dfd3] bg-[#fcfaf6]/92 px-4 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 shadow-[0_-10px_30px_rgba(43,85,78,0.08)] backdrop-blur-xl lg:hidden">
+        <div className="mb-2 flex items-center justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-[#81786e]">
               Total
@@ -480,7 +479,7 @@ export default function ProductHero({
           onClick={isAvailable ? handleAddToCartClick : undefined}
           disabled={!isAvailable || showAddedMessage}
           className={[
-            "h-[56px] w-full rounded-full text-sm font-semibold uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-70",
+           "h-[48px] w-full rounded-full text-[13px] font-semibold uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-70",
             isAvailable
               ? "bg-[#2b554e] text-white shadow-[0_12px_28px_rgba(43,85,78,0.22)]"
               : "border border-[#2b554e] bg-white text-[#2b554e]",

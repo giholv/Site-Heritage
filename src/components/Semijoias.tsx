@@ -76,7 +76,7 @@ function Card({ peca, compact = false, onClick, onAdd, onDetails }: CardProps) {
       </div>
 
       {!compact && (
-        <div className="p-4 md:p-5">
+        <div className="p-2 md:p-5">
           <h3 className="text-[17px] md:text-lg font-semibold text-[#2b554e] leading-tight line-clamp-2">
             {peca.nome}
           </h3>
@@ -95,8 +95,7 @@ function Card({ peca, compact = false, onClick, onAdd, onDetails }: CardProps) {
             <button
               type="button"
               onClick={onAdd}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-3 md:px-4 py-2 text-sm font-semibold hover:opacity-95 transition"
-            >
+              className="inline-flex items-center gap-1 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-2.5 md:px-4 py-2 text-xs md:text-sm font-semibold hover:opacity-95 transition"            >
               <ShoppingBag className="h-4 w-4" />
               Adicionar
             </button>
@@ -218,7 +217,7 @@ export default function SemijoiasCarousel() {
   };
 
   return (
-    <section id="semijoias" className="py-14 md:py-16 bg-[#FCFAF6] scroll-mt-[140px]">
+    <section id="semijoias"  className="pt-6 pb-8 md:pt-14 md:pb-16 bg-[#FCFAF6] scroll-mt-[140px]">
       <div className="container mx-auto px-4 md:px-8 lg:px-10">
         <div className="text-center mb-8 md:mb-10">
           <h2 className="text-[30px] leading-tight md:text-4xl font-semibold text-[#2b554e]">
@@ -228,7 +227,7 @@ export default function SemijoiasCarousel() {
           <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mt-4 mb-4 rounded-full" />
 
           <p className="text-[#2b554e]/80 text-[15px] leading-relaxed md:text-lg max-w-[320px] md:max-w-none mx-auto">
-            Peças com banho premium — brilho marcante, acabamento impecável.
+            Peças com banho premium e acabamento impecável.
           </p>
 
           {err && <p className="mt-3 text-sm text-red-600">Erro: {err}</p>}
@@ -270,7 +269,7 @@ export default function SemijoiasCarousel() {
                 {pecas.map((peca, index) => (
                   <motion.div
                     key={`${peca.id}-${index}-mobile`}
-                    className="w-[74vw] max-w-[260px] snap-center shrink-0"
+                    className="w-[62vw] max-w-[220px] snap-center shrink-0"
                     initial={false}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.25 }}

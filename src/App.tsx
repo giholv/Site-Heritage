@@ -2,8 +2,6 @@ import { useEffect, lazy, Suspense } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 
 import CookieBanner from "./components/CookieBanner";
-import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
-import AmbientSound from "./components/AmbientSound";
 import { AdminGuard } from "./routes/AdminGuard";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -119,8 +117,8 @@ export default function App() {
         </Routes>
       </Suspense>
 
-      {!isAdmin && <WhatsAppFloatingButton />}
-      {!isAdmin && <AmbientSound />}
+    
+     
       {!isAdmin && <CookieBanner />}
     </>
   );

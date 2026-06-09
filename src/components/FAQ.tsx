@@ -74,9 +74,9 @@ const FAQ: React.FC = () => {
   };
 
   return (
-    <section id="faq" className="py-20 bg-[#FCFAF6] scroll-mt-[140px]">
+ <section id="faq" className="pt-8 pb-12 md:pt-16 md:pb-20 bg-[#FCFAF6] scroll-mt-[140px]">
       <div className="container mx-auto px-4 md:px-6">
-        <div className="text-center max-w-3xl mx-auto mb-12">
+       <div className="text-center max-w-3xl mx-auto mb-7 md:mb-12">
           <h2 className="text-3xl md:text-4xl font-semibold text-[#2b554e] mb-3">
             FAQ <span className="text-[#b08d57]">rápido</span>
           </h2>
@@ -122,7 +122,7 @@ const FAQ: React.FC = () => {
                             <img
                               src={item.img.src}
                               alt={item.img.alt || item.q}
-                              className="max-w-full max-h-full object-contain scale-[1.2]"
+                              className="max-w-full max-h-full object-contain scale-[2.0]"
                               loading="lazy"
                             />
                           </div>
