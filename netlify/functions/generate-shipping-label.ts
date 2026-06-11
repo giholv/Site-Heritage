@@ -323,7 +323,7 @@ export default async (req: Request) => {
 
     const endpoint =
       process.env.FRENET_URL ||
-       "https://whitelabel.apifrenet.com.br/v1/orders/oneclick";
+      "https://whitelabel.apifrenet.com.br/v1/orders";
 
     const packageWeight = items.reduce((acc: number, item: any) => {
       const sku = Array.isArray(item.skus) ? item.skus[0] : item.skus;
@@ -430,19 +430,43 @@ export default async (req: Request) => {
       length: Number(Math.max(16, maxLength)),
     });
 
+    const frenetItems = items.map((item: any) => {
+      const sku = Array.isArray(item.skus) ? item.skus[0] : item.skus;
+      const product = Array.isArray(sku?.products)
+        ? sku.products[0]
+        : sku?.products;
+
+      return {
+        OrderId: order.order_number || order.id,
+        ItemId: item.id,
+        ProductId: sku?.id || item.id,
+        ProductOptions: "",
+        ProductType: "Semijoia",
+
+        Weight: safeNumber(sku?.weight_kg, 0.03),
+        Length: safeNumber(sku?.length_cm, 16),
+        Height: safeNumber(sku?.height_cm, 2),
+        Width: safeNumber(sku?.width_cm, 12),
+
+        Quantity: Number(item.quantity || 1),
+        Price: centsToBRL(item.unit_price_cents),
+        IsFragile: true,
+
+        ProductName: product?.name || "Produto Caléa",
+        SKU: sku?.sku_code || sku?.id || item.id,
+        Category: "Semijoias",
+      };
+    });
+
+    const declaredValue = Math.max(centsToBRL(order.subtotal_cents), 25);
+    const orderValue = centsToBRL(order.total_cents);
+
     const frenetPayload = {
-      Quotation: quotation,
-
-      Volumes: {
-        Weight: Number(Math.max(0.03, packageWeight).toFixed(3)),
-        Height: Number(Math.max(2, maxHeight)),
-        Width: Number(Math.max(11, maxWidth)),
-        Length: Number(Math.max(16, maxLength)),
-      },
-
       Order: {
         Id: order.order_number || order.id,
-        Value: centsToBRL(order.total_cents),
+        Value: orderValue,
+        Created: new Date().toISOString(),
+        UseFrenetRegistration: true,
 
         To: {
           Name:
@@ -451,37 +475,88 @@ export default async (req: Request) => {
             "Cliente Caléa Blanc",
           Email: customer?.email || "",
           Phone: recipientPhone,
+          Cellphone: recipientPhone,
           Document: recipientDocument,
+          IE: "",
 
           Address: {
             ZipCode: onlyDigits(address.cep),
-            Street: address.street,
-            Number: address.number,
-            Complement: address.complement || "",
-
-            AddressQuarter: address.neighborhood || "",
             City: address.city,
+            Street: address.street,
+            AddressNumber: address.number,
+            AddressComplement: address.complement || "",
+            AddressQuarter: address.neighborhood || "",
             AddressState: address.state,
-
             Country: address.country || "BR",
           },
         },
 
-        Items: items.map((item: any) => {
-          const sku = Array.isArray(item.skus) ? item.skus[0] : item.skus;
-          const product = Array.isArray(sku?.products)
-            ? sku.products[0]
-            : sku?.products;
+        Items: frenetItems,
+      },
 
-          return {
-            Sku: sku?.sku_code || sku?.id,
-            Name: product?.name || "Produto",
-            Quantity: Number(item.quantity || 1),
-            Value: centsToBRL(item.unit_price_cents),
-          };
-        }),
+      Volumes: {
+        Weight: Number(Math.max(0.03, packageWeight).toFixed(3)),
+        Length: Number(Math.max(16, maxLength)),
+        Height: Number(Math.max(2, maxHeight)),
+        Width: Number(Math.max(11, maxWidth)),
+        Price: declaredValue,
+        DeclaredValue: declaredValue,
+        OrderItemsId: frenetItems.map((item: any) => item.ItemId),
+      },
+
+      Quotation: {
+        ShippingServiceCode:
+          quotation?.ShippingServiceCode ||
+          quotation?.ServiceCode ||
+          quotation?.Code ||
+          serviceCode,
+
+        ShippingServiceName:
+          quotation?.ShippingServiceName ||
+          quotation?.ServiceDescription ||
+          quotation?.Description ||
+          order.shipping_service_description ||
+          "Serviço Frenet",
+
+        PlatformShippingPrice: centsToBRL(order.shipping_cents),
+
+        DeliveryTime: Number(
+          quotation?.DeliveryTime ||
+          quotation?.DeliveryTimeDays ||
+          order.shipping_delivery_time ||
+          0
+        ),
+
+        Carrier:
+          quotation?.Carrier ||
+          quotation?.CarrierName ||
+          order.carrier ||
+          "Correios",
+
+        CarrierCode:
+          quotation?.CarrierCode ||
+          quotation?.Carrier ||
+          order.carrier ||
+          "COR",
+
+        ShippingPrice: Number(
+          quotation?.ShippingPrice || centsToBRL(order.shipping_cents)
+        ),
+
+        ShippingCompetitorPrice: Number(
+          quotation?.ShippingCompetitorPrice ||
+          quotation?.ShippingPrice ||
+          centsToBRL(order.shipping_cents)
+        ),
+
+        Services: {
+          DeclaredValue: false,
+          ReceiptNotification: false,
+          OwnHand: false,
+        },
       },
     };
+
 
     if (!serviceCode) {
       return json(
@@ -586,8 +661,39 @@ export default async (req: Request) => {
         resp.status
       );
     }
+    const batchHasError =
+      data?.statusBatch === "Erro" ||
+      data?.items?.some((item: any) => item?.errors?.length);
+
+    if (batchHasError) {
+      await supabase
+        .from("orders")
+        .update({
+          shipping_response: data,
+          shipping_error:
+            data?.items?.[0]?.errors?.[0]?.message ||
+            data?.error ||
+            "Erro retornado pela Frenet.",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      return json(
+        {
+          ok: false,
+          error:
+            data?.items?.[0]?.errors?.[0]?.message ||
+            "Erro retornado pela Frenet.",
+          details: data,
+        },
+        400
+      );
+    }
+
+    const firstItem = Array.isArray(data?.items) ? data.items[0] : null;
 
     const labelUrl =
+      firstItem?.labelUrl ||
       data?.labelUrl ||
       data?.label_url ||
       data?.labelsUrl ||
@@ -597,7 +703,16 @@ export default async (req: Request) => {
       data?.data?.label_url ||
       null;
 
+    const trackingUrl =
+      firstItem?.trackingUrl ||
+      data?.trackingUrl ||
+      data?.tracking_url ||
+      data?.data?.trackingUrl ||
+      data?.data?.tracking_url ||
+      null;
+
     const trackingCode =
+      trackingUrl?.split("/").pop() ||
       data?.trackingCode ||
       data?.tracking_code ||
       data?.data?.trackingCode ||
@@ -605,6 +720,7 @@ export default async (req: Request) => {
       null;
 
     const frenetOrderId =
+      firstItem?.orderId ||
       data?.orderId ||
       data?.order_id ||
       data?.data?.orderId ||
@@ -612,6 +728,7 @@ export default async (req: Request) => {
       null;
 
     const frenetShipmentId =
+      firstItem?.shipmentId ||
       data?.shipmentId ||
       data?.shipment_id ||
       data?.data?.shipmentId ||

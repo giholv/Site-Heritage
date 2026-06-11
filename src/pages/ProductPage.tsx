@@ -374,7 +374,7 @@ export default function ProductPage() {
         to_postcode: cleanCep,
         insurance_value: Number((price * quantity).toFixed(2)),
         weight: Number(Math.max(0.03, 0.03 * quantity).toFixed(2)),
-        services: "1,2,17,3",
+       
       };
       console.log("Calculando frete:", payload);
 

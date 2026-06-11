@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "apis": [
+    {
+      "identifier": "frenet",
+      "source": "@frenet/v1.0#136m9mk1wcm861zhyq",
+      "integrity": "sha512-fsbtKFO6IxoMekcynX0Lxv3bkGLKpIEaeGFNGeprsn2KALq+xoB4sjmSOPiaNNhYzn5p4+/LaQnHzgN4bKL7MA==",
+      "installerVersion": "6.1.3"
+    }
+  ]
+}
