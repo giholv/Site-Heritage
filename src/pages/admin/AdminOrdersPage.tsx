@@ -38,6 +38,7 @@ type OrderItem = {
   id: string;
   order_number: string | null;
   customer_name: string;
+  customer_email: string | null;
   status: string;
   payment_status: string | null;
   total_cents: number;
@@ -227,6 +228,7 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [generatingLabelId, setGeneratingLabelId] = useState<string | null>(null);
+  const [sendingTrackingEmailId, setSendingTrackingEmailId] = useState<string | null>(null);
 
   async function loadOrders() {
     try {
@@ -247,7 +249,7 @@ export default function AdminOrdersPage() {
         new Set((ordersData ?? []).map((o) => o.customer_id).filter(Boolean))
       ) as string[];
 
-      let customerMap = new Map<string, string>();
+      let customerMap = new Map<string, { name: string; email: string }>();
 
       if (customerIds.length > 0) {
         const { data: customersData, error: customersError } = await supabase
@@ -260,19 +262,27 @@ export default function AdminOrdersPage() {
         customerMap = new Map(
           (customersData as CustomerRow[]).map((customer) => [
             customer.id,
-            customer.full_name || customer.email || "Cliente",
+            {
+              name: customer.full_name || customer.email || "Cliente",
+              email: customer.email,
+            },
           ])
         );
       }
 
-      const normalized: OrderItem[] = (ordersData as OrderRow[]).map(
-        (order) => ({
+      const normalized: OrderItem[] = (ordersData as OrderRow[]).map((order) => {
+        const customerInfo = order.customer_id
+          ? customerMap.get(order.customer_id)
+          : null;
+
+        return {
           id: order.id,
           order_number: order.order_number,
           customer_name:
             order.external_customer_name ||
-            (order.customer_id ? customerMap.get(order.customer_id) : null) ||
+            customerInfo?.name ||
             "Cliente",
+          customer_email: customerInfo?.email || null,
           status: order.status,
           payment_status: order.payment_status,
           total_cents: order.total_cents ?? 0,
@@ -284,8 +294,8 @@ export default function AdminOrdersPage() {
           tracking_code: order.tracking_code,
           shipping_label_url: order.shipping_label_url,
           shipping_error: order.shipping_error,
-        })
-      );
+        };
+      });
 
       setOrders(normalized);
     } catch (err: any) {
@@ -388,6 +398,46 @@ export default function AdminOrdersPage() {
       setGeneratingLabelId(null);
     }
   }
+
+  async function sendTrackingEmail(order: OrderItem) {
+    try {
+      setError("");
+
+      if (!order.customer_email) {
+        throw new Error("Cliente sem e-mail cadastrado.");
+      }
+
+      if (!order.tracking_code) {
+        throw new Error("Pedido sem código de rastreio.");
+      }
+
+      setSendingTrackingEmailId(order.id);
+
+      const { data, error } = await supabase.functions.invoke("send-tracking-email", {
+        body: {
+           to: "contato@calea.com.br", // e-mail de teste
+          customer_name: order.customer_name,
+          order_number: order.order_number,
+          tracking_code: order.tracking_code,
+        },
+      });
+
+      if (error) throw error;
+
+      if (!data?.ok) {
+        throw new Error(data?.error || "Erro ao enviar e-mail de rastreio.");
+      }
+
+      alert("E-mail de rastreio enviado com sucesso.");
+    } catch (err: any) {
+      setError(err?.message || "Erro ao enviar e-mail de rastreio.");
+      alert(err?.message || "Erro ao enviar e-mail de rastreio.");
+    } finally {
+      setSendingTrackingEmailId(null);
+    }
+  }
+
+
   const counters = useMemo(() => {
     return {
       orders: orders.filter(isPaidOrder).length,
@@ -660,25 +710,40 @@ export default function AdminOrdersPage() {
                           </td>
 
                           <td className="px-5 py-4">
-                            <input
-                              value={order.tracking_code || ""}
-                              onChange={(e) =>
-                                setOrders((current) =>
-                                  current.map((item) =>
-                                    item.id === order.id
-                                      ? { ...item, tracking_code: e.target.value }
-                                      : item
+                            <div className="flex flex-col gap-2">
+                              <input
+                                value={order.tracking_code || ""}
+                                onChange={(e) =>
+                                  setOrders((current) =>
+                                    current.map((item) =>
+                                      item.id === order.id
+                                        ? { ...item, tracking_code: e.target.value }
+                                        : item
+                                    )
                                   )
-                                )
-                              }
-                              onBlur={(e) =>
-                                updateShippingInfo(order.id, {
-                                  tracking_code: e.target.value.trim() || null,
-                                })
-                              }
-                              placeholder="Código de rastreio"
-                              className="h-10 w-56 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[#2b554e]"
-                            />
+                                }
+                                onBlur={(e) =>
+                                  updateShippingInfo(order.id, {
+                                    tracking_code: e.target.value.trim() || null,
+                                  })
+                                }
+                                placeholder="Código de rastreio"
+                                className="h-10 w-56 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[#2b554e]"
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => sendTrackingEmail(order)}
+                                disabled={
+                                  !order.tracking_code ||
+                                  !order.customer_email ||
+                                  sendingTrackingEmailId === order.id
+                                }
+                                className="inline-flex h-9 w-fit items-center justify-center rounded-xl border border-[#2b554e] bg-white px-3 text-xs font-semibold text-[#2b554e] transition hover:bg-[#f1f6f4] disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {sendingTrackingEmailId === order.id ? "Enviando..." : "Enviar e-mail"}
+                              </button>
+                            </div>
                           </td>
                         </>
                       )}
