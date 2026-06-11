@@ -735,6 +735,10 @@ export default async (req: Request) => {
       data?.data?.shipment_id ||
       null;
 
+    const hasLabel = Boolean(labelUrl);
+    const hasTracking = Boolean(trackingCode);
+    const hasShipment = Boolean(frenetShipmentId || frenetOrderId);
+
     await supabase
       .from("orders")
       .update({
@@ -743,20 +747,28 @@ export default async (req: Request) => {
         tracking_code: trackingCode,
         frenet_order_id: frenetOrderId,
         frenet_shipment_id: frenetShipmentId,
-        shipping_generated_at: new Date().toISOString(),
-        shipping_label_generated: Boolean(labelUrl || trackingCode || frenetOrderId),
-        shipping_status: trackingCode ? "posted" : "awaiting_post",
-        shipping_error: null,
+        shipping_generated_at: hasLabel ? new Date().toISOString() : null,
+        shipping_label_generated: hasLabel,
+        shipping_status: hasTracking ? "posted" : "awaiting_post",
+        shipping_error: hasLabel
+          ? null
+          : hasShipment
+            ? "Envio criado na Frenet, mas a etiqueta ainda não retornou URL/PDF."
+            : "A Frenet não retornou etiqueta nem shipmentId.",
         updated_at: new Date().toISOString(),
       })
       .eq("id", orderId);
 
     return json({
-      ok: true,
+      ok: Boolean(labelUrl),
       label_url: labelUrl,
       tracking_code: trackingCode,
       frenet_order_id: frenetOrderId,
       frenet_shipment_id: frenetShipmentId,
+      pending_label: !labelUrl && Boolean(frenetShipmentId || frenetOrderId),
+      error: !labelUrl
+        ? "Envio criado na Frenet, mas a etiqueta ainda não retornou URL/PDF."
+        : undefined,
       raw: data,
     });
   } catch (err: any) {

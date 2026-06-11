@@ -621,23 +621,25 @@ export default function AdminOrdersPage() {
                         <>
                           <td className="px-5 py-4">
                             <div className="flex flex-col gap-2">
-                              {order.shipping_label_generated ? (
+                              {order.shipping_label_url ? (
                                 <>
                                   <span className="inline-flex w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                                     Gerada
                                   </span>
 
-                                  {order.shipping_label_url && (
-                                    <a
-                                      href={order.shipping_label_url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-xs font-semibold text-[#2b554e] underline"
-                                    >
-                                      Abrir etiqueta
-                                    </a>
-                                  )}
+                                  <a
+                                    href={order.shipping_label_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs font-semibold text-[#2b554e] underline"
+                                  >
+                                    Abrir etiqueta
+                                  </a>
                                 </>
+                              ) : order.shipping_label_generated ? (
+                                <span className="inline-flex w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                                  Aguardando etiqueta
+                                </span>
                               ) : (
                                 <button
                                   type="button"
