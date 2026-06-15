@@ -4,7 +4,6 @@ import { supabase } from "../lib/supabase";
 type Banner = { src: string; alt: string };
 
 const BUCKET = "product-images";
-const FOLDER = "banners";
 
 function getPublicUrl(path: string) {
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
@@ -25,23 +24,28 @@ const Hero: React.FC = () => {
     let active = true;
 
     async function loadBanners() {
-      const { data, error } = await supabase.storage.from(BUCKET).list(FOLDER, {
-        limit: 10,
-        sortBy: { column: "name", order: "asc" },
-      });
+      const { data, error } = await supabase
+        .from("hero_banners")
+        .select("image_path, alt")
+        .eq("active", true)
+        .order("position", { ascending: true });
 
-      if (error || !data?.length || !active) return;
+      if (error) {
+        console.error("Erro ao carregar banners:", error.message);
+        return;
+      }
+
+      if (!data?.length || !active) return;
 
       const mapped = data
-        .filter((file) => /\.(png|jpg|jpeg|webp|avif)$/i.test(file.name))
-        .map((file) => ({
-          src: getPublicUrl(`${FOLDER}/${file.name}`),
-          alt: file.name,
+        .filter((banner) => /\.(webp|avif)$/i.test(banner.image_path))
+        .map((banner) => ({
+          src: getPublicUrl(banner.image_path),
+          alt: banner.alt || "Banner Caléa Blanc",
         }));
 
       if (mapped.length && active) setBanners(mapped);
     }
-
     loadBanners();
 
     return () => {
@@ -99,6 +103,7 @@ const Hero: React.FC = () => {
                 objectPosition: idx === 0 ? "50% 35%" : "50% 30%",
               }}
               loading="eager"
+              fetchPriority="high"
               decoding="async"
               width={1600}
               height={700}
