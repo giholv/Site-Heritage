@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Music, VolumeX } from "lucide-react";
 
 const TRACKS = [
@@ -23,7 +23,6 @@ export default function AmbientSound({ hidden = false }: AmbientSoundProps) {
   const [trackIndex, setTrackIndex] = useState(0);
 
   const currentTrack = TRACKS[trackIndex];
-  if (hidden) return null;
 
   async function playAudio() {
     const audio = audioRef.current;
@@ -48,7 +47,10 @@ export default function AmbientSound({ hidden = false }: AmbientSoundProps) {
   }
 
   async function toggleSound() {
-    if (playing) {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (!audio.paused) {
       pauseAudio();
       return;
     }
@@ -57,13 +59,41 @@ export default function AmbientSound({ hidden = false }: AmbientSoundProps) {
   }
 
   function handleEnded() {
-    const nextIndex = (trackIndex + 1) % TRACKS.length;
-    setTrackIndex(nextIndex);
+    setTrackIndex((prev) => (prev + 1) % TRACKS.length);
+  }
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (!playing) return;
+
+    audio.load();
 
     window.setTimeout(() => {
       playAudio();
     }, 80);
-  }
+  }, [trackIndex]);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("calea-sound-state", {
+        detail: { playing },
+      })
+    );
+  }, [playing]);
+
+  useEffect(() => {
+    function handleToggleSound() {
+      toggleSound();
+    }
+
+    window.addEventListener("calea-toggle-sound", handleToggleSound);
+
+    return () => {
+      window.removeEventListener("calea-toggle-sound", handleToggleSound);
+    };
+  }, []);
 
   return (
     <>
@@ -74,37 +104,29 @@ export default function AmbientSound({ hidden = false }: AmbientSoundProps) {
         onEnded={handleEnded}
       />
 
-      <button
-        type="button"
-        onClick={toggleSound}
-        aria-label={playing ? "Desligar som ambiente" : "Ligar som ambiente"}
-        title={playing ? "Desligar som ambiente" : "Ligar som ambiente"}
-        className={[
-          /**
-           * MOBILE:
-           * sobe o botão para não encostar na barra fixa de compra
-           */
-          "fixed left-4 bottom-[142px] z-[9998]",
-
-          /**
-           * DESKTOP:
-           * volta para o canto inferior
-           */
-          "md:bottom-6 md:left-5",
-
-          "flex h-11 w-11 items-center justify-center rounded-full md:h-12 md:w-12",
-          "border border-[#e8dfd2]/80 bg-[#FCFAF6]/90 text-[#2b554e]",
-          "backdrop-blur-xl shadow-[0_10px_28px_rgba(43,85,78,0.16)]",
-          "transition hover:bg-white active:scale-95",
-          playing ? "border-[#2b554e] bg-[#2b554e] text-white" : "",
-        ].join(" ")}
-      >
-        {playing ? (
-          <Music size={19} strokeWidth={1.8} />
-        ) : (
-          <VolumeX size={19} strokeWidth={1.8} />
-        )}
-      </button>
+      {!hidden && (
+        <button
+          type="button"
+          onClick={toggleSound}
+          aria-label={playing ? "Desligar som ambiente" : "Ligar som ambiente"}
+          title={playing ? "Desligar som ambiente" : "Ligar som ambiente"}
+          className={[
+            "fixed left-4 bottom-[142px] z-[9998]",
+            "md:bottom-6 md:left-5",
+            "flex h-11 w-11 items-center justify-center rounded-full md:h-12 md:w-12",
+            "border border-[#e8dfd2]/80 bg-[#FCFAF6]/90 text-[#2b554e]",
+            "backdrop-blur-xl shadow-[0_10px_28px_rgba(43,85,78,0.16)]",
+            "transition hover:bg-white active:scale-95",
+            playing ? "border-[#2b554e] bg-[#2b554e] text-white" : "",
+          ].join(" ")}
+        >
+          {playing ? (
+            <Music size={19} strokeWidth={1.8} />
+          ) : (
+            <VolumeX size={19} strokeWidth={1.8} />
+          )}
+        </button>
+      )}
     </>
   );
 }

@@ -218,16 +218,17 @@ export default function ProductPage() {
         setProduct(productData as ProductRow);
         setSkus(safeSkus);
         setSelectedSkuId(firstSku?.id ?? "");
-
-        console.table(
-          safeSkus.map((sku) => ({
-            sku_id: sku.id,
-            title: sku.title,
-            variant_name: sku.variant_name,
-            active: sku.active,
-            available_qty: sku.available_qty,
-          }))
-        );
+        if (import.meta.env.DEV) {
+          console.table(
+            safeSkus.map((sku) => ({
+              sku_id: sku.id,
+              title: sku.title,
+              variant_name: sku.variant_name,
+              active: sku.active,
+              available_qty: sku.available_qty,
+            }))
+          );
+        }
       } catch (err: any) {
         if (!cancelled) setError(err?.message || "Erro ao carregar produto.");
       } finally {

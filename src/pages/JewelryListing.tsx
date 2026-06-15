@@ -443,16 +443,17 @@ export default function JewelryListing() {
         ...item,
         available_qty: normalizeAvailableQty(item.available_qty),
       }));
-
-      console.table(
-        normalizedRows.map((product) => ({
-          name: product.name,
-          slug: product.slug,
-          available_qty: product.available_qty,
-          available: normalizeAvailableQty(product.available_qty) > 0,
-        }))
-      );
-
+      if (import.meta.env.DEV) {
+        console.table(
+          normalizedRows.map((product) => ({
+            name: product.name,
+            slug: product.slug,
+            available_qty: product.available_qty,
+            available: normalizeAvailableQty(product.available_qty) > 0,
+          }))
+        );
+      }
+      
       setProducts(normalizedRows);
       setLoading(false);
     }

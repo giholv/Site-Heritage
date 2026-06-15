@@ -3,6 +3,8 @@ import { Routes, Route, useLocation } from "react-router-dom";
 
 import CookieBanner from "./components/CookieBanner";
 import { AdminGuard } from "./routes/AdminGuard";
+import AmbientSound from "./components/AmbientSound";
+
 
 const HomePage = lazy(() => import("./pages/HomePage"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
@@ -117,9 +119,10 @@ export default function App() {
         </Routes>
       </Suspense>
 
-    
-     
+
+
       {!isAdmin && <CookieBanner />}
+      {!isAdmin && <AmbientSound hidden />}
     </>
   );
 }

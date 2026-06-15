@@ -9,13 +9,15 @@ import {
   Home,
   MessageCircle,
   LogOut,
+  Music,
+  VolumeX,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import CartDrawer from "./CartDrawer";
 import { useCart } from "../context/CartContext";
 import { supabase } from "../lib/supabase";
 import { WhatsAppFloatingButton } from "../components/WhatsAppFloatingButton";
-import AmbientSound from "./AmbientSound";
+
 
 type HeaderProps = {
   searchValue?: string;
@@ -45,6 +47,18 @@ const Header: React.FC<HeaderProps> = ({
   const isProductPage = location.pathname.startsWith("/produto/");
   const isAdminPage = location.pathname.startsWith("/admin");
   const isCheckoutPage = location.pathname.startsWith("/checkout");
+  const [soundPlaying, setSoundPlaying] = useState(false);
+
+  const showFloatingSound =
+    !isAdminPage && !isCheckoutPage && !cartOpen && !isOpen && !isProductPage;
+
+  const showHeaderSound =
+    !isAdminPage && !showFloatingSound;
+
+  const toggleHeaderSound = () => {
+    window.dispatchEvent(new Event("calea-toggle-sound"));
+  };
+
 
   const menuItems = [
     { label: "Início", id: "home" },
@@ -188,6 +202,46 @@ const Header: React.FC<HeaderProps> = ({
       listener.subscription.unsubscribe();
     };
   }, []);
+  useEffect(() => {
+    function handleSoundState(event: Event) {
+      const customEvent = event as CustomEvent<{ playing: boolean }>;
+      setSoundPlaying(Boolean(customEvent.detail?.playing));
+    }
+
+    window.addEventListener("calea-sound-state", handleSoundState);
+
+    return () => {
+      window.removeEventListener("calea-sound-state", handleSoundState);
+    };
+  }, []);
+
+  const SoundButton = ({ mobile = false }: { mobile?: boolean }) => (
+    <button
+      type="button"
+      onClick={toggleHeaderSound}
+      aria-label={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
+      title={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
+      className={[
+        mobile
+          ? "inline-flex h-10 w-10 items-center justify-center"
+          : "inline-flex h-12 w-12 items-center justify-center",
+        "text-[#2b554e] transition hover:text-[#b08d57] active:scale-95",
+      ].join(" ")}
+    >
+      {soundPlaying ? (
+        <Music
+          className={mobile ? "h-[21px] w-[21px]" : "h-6 w-6"}
+          strokeWidth={1.8}
+        />
+      ) : (
+        <VolumeX
+          className={mobile ? "h-[21px] w-[21px]" : "h-6 w-6"}
+          strokeWidth={1.8}
+        />
+      )}
+    </button>
+  );
+
   return (
     <>
       <header
@@ -261,6 +315,7 @@ const Header: React.FC<HeaderProps> = ({
               </div>
 
               <div className="flex items-center justify-end gap-1 justify-self-end">
+                {showHeaderSound && <SoundButton mobile />}
                 <button
                   type="button"
                   aria-label="Pesquisar"
@@ -317,7 +372,7 @@ const Header: React.FC<HeaderProps> = ({
                       </button>
 
                       <a
-                        href="https://wa.me/5511999999999"
+                        href="https://wa.me/5511997946257"
                         target="_blank"
                         className="
           flex items-center gap-3
@@ -459,6 +514,7 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="relative flex items-center justify-end gap-2">
+                  {showHeaderSound && <SoundButton />}
                   <div className="relative">
                     <button
                       type="button"
@@ -698,8 +754,28 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
-      {!isAdminPage && !isCheckoutPage && !cartOpen && !isOpen && !isProductPage && (
-        <AmbientSound />
+      {showFloatingSound && (
+        <button
+          type="button"
+          onClick={toggleHeaderSound}
+          aria-label={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
+          title={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
+          className={[
+            "fixed left-4 bottom-[142px] z-[9998]",
+            "md:bottom-6 md:left-5",
+            "flex h-11 w-11 items-center justify-center rounded-full md:h-12 md:w-12",
+            "border border-[#e8dfd2]/80 bg-[#FCFAF6]/90 text-[#2b554e]",
+            "backdrop-blur-xl shadow-[0_10px_28px_rgba(43,85,78,0.16)]",
+            "transition hover:bg-white active:scale-95",
+            soundPlaying ? "border-[#2b554e] bg-[#2b554e] text-white" : "",
+          ].join(" ")}
+        >
+          {soundPlaying ? (
+            <Music size={19} strokeWidth={1.8} />
+          ) : (
+            <VolumeX size={19} strokeWidth={1.8} />
+          )}
+        </button>
       )}
 
       {!isAdminPage && !isCheckoutPage && (

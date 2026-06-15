@@ -103,7 +103,7 @@ const Hero: React.FC = () => {
                 objectPosition: idx === 0 ? "50% 35%" : "50% 30%",
               }}
               loading="eager"
-              fetchPriority="high"
+               {...({ fetchpriority: "high" } as any)}
               decoding="async"
               width={1600}
               height={700}
