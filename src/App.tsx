@@ -4,6 +4,7 @@ import { Routes, Route, useLocation } from "react-router-dom";
 import CookieBanner from "./components/CookieBanner";
 import { AdminGuard } from "./routes/AdminGuard";
 import AmbientSound from "./components/AmbientSound";
+import ClarityScript from "./components/ClarityScript";
 
 
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -123,6 +124,7 @@ export default function App() {
 
       {!isAdmin && <CookieBanner />}
       {!isAdmin && <AmbientSound hidden />}
+      {!isAdmin && <ClarityScript />}
     </>
   );
 }
