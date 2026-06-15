@@ -45,6 +45,9 @@ type SkuImageRow = {
   id: string;
   sku_id: string;
   path: string;
+  thumb_path: string | null;
+  medium_path: string | null;
+  full_path: string | null;
   alt: string | null;
   sort_order: number;
   is_primary: boolean;
@@ -250,7 +253,7 @@ export default function ProductPage() {
 
       const { data, error } = await supabase
         .from("sku_images")
-        .select("id, sku_id, path, alt, sort_order, is_primary")
+        .select("id, sku_id, path, thumb_path, medium_path, full_path, alt, sort_order, is_primary")
         .eq("sku_id", selectedSkuId)
         .order("is_primary", { ascending: false })
         .order("sort_order", { ascending: true });
@@ -262,14 +265,19 @@ export default function ProductPage() {
       }
 
       const normalizedImages: ProductImage[] = ((data ?? []) as SkuImageRow[])
-        .map((img, index) => ({
-          id: String(img.id ?? `img-${index}`),
-          src: resolveImageUrl(String(img.path ?? "")),
-          alt: String(img.alt ?? product.name ?? "Produto"),
-        }))
-        .filter((img) => img.src);
+        .map((img, index) => {
+          const imagePath =
+            img.full_path ||
+            img.medium_path ||
+            img.path;
 
-      if (cancelled) return;
+          return {
+            id: String(img.id ?? `img-${index}`),
+            src: resolveImageUrl(String(imagePath ?? "")),
+            alt: String(img.alt ?? product.name ?? "Produto"),
+          };
+        })
+        .filter((img) => img.src);
 
       setImages(
         normalizedImages.length > 0
@@ -368,7 +376,7 @@ export default function ProductPage() {
         to_postcode: cleanCep,
         insurance_value: Number((price * quantity).toFixed(2)),
         weight: Number(Math.max(0.03, 0.03 * quantity).toFixed(2)),
-       
+
       };
       console.log("Calculando frete:", payload);
 
