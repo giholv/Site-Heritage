@@ -40,6 +40,7 @@ const AdminOrdersKanban = lazy(() => import("./pages/admin/AdminOrdersKanban"));
 const AdminEstatisticas = lazy(() => import("./pages/admin/AdminEstatisticas"));
 const AdminCupons = lazy(() => import("./pages/admin/AdminCupons"));
 const AdminParcerias = lazy(() => import("./pages/admin/AdminParcerias"));
+import AdminCustosPage from "./pages/admin/AdminCustosPage";
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -113,6 +114,7 @@ export default function App() {
               <Route path="clientes" element={<AdminCustomersPage />} />
               <Route path="configuracoes" element={<AdminConfiguracoes />} />
               <Route path="kanban" element={<AdminOrdersKanban />} />
+              <Route path="custos" element={<AdminCustosPage />} />
             </Route>
           </Route>
 

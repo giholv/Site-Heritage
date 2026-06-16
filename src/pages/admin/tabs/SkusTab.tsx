@@ -80,6 +80,52 @@ function normalizePriceToCents(v: string) {
   return Math.round(n * 100);
 }
 
+
+function parseDecimal(value: string) {
+  const clean = String(value || "")
+    .replace(/\s/g, "")
+    .replace(",", ".")
+    .replace(/[^\d.]/g, "");
+
+  const number = Number(clean);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function calculateSuggestedPriceCents({
+  baseCostCents,
+  packagingCostCents,
+  extraAllocatedPerPieceCents,
+  marginPct,
+  marketplaceFeePct,
+  roundStepCents,
+}: {
+  baseCostCents: number;
+  packagingCostCents: number;
+  extraAllocatedPerPieceCents: number;
+  marginPct: number;
+  marketplaceFeePct: number;
+  roundStepCents: number;
+}) {
+  const totalCostCents =
+    Number(baseCostCents || 0) +
+    Number(packagingCostCents || 0) +
+    Number(extraAllocatedPerPieceCents || 0);
+
+  const marginRate = Number(marginPct || 0) / 100;
+  const marketplaceRate = Number(marketplaceFeePct || 0) / 100;
+
+  const divisor = 1 - marginRate - marketplaceRate;
+
+  if (totalCostCents <= 0 || divisor <= 0) {
+    return 0;
+  }
+
+  const rawPrice = totalCostCents / divisor;
+  const step = Number(roundStepCents || 100);
+
+  return Math.ceil(rawPrice / step) * step;
+}
+
 async function ensureAuthenticatedSession() {
   const { data, error } = await supabase.auth.getSession();
 
@@ -93,6 +139,8 @@ async function ensureAuthenticatedSession() {
 
   return data.session;
 }
+
+
 
 function Field({
   label,
@@ -189,10 +237,10 @@ function Badge({
     tone === "active"
       ? "bg-emerald-900 text-white"
       : tone === "ok"
-      ? "bg-emerald-900/10 text-emerald-900 border border-emerald-900/20"
-      : tone === "warn"
-      ? "bg-amber-500/10 text-amber-700 border border-amber-500/20"
-      : "bg-gray-100 text-gray-700 border border-gray-200";
+        ? "bg-emerald-900/10 text-emerald-900 border border-emerald-900/20"
+        : tone === "warn"
+          ? "bg-amber-500/10 text-amber-700 border border-amber-500/20"
+          : "bg-gray-100 text-gray-700 border border-gray-200";
 
   return (
     <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${styles}`}>
@@ -372,6 +420,43 @@ function SkuEditor({
     String((initial as any)?.price_round_step_cents ?? "100")
   );
 
+  const [pricingConfig, setPricingConfig] = useState<{
+    marketplace_fee_pct: number;
+    packaging_cost_cents: number;
+    extra_allocated_per_piece_cents: number;
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadPricingConfig() {
+      if (!initial?.id) return;
+
+      const { data, error } = await supabase
+        .from("v_sku_pricing")
+        .select(
+          "marketplace_fee_pct, packaging_cost_cents, extra_allocated_per_piece_cents"
+        )
+        .eq("sku_id", initial.id)
+        .maybeSingle();
+
+      if (error) {
+        console.log("Erro ao carregar precificação do SKU:", error.message);
+        return;
+      }
+
+      if (data) {
+        setPricingConfig({
+          marketplace_fee_pct: Number(data.marketplace_fee_pct || 0),
+          packaging_cost_cents: Number(data.packaging_cost_cents || 0),
+          extra_allocated_per_piece_cents: Number(
+            data.extra_allocated_per_piece_cents || 0
+          ),
+        });
+      }
+    }
+
+    loadPricingConfig();
+  }, [initial?.id]);
+
   const canSave = useMemo(() => {
     const cc = normalizePriceToCents(cost);
     if (cc === null || cc <= 0) return false;
@@ -382,6 +467,21 @@ function SkuEditor({
     if (!Number.isFinite(Number(roundStep)) || Number(roundStep) <= 0) return false;
     return true;
   }, [cost, platingType, millesimal, ringSize, isRing, marginPct, roundStep]);
+
+  const calculatedPriceCents = useMemo(() => {
+    if (!pricingConfig) return 0;
+
+    const baseCostCents = normalizePriceToCents(cost) || 0;
+
+    return calculateSuggestedPriceCents({
+      baseCostCents,
+      packagingCostCents: pricingConfig.packaging_cost_cents,
+      extraAllocatedPerPieceCents: pricingConfig.extra_allocated_per_piece_cents,
+      marginPct: parseDecimal(marginPct),
+      marketplaceFeePct: pricingConfig.marketplace_fee_pct,
+      roundStepCents: Number(roundStep || 100),
+    });
+  }, [cost, marginPct, roundStep, pricingConfig]);
 
   return (
     <div className="rounded-3xl border bg-gray-50 p-5">
@@ -437,8 +537,11 @@ function SkuEditor({
                 stone_id: finalStoneId,
                 stone_color_id: finalStoneColorId,
                 cost_cents,
+                cost_gross_cents: cost_cents,
                 target_margin_pct,
                 price_round_step_cents,
+                price_cents: calculatedPriceCents,
+
               });
             }}
           >
@@ -572,7 +675,13 @@ function SkuEditor({
         <div className="md:col-span-4">
           <Field label="Preço (calculado)">
             <TextInput
-              value={initial?.price_cents ? formatBRL(initial.price_cents) : "Salve para calcular"}
+              value={
+                !pricingConfig
+                  ? "Carregando cálculo..."
+                  : calculatedPriceCents > 0
+                    ? formatBRL(calculatedPriceCents)
+                    : "Informe custo e margem"
+              }
               disabled
               className="bg-gray-50"
             />
@@ -580,7 +689,7 @@ function SkuEditor({
         </div>
 
         {(() => {
-          const pc = initial?.price_cents ?? null;
+          const pc = calculatedPriceCents || null;
           const cc = normalizePriceToCents(cost);
 
           if (!pc || !cc) return null;
@@ -746,6 +855,7 @@ export default function SkusTab({
       "barcode",
       "price_cents",
       "cost_cents",
+      "cost_gross_cents",
       "target_margin_pct",
       "price_round_step_cents",
       "plating_type",
@@ -767,7 +877,7 @@ export default function SkusTab({
       .order("created_at", { ascending: true });
 
     if (error) return { ok: false as const, error };
-    return { ok: true as const, data: (data ?? []) as SkuDbRow[] };
+    return { ok: true as const, data: (data ?? []) as unknown as SkuDbRow[] };
   }
 
   const loadList = useCallback(
@@ -858,6 +968,7 @@ export default function SkusTab({
         "barcode",
         "price_cents",
         "cost_cents",
+        "cost_gross_cents",
         "target_margin_pct",
         "price_round_step_cents",
         "plating_type",
@@ -884,7 +995,7 @@ export default function SkusTab({
 
         if (error) throw new Error(error.message);
 
-        savedId = (data as SkuDbRow).id;
+        savedId = (data as unknown as SkuDbRow).id;
       } else {
         const { data, error } = await supabase
           .from(T.SKUS)
@@ -894,9 +1005,8 @@ export default function SkusTab({
 
         if (error) throw new Error(error.message);
 
-        savedId = (data as SkuDbRow).id;
+        savedId = (data as unknown as SkuDbRow).id;
       }
-
       setCreating(false);
       setEditing(null);
       await loadList(savedId);
@@ -960,8 +1070,8 @@ export default function SkusTab({
           {loadingContext
             ? "Carregando regras do produto..."
             : isRing
-            ? "Produto detectado como anel → tamanho do anel será exigido."
-            : `Produto: ${productName}${selectedSkuLabel ? ` • SKU selecionado: ${selectedSkuLabel}` : ""}`}
+              ? "Produto detectado como anel → tamanho do anel será exigido."
+              : `Produto: ${productName}${selectedSkuLabel ? ` • SKU selecionado: ${selectedSkuLabel}` : ""}`}
         </div>
 
         <GhostButton

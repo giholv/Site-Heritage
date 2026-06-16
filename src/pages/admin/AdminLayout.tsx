@@ -190,6 +190,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "Gestão",
     items: [
       { to: "/admin/vendas", label: "Vendas", icon: <IconCart /> },
+      { to: "/admin/custos", label: "Custos", icon: <IconMoney /> },
       { to: "/admin/produtos", label: "Produtos", icon: <IconTag /> },
       { to: "/admin/estoques", label: "Estoque", icon: <IconBoxes /> },
       { to: "/admin/fornecedores", label: "Fornecedores", icon: <IconTruck /> },
