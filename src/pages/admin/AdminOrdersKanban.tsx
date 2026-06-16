@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   ReceiptText,
 } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 
 type OrderItemRow = {
@@ -74,6 +75,14 @@ type KanbanColumnKey =
   | "packed"
   | "shipped"
   | "delivered";
+
+type OperationalFilter =
+  | "all"
+  | "attention"
+  | "late"
+  | "no_tracking"
+  | "external"
+  | "today";
 
 const CALEA = {
   primary: "#2b554e",
@@ -185,6 +194,99 @@ function resolveKanbanColumn(order: OrderRow): KanbanColumnKey | null {
   if (fulfillmentStatus === "picking") return "picking";
 
   return "paid";
+}
+
+
+function daysSince(value?: string | null) {
+  if (!value) return 0;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 0;
+
+  const diff = Date.now() - date.getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+function isToday(value?: string | null) {
+  if (!value) return false;
+
+  const date = new Date(value);
+  const today = new Date();
+
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+}
+
+function orderAgeLabel(order: OrderRow) {
+  const days = daysSince(order.created_at);
+
+  if (days <= 0) return "Hoje";
+  if (days === 1) return "1 dia";
+  return `${days} dias`;
+}
+
+function isLateOrder(order: OrderRow) {
+  const column = resolveKanbanColumn(order);
+
+  if (!column || column === "shipped" || column === "delivered") return false;
+
+  return daysSince(order.created_at) >= 2;
+}
+
+function needsTracking(order: OrderRow) {
+  const column = resolveKanbanColumn(order);
+
+  return column === "packed" && !order.tracking_code;
+}
+
+function needsAttention(order: OrderRow) {
+  return isLateOrder(order) || needsTracking(order);
+}
+
+function nextActionLabel(order: OrderRow) {
+  const column = resolveKanbanColumn(order);
+
+  if (needsTracking(order)) return "Informar rastreio";
+  if (column === "paid") return "Separar pedido";
+  if (column === "picking") return "Embalar pedido";
+  if (column === "packed") return "Marcar como enviado";
+  if (column === "shipped") return "Acompanhar entrega";
+  if (column === "delivered") return "Finalizado";
+
+  return "Revisar pedido";
+}
+
+function priorityScore(order: OrderRow) {
+  let score = 0;
+
+  if (needsAttention(order)) score += 100;
+  if (needsTracking(order)) score += 60;
+  if (isLateOrder(order)) score += 40;
+
+  score += Math.min(daysSince(order.created_at), 10);
+
+  return score;
+}
+
+function compareOrdersByPriority(a: OrderRow, b: OrderRow) {
+  const priorityDiff = priorityScore(b) - priorityScore(a);
+  if (priorityDiff !== 0) return priorityDiff;
+
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+}
+
+function filterOperationalOrder(order: OrderRow, filter: OperationalFilter) {
+  if (filter === "all") return true;
+  if (filter === "attention") return needsAttention(order);
+  if (filter === "late") return isLateOrder(order);
+  if (filter === "no_tracking") return needsTracking(order);
+  if (filter === "external") return (order.origin || "").toLowerCase() === "external";
+  if (filter === "today") return isToday(order.created_at);
+
+  return true;
 }
 
 function statusTone(
@@ -441,6 +543,10 @@ function OrderCard({
 }) {
   const customerName =
     order.customer_name || order.external_customer_name || "Cliente sem nome";
+  const late = isLateOrder(order);
+  const withoutTracking = needsTracking(order);
+  const attention = needsAttention(order);
+  const nextAction = nextActionLabel(order);
 
   return (
     <button
@@ -449,8 +555,8 @@ function OrderCard({
       style={{
         width: "100%",
         textAlign: "left",
-        background: "#fff",
-        border: `1px solid ${CALEA.line}`,
+        background: attention ? "#fffaf5" : "#fff",
+        border: `1px solid ${attention ? "rgba(176,141,87,0.45)" : CALEA.line}`,
         borderRadius: 22,
         padding: 16,
         boxShadow: "0 10px 28px rgba(43,85,78,0.07)",
@@ -518,7 +624,39 @@ function OrderCard({
 
       <div
         style={{
-          marginTop: 5,
+          marginTop: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        <Badge tone={attention ? "yellow" : "default"}>
+          {nextAction}
+        </Badge>
+
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: late ? "#b42318" : CALEA.muted,
+          }}
+        >
+          {orderAgeLabel(order)} no fluxo
+        </span>
+      </div>
+
+      {(late || withoutTracking) && (
+        <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {late && <Badge tone="red">Parado há 2+ dias</Badge>}
+          {withoutTracking && <Badge tone="red">Sem rastreio</Badge>}
+        </div>
+      )}
+
+      <div
+        style={{
+          marginTop: 8,
           fontSize: 12,
           color: CALEA.muted,
           display: "flex",
@@ -622,6 +760,9 @@ const summaryValueStyle: React.CSSProperties = {
 };
 
 export default function AdminOrdersKanban() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -632,6 +773,22 @@ export default function AdminOrdersKanban() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [trackingCodeInput, setTrackingCodeInput] = useState("");
   const [carrierInput, setCarrierInput] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileColumn, setMobileColumn] = useState<KanbanColumnKey>("paid");
+  const [operationalFilter, setOperationalFilter] =
+    useState<OperationalFilter>("all");
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   async function loadOrders() {
     try {
       setLoading(true);
@@ -657,10 +814,31 @@ export default function AdminOrdersKanban() {
     loadOrders();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const orderId = params.get("order_id");
+
+    if (!orderId || !orders.length) return;
+    if (selected?.id === orderId) return;
+
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return;
+
+    const column = resolveKanbanColumn(order);
+    if (column) {
+      setMobileColumn(column);
+    }
+
+    openOrder(order, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, orders]);
+
+  function openInSales(orderId: string) {
+    navigate(`/admin/vendas?order_id=${orderId}&section=all`);
+  }
+
   const filteredOrders = useMemo(() => {
     const q = search.trim().toLowerCase();
-
-    if (!q) return orders;
 
     return orders.filter((order) => {
       const haystack = [
@@ -684,9 +862,12 @@ export default function AdminOrdersKanban() {
         .join(" ")
         .toLowerCase();
 
-      return haystack.includes(q);
+      const matchesSearch = !q || haystack.includes(q);
+      const matchesOperationalFilter = filterOperationalOrder(order, operationalFilter);
+
+      return matchesSearch && matchesOperationalFilter;
     });
-  }, [orders, search]);
+  }, [orders, search, operationalFilter]);
 
   const grouped = useMemo(() => {
     const base: Record<KanbanColumnKey, OrderRow[]> = {
@@ -705,6 +886,10 @@ export default function AdminOrdersKanban() {
       base[key].push(order);
     }
 
+    Object.keys(base).forEach((key) => {
+      base[key as KanbanColumnKey].sort(compareOrdersByPriority);
+    });
+
     return base;
   }, [filteredOrders]);
 
@@ -718,15 +903,33 @@ export default function AdminOrdersKanban() {
       .flat()
       .reduce((sum, order) => sum + Number(order.total_cents || 0), 0);
 
+    const visibleOrders = Object.values(grouped).flat();
+    const attention = visibleOrders.filter(needsAttention).length;
+    const late = visibleOrders.filter(isLateOrder).length;
+    const noTracking = visibleOrders.filter(needsTracking).length;
+
     return {
       totalVisible,
       totalValue,
       paid: grouped.paid.length,
       delivered: grouped.delivered.length,
+      attention,
+      late,
+      noTracking,
     };
   }, [grouped]);
 
-  async function openOrder(order: OrderRow) {
+  const visibleColumns = useMemo(() => {
+    if (!isMobile) return COLUMNS;
+
+    return COLUMNS.filter((column) => column.key === mobileColumn);
+  }, [isMobile, mobileColumn]);
+
+  async function openOrder(order: OrderRow, updateUrl = true) {
+    if (updateUrl) {
+      navigate(`/admin/kanban?order_id=${order.id}`, { replace: true });
+    }
+
     setSelected(order);
     setSelectedItems([]);
     setLoadingItems(true);
@@ -915,7 +1118,7 @@ export default function AdminOrdersKanban() {
       .maybeSingle();
 
     if (!error && data) {
-      await openOrder(data as OrderRow);
+      await openOrder(data as OrderRow, false);
     }
   }
 
@@ -1104,6 +1307,22 @@ export default function AdminOrdersKanban() {
     });
   }
   const drawerOpen = !!selected;
+  
+  function closeDrawer() {
+  setSelected(null);
+  setSelectedItems([]);
+  setTrackingCodeInput("");
+  setCarrierInput("");
+}
+
+  const operationalFilters: { key: OperationalFilter; label: string; count?: number }[] = [
+    { key: "all", label: "Todos", count: summary.totalVisible },
+    { key: "attention", label: "Atenção", count: summary.attention },
+    { key: "late", label: "Parados", count: summary.late },
+    { key: "no_tracking", label: "Sem rastreio", count: summary.noTracking },
+    { key: "external", label: "Externas" },
+    { key: "today", label: "Hoje" },
+  ];
 
   return (
     <div
@@ -1111,7 +1330,7 @@ export default function AdminOrdersKanban() {
         minHeight: "100%",
         background:
           "radial-gradient(circle at top left, rgba(176,141,87,0.10), transparent 32%), #FCFAF6",
-        padding: 24,
+        padding: isMobile ? 12 : 24,
         overflowX: "hidden",
       }}
     >
@@ -1148,7 +1367,7 @@ export default function AdminOrdersKanban() {
           <h1
             style={{
               margin: 0,
-              fontSize: 34,
+              fontSize: isMobile ? 26 : 34,
               lineHeight: 1.1,
               color: CALEA.primary,
               letterSpacing: "-0.04em",
@@ -1178,7 +1397,7 @@ export default function AdminOrdersKanban() {
         >
           <div
             style={{
-              width: 340,
+              width: isMobile ? "100%" : 340,
               maxWidth: "100%",
               height: 48,
               display: "flex",
@@ -1235,10 +1454,12 @@ export default function AdminOrdersKanban() {
 
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(160px, 1fr))",
+          display: isMobile ? "flex" : "grid",
+          gridTemplateColumns: isMobile ? undefined : "repeat(6, minmax(150px, 1fr))",
           gap: 14,
           marginBottom: 20,
+          overflowX: isMobile ? "auto" : "visible",
+          paddingBottom: isMobile ? 4 : 0,
         }}
       >
         <div style={summaryCardStyle}>
@@ -1260,7 +1481,137 @@ export default function AdminOrdersKanban() {
           <span style={summaryLabelStyle}>Entregues 7 dias</span>
           <strong style={summaryValueStyle}>{summary.delivered}</strong>
         </div>
+
+        <div style={summaryCardStyle}>
+          <span style={summaryLabelStyle}>Precisam atenção</span>
+          <strong style={{ ...summaryValueStyle, color: summary.attention ? "#b54708" : CALEA.primary }}>
+            {summary.attention}
+          </strong>
+        </div>
+
+        <div style={summaryCardStyle}>
+          <span style={summaryLabelStyle}>Sem rastreio</span>
+          <strong style={{ ...summaryValueStyle, color: summary.noTracking ? "#b42318" : CALEA.primary }}>
+            {summary.noTracking}
+          </strong>
+        </div>
       </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          overflowX: "auto",
+          marginBottom: 14,
+          paddingBottom: 4,
+        }}
+      >
+        {operationalFilters.map((item) => {
+          const active = operationalFilter === item.key;
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setOperationalFilter(item.key)}
+              style={{
+                flex: "0 0 auto",
+                height: 40,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                borderRadius: 999,
+                border: `1px solid ${active ? CALEA.accent : CALEA.line}`,
+                background: active ? "#fff7e8" : "#fff",
+                color: active ? CALEA.primary : "#52525b",
+                padding: "0 13px",
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: active
+                  ? "0 10px 22px rgba(176,141,87,0.16)"
+                  : "0 8px 18px rgba(43,85,78,0.05)",
+              }}
+            >
+              <span>{item.label}</span>
+              {typeof item.count === "number" && (
+                <span
+                  style={{
+                    minWidth: 23,
+                    height: 23,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 999,
+                    background: active ? "#fff" : CALEA.soft,
+                    fontSize: 12,
+                  }}
+                >
+                  {item.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {isMobile ? (
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            overflowX: "auto",
+            marginBottom: 14,
+            paddingBottom: 4,
+          }}
+        >
+          {COLUMNS.map((column) => {
+            const active = mobileColumn === column.key;
+
+            return (
+              <button
+                key={column.key}
+                type="button"
+                onClick={() => setMobileColumn(column.key)}
+                style={{
+                  flex: "0 0 auto",
+                  height: 42,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  borderRadius: 999,
+                  border: `1px solid ${active ? CALEA.primary : CALEA.line}`,
+                  background: active ? CALEA.primary : "#fff",
+                  color: active ? "#fff" : CALEA.primary,
+                  padding: "0 14px",
+                  fontWeight: 800,
+                  fontSize: 13,
+                  boxShadow: active
+                    ? "0 12px 24px rgba(43,85,78,0.18)"
+                    : "0 8px 18px rgba(43,85,78,0.06)",
+                  cursor: "pointer",
+                }}
+              >
+                <span>{column.title}</span>
+                <span
+                  style={{
+                    minWidth: 24,
+                    height: 24,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 999,
+                    background: active ? "rgba(255,255,255,0.18)" : CALEA.soft,
+                    fontSize: 12,
+                  }}
+                >
+                  {grouped[column.key].length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {errorMsg && (
         <div
@@ -1293,25 +1644,25 @@ export default function AdminOrdersKanban() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(240px, 1fr))",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(5, minmax(240px, 1fr))",
             width: "100%",
-            gap: 16,
+            gap: isMobile ? 12 : 16,
             alignItems: "start",
-            overflowX: "auto",
+            overflowX: isMobile ? "hidden" : "auto",
             paddingBottom: 10,
           }}
         >
-          {COLUMNS.map((column) => (
+          {visibleColumns.map((column) => (
             <div
               key={column.key}
               style={{
-                minWidth: 220,
+                minWidth: isMobile ? 0 : 220,
                 background: CALEA.soft,
                 border: `1px solid ${CALEA.line}`,
                 borderRadius: 28,
                 padding: 14,
-                maxHeight: "calc(100vh - 180px)",
-                overflowY: "auto",
+                maxHeight: isMobile ? "none" : "calc(100vh - 180px)",
+                overflowY: isMobile ? "visible" : "auto",
               }}
             >
               <ColumnHeader
@@ -1347,10 +1698,7 @@ export default function AdminOrdersKanban() {
       {drawerOpen && selected && (
         <>
           <div
-            onClick={() => {
-              setSelected(null);
-              setSelectedItems([]);
-            }}
+            onClick={closeDrawer}
             style={{
               position: "fixed",
               inset: 0,
@@ -1364,7 +1712,8 @@ export default function AdminOrdersKanban() {
               position: "fixed",
               top: 0,
               right: 0,
-              width: 520,
+              left: isMobile ? 0 : "auto",
+              width: isMobile ? "100vw" : 520,
               maxWidth: "100%",
               height: "100vh",
               background: CALEA.bg,
@@ -1376,7 +1725,7 @@ export default function AdminOrdersKanban() {
           >
             <div
               style={{
-                padding: 22,
+                padding: isMobile ? 16 : 22,
                 borderBottom: `1px solid ${CALEA.line}`,
                 background: "#fff",
                 display: "flex",
@@ -1402,10 +1751,7 @@ export default function AdminOrdersKanban() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setSelected(null);
-                  setSelectedItems([]);
-                }}
+                onClick={closeDrawer}
                 style={{
                   border: "none",
                   background: "transparent",
@@ -1416,7 +1762,7 @@ export default function AdminOrdersKanban() {
               </button>
             </div>
 
-            <div style={{ padding: 20, overflowY: "auto", flex: 1 }}>
+            <div style={{ padding: isMobile ? 12 : 20, overflowY: "auto", flex: 1 }}>
               <DrawerCard title="Resumo" icon={<ReceiptText size={18} />}>
                 <div style={{ display: "grid", gap: 10, fontSize: 14 }}>
                   <InfoLine
@@ -1462,6 +1808,45 @@ export default function AdminOrdersKanban() {
                   <Badge tone={statusTone(selected.shipping_status)}>
                     Envio: {selected.shipping_status || "-"}
                   </Badge>
+                </div>
+              </DrawerCard>
+
+              <DrawerCard title="Próxima ação sugerida" icon={<Package size={18} />}>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <ValueRow label="Ação" value={nextActionLabel(selected)} strong />
+                  <ValueRow label="Tempo no fluxo" value={orderAgeLabel(selected)} />
+
+                  {isLateOrder(selected) && (
+                    <div
+                      style={{
+                        border: "1px solid #fed7aa",
+                        background: "#fff7ed",
+                        color: "#9a3412",
+                        borderRadius: 16,
+                        padding: 12,
+                        fontSize: 13,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Pedido parado há 2 dias ou mais. Priorize a próxima etapa.
+                    </div>
+                  )}
+
+                  {needsTracking(selected) && (
+                    <div
+                      style={{
+                        border: "1px solid #fecaca",
+                        background: "#fef2f2",
+                        color: "#991b1b",
+                        borderRadius: 16,
+                        padding: 12,
+                        fontSize: 13,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Pedido embalado sem rastreio. Informe o código antes de marcar como enviado.
+                    </div>
+                  )}
                 </div>
               </DrawerCard>
 
@@ -1539,7 +1924,7 @@ export default function AdminOrdersKanban() {
                           style={{
                             marginTop: 12,
                             display: "grid",
-                            gridTemplateColumns: "repeat(3, 1fr)",
+                            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
                             gap: 8,
                           }}
                         >
@@ -1771,6 +2156,14 @@ export default function AdminOrdersKanban() {
 
               <DrawerCard title="Ações">
                 <div style={{ display: "grid", gap: 10 }}>
+                  <ActionButton
+                    icon={<ShoppingBag size={16} />}
+                    onClick={() => openInSales(selected.id)}
+                    disabled={saving}
+                  >
+                    Abrir na aba Vendas
+                  </ActionButton>
+
                   <ActionButton
                     icon={<CreditCard size={16} />}
                     onClick={handleSetPaymentPaid}

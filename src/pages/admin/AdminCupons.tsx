@@ -230,6 +230,17 @@ export default function AdminCupons() {
     });
   }, [coupons, search]);
 
+  const couponStats = useMemo(() => {
+    return {
+      total: coupons.length,
+      active: coupons.filter((coupon) => statusLabel(coupon) === "Ativo").length,
+      scheduled: coupons.filter((coupon) => statusLabel(coupon) === "Agendado").length,
+      expired: coupons.filter((coupon) => statusLabel(coupon) === "Expirado").length,
+      inactive: coupons.filter((coupon) => !coupon.active).length,
+      freeShipping: coupons.filter((coupon) => coupon.free_shipping).length,
+    };
+  }, [coupons]);
+
   async function loadPartners() {
     const { data, error } = await supabase
       .from("marketing_partners")
@@ -516,7 +527,7 @@ export default function AdminCupons() {
 
           <button
             onClick={openCreateForm}
-            className="rounded-2xl bg-[#2b554e] px-5 py-3 text-sm font-semibold text-white hover:bg-[#244841]"
+            className="w-full rounded-2xl bg-[#2b554e] px-5 py-3 text-sm font-semibold text-white hover:bg-[#244841] sm:w-auto"
           >
             Novo cupom
           </button>
@@ -530,6 +541,38 @@ export default function AdminCupons() {
           placeholder="Buscar por código, nome, campanha ou parceria"
           className="w-full rounded-2xl border border-[#e9e2d6] bg-[#FCFAF6] px-4 py-3 text-sm outline-none focus:border-[#2b554e]"
         />
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Total</p>
+          <p className="mt-2 text-2xl font-semibold text-[#2b554e]">{couponStats.total}</p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Ativos</p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-700">{couponStats.active}</p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Agendados</p>
+          <p className="mt-2 text-2xl font-semibold text-sky-700">{couponStats.scheduled}</p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Expirados</p>
+          <p className="mt-2 text-2xl font-semibold text-amber-700">{couponStats.expired}</p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Inativos</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-700">{couponStats.inactive}</p>
+        </div>
+
+        <div className="rounded-3xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Frete grátis</p>
+          <p className="mt-2 text-2xl font-semibold text-[#2b554e]">{couponStats.freeShipping}</p>
+        </div>
       </section>
 
       {showForm ? (
@@ -917,11 +960,11 @@ export default function AdminCupons() {
               </label>
             </div>
 
-            <div className="flex justify-end gap-3 md:col-span-2">
+            <div className="flex flex-col-reverse gap-3 md:col-span-2 md:flex-row md:justify-end">
               <button
                 type="button"
                 onClick={resetForm}
-                className="rounded-2xl border border-[#e9e2d6] px-5 py-3 text-sm font-semibold text-zinc-600 hover:bg-[#f6f3ee]"
+                className="w-full rounded-2xl border border-[#e9e2d6] px-5 py-3 text-sm font-semibold text-zinc-600 hover:bg-[#f6f3ee] md:w-auto"
               >
                 Cancelar
               </button>
@@ -929,7 +972,7 @@ export default function AdminCupons() {
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-2xl bg-[#2b554e] px-5 py-3 text-sm font-semibold text-white hover:bg-[#244841] disabled:opacity-60"
+                className="w-full rounded-2xl bg-[#2b554e] px-5 py-3 text-sm font-semibold text-white hover:bg-[#244841] disabled:opacity-60 md:w-auto"
               >
                 {saving
                   ? "Salvando..."
@@ -943,10 +986,15 @@ export default function AdminCupons() {
       ) : null}
 
       <section className="overflow-hidden rounded-3xl border border-[#e9e2d6] bg-white shadow-sm">
-        <div className="border-b border-[#e9e2d6] px-5 py-4">
-          <h2 className="text-xl font-semibold text-[#2b554e]">
-            Cupons cadastrados
-          </h2>
+        <div className="flex flex-col gap-1 border-b border-[#e9e2d6] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-[#2b554e]">
+              Cupons cadastrados
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              {filteredCoupons.length} de {coupons.length} cupom(ns)
+            </p>
+          </div>
         </div>
 
         {loading ? (
@@ -956,94 +1004,195 @@ export default function AdminCupons() {
             Nenhum cupom encontrado.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] text-sm">
-              <thead className="bg-[#f6f3ee] text-left text-[#2b554e]">
-                <tr>
-                  <th className="px-4 py-3">Código</th>
-                  <th className="px-4 py-3">Parceria/Campanha</th>
-                  <th className="px-4 py-3">Desconto</th>
-                  <th className="px-4 py-3">Pedido mínimo</th>
-                  <th className="px-4 py-3">Uso</th>
-                  <th className="px-4 py-3">Validade</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
-                </tr>
-              </thead>
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1100px] text-sm">
+                <thead className="bg-[#f6f3ee] text-left text-[#2b554e]">
+                  <tr>
+                    <th className="px-4 py-3">Código</th>
+                    <th className="px-4 py-3">Parceria/Campanha</th>
+                    <th className="px-4 py-3">Desconto</th>
+                    <th className="px-4 py-3">Pedido mínimo</th>
+                    <th className="px-4 py-3">Uso</th>
+                    <th className="px-4 py-3">Validade</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Ações</th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {filteredCoupons.map((coupon) => (
-                  <tr key={coupon.id} className="border-t border-[#e9e2d6]">
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-zinc-900">
+                <tbody>
+                  {filteredCoupons.map((coupon) => (
+                    <tr key={coupon.id} className="border-t border-[#e9e2d6]">
+                      <td className="px-4 py-4">
+                        <div className="font-semibold text-zinc-900">
+                          {coupon.code}
+                        </div>
+
+                        <div className="text-xs text-zinc-500">
+                          {coupon.name || coupon.description || "Sem nome"}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4 text-zinc-700">
+                        <div className="font-medium">
+                          {coupon.marketing_partners?.name || "Sem parceria"}
+                        </div>
+
+                        <div className="text-xs text-zinc-500">
+                          {coupon.campaign_name ||
+                            channelLabel(coupon.source_channel) ||
+                            "-"}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4 font-medium text-zinc-700">
+                        {discountLabel(coupon)}
+                      </td>
+
+                      <td className="px-4 py-4 text-zinc-700">
+                        {moneyBRLFromCents(coupon.min_subtotal_cents)}
+                      </td>
+
+                      <td className="px-4 py-4 text-zinc-700">
+                        {coupon.max_uses ? `Até ${coupon.max_uses}` : "Ilimitado"}
+                      </td>
+
+                      <td className="px-4 py-4 text-zinc-700">
+                        {formatDate(coupon.ends_at)}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass(
+                            coupon
+                          )}`}
+                        >
+                          {statusLabel(coupon)}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => openEditForm(coupon)}
+                            className="rounded-xl border border-[#e9e2d6] px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-[#f6f3ee]"
+                          >
+                            Editar
+                          </button>
+
+                          <button
+                            onClick={() => toggleActive(coupon)}
+                            className="rounded-xl border border-[#e9e2d6] px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-[#f6f3ee]"
+                          >
+                            {coupon.active ? "Desativar" : "Ativar"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid gap-3 p-4 md:hidden">
+              {filteredCoupons.map((coupon) => (
+                <article
+                  key={coupon.id}
+                  className="rounded-3xl border border-[#e9e2d6] bg-[#FCFAF6] p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-lg font-semibold text-[#2b554e]">
                         {coupon.code}
                       </div>
 
-                      <div className="text-xs text-zinc-500">
+                      <div className="mt-1 truncate text-sm text-zinc-600">
                         {coupon.name || coupon.description || "Sem nome"}
                       </div>
-                    </td>
+                    </div>
 
-                    <td className="px-4 py-4 text-zinc-700">
-                      <div className="font-medium">
-                        {coupon.marketing_partners?.name || "Sem parceria"}
-                      </div>
+                    <span
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${statusClass(
+                        coupon
+                      )}`}
+                    >
+                      {statusLabel(coupon)}
+                    </span>
+                  </div>
 
-                      <div className="text-xs text-zinc-500">
-                        {coupon.campaign_name ||
-                          channelLabel(coupon.source_channel) ||
-                          "-"}
-                      </div>
-                    </td>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-2xl bg-white p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                        Desconto
+                      </p>
+                      <p className="mt-1 font-semibold text-zinc-800">
+                        {discountLabel(coupon)}
+                      </p>
+                    </div>
 
-                    <td className="px-4 py-4 font-medium text-zinc-700">
-                      {discountLabel(coupon)}
-                    </td>
+                    <div className="rounded-2xl bg-white p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                        Pedido mínimo
+                      </p>
+                      <p className="mt-1 font-semibold text-zinc-800">
+                        {moneyBRLFromCents(coupon.min_subtotal_cents)}
+                      </p>
+                    </div>
 
-                    <td className="px-4 py-4 text-zinc-700">
-                      {moneyBRLFromCents(coupon.min_subtotal_cents)}
-                    </td>
+                    <div className="rounded-2xl bg-white p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                        Uso
+                      </p>
+                      <p className="mt-1 font-semibold text-zinc-800">
+                        {coupon.max_uses ? `Até ${coupon.max_uses}` : "Ilimitado"}
+                      </p>
+                    </div>
 
-                    <td className="px-4 py-4 text-zinc-700">
-                      {coupon.max_uses ? `Até ${coupon.max_uses}` : "Ilimitado"}
-                    </td>
+                    <div className="rounded-2xl bg-white p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                        Validade
+                      </p>
+                      <p className="mt-1 font-semibold text-zinc-800">
+                        {formatDate(coupon.ends_at)}
+                      </p>
+                    </div>
+                  </div>
 
-                    <td className="px-4 py-4 text-zinc-700">
-                      {formatDate(coupon.ends_at)}
-                    </td>
+                  <div className="mt-4 rounded-2xl bg-white p-3 text-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                      Parceria / Campanha
+                    </p>
 
-                    <td className="px-4 py-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass(
-                          coupon
-                        )}`}
-                      >
-                        {statusLabel(coupon)}
-                      </span>
-                    </td>
+                    <p className="mt-1 font-semibold text-zinc-800">
+                      {coupon.marketing_partners?.name || "Sem parceria"}
+                    </p>
 
-                    <td className="px-4 py-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => openEditForm(coupon)}
-                          className="rounded-xl border border-[#e9e2d6] px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-[#f6f3ee]"
-                        >
-                          Editar
-                        </button>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      {coupon.campaign_name ||
+                        channelLabel(coupon.source_channel) ||
+                        "Sem campanha"}
+                    </p>
+                  </div>
 
-                        <button
-                          onClick={() => toggleActive(coupon)}
-                          className="rounded-xl border border-[#e9e2d6] px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-[#f6f3ee]"
-                        >
-                          {coupon.active ? "Desativar" : "Ativar"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => openEditForm(coupon)}
+                      className="rounded-2xl border border-[#e9e2d6] bg-white px-3 py-3 text-sm font-semibold text-[#2b554e]"
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      onClick={() => toggleActive(coupon)}
+                      className="rounded-2xl border border-[#e9e2d6] bg-white px-3 py-3 text-sm font-semibold text-zinc-700"
+                    >
+                      {coupon.active ? "Desativar" : "Ativar"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
         )}
       </section>
     </div>

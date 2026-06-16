@@ -55,6 +55,16 @@ function statusClass(status: ProductStatus) {
     : "bg-amber-50 text-amber-700 border-amber-200";
 }
 
+function formatDateBR(value: string) {
+  if (!value) return "-";
+
+  return new Date(value).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 export default function AdminProducts() {
   const nav = useNavigate();
 
@@ -67,6 +77,15 @@ export default function AdminProducts() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const hasItems = useMemo(() => items.length > 0, [items]);
+
+  const stats = useMemo(() => {
+    return {
+      total: items.length,
+      active: items.filter((item) => item.status === "active").length,
+      draft: items.filter((item) => item.status === "draft").length,
+      withoutPhoto: items.filter((item) => !item.image_url).length,
+    };
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -182,7 +201,7 @@ export default function AdminProducts() {
     try {
       const { error } = await supabase
         .from("products")
-        .update({ status: nextStatus })
+        .update({ status: nextStatus, updated_at: new Date().toISOString() })
         .eq("id", product.id);
 
       if (error) throw error;
@@ -234,168 +253,321 @@ export default function AdminProducts() {
     }
   }
 
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+  }
+
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Produtos</h1>
+    <div className="mx-auto w-full max-w-[1500px] space-y-5">
+      <section className="rounded-[26px] border border-[#e9e2d6] bg-white p-4 shadow-sm sm:p-5 lg:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b08d57]">
+              Catálogo
+            </p>
 
-        <button
-          onClick={() => nav("/admin/produtos/novo")}
-          className="rounded-xl bg-[#2b554e] px-4 py-2 text-white hover:opacity-95"
-        >
-          Novo produto
-        </button>
-      </div>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#2b554e] sm:text-3xl">
+              Produtos
+            </h1>
 
-      {err && (
-        <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700">
+            <p className="mt-1 text-sm text-zinc-500">
+              Gerencie produtos, status, fotos principais e acesso rápido aos SKUs.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={load}
+              className="h-11 rounded-2xl border border-[#e9e2d6] bg-white px-4 text-sm font-semibold text-[#2b554e] hover:bg-[#fcfaf6]"
+            >
+              Recarregar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => nav("/admin/produtos/novo")}
+              className="h-11 rounded-2xl bg-[#2b554e] px-4 text-sm font-semibold text-white hover:opacity-95"
+            >
+              Novo produto
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {err ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {err}
         </div>
-      )}
+      ) : null}
 
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border bg-white p-4 md:flex-row md:items-center md:justify-between">
-        <div className="w-full md:max-w-md">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-2xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
+            Total
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-[#2b554e]">
+            {stats.total}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
+            Ativos
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-700">
+            {stats.active}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
+            Rascunhos
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-amber-700">
+            {stats.draft}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
+            Sem foto
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-rose-700">
+            {stats.withoutPhoto}
+          </p>
+        </div>
+      </section>
+
+      <section className="rounded-[24px] border border-[#e9e2d6] bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome ou slug..."
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-[#2b554e] focus:ring-2 focus:ring-[#2b554e]/10"
+            className="h-11 w-full rounded-2xl border border-[#e9e2d6] bg-[#fcfaf6] px-4 text-sm text-gray-800 outline-none transition focus:border-[#2b554e] focus:ring-2 focus:ring-[#2b554e]/10 lg:max-w-md"
           />
-        </div>
 
-        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-[#2b554e] focus:ring-2 focus:ring-[#2b554e]/10 md:w-44"
-          >
-            <option value="all">Todos</option>
-            <option value="active">Ativos</option>
-            <option value="draft">Rascunhos</option>
-          </select>
-
-          {(search || statusFilter !== "all") && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("all");
-              }}
-              className="rounded-xl border px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[180px_auto]">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              className="h-11 w-full rounded-2xl border border-[#e9e2d6] bg-white px-4 text-sm text-gray-800 outline-none transition focus:border-[#2b554e] focus:ring-2 focus:ring-[#2b554e]/10"
             >
-              Limpar filtros
-            </button>
-          )}
-        </div>
-      </div>
+              <option value="all">Todos</option>
+              <option value="active">Ativos</option>
+              <option value="draft">Rascunhos</option>
+            </select>
 
-      <div className="mb-3 text-sm text-gray-500">
-        Exibindo {filteredItems.length} de {items.length} produtos
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border bg-white">
-        <div className="grid grid-cols-12 gap-3 border-b px-4 py-3 text-sm text-gray-500">
-          <div className="col-span-2">Foto</div>
-          <div className="col-span-4">Nome</div>
-          <div className="col-span-3">Slug</div>
-          <div className="col-span-1">Status</div>
-          <div className="col-span-2 text-right">Ações</div>
-        </div>
-
-        {loading ? (
-          <div className="p-6 text-sm text-gray-600">Carregando...</div>
-        ) : !hasItems ? (
-          <div className="p-6 text-sm text-gray-600">
-            Nenhum produto cadastrado.
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="p-6 text-sm text-gray-600">
-            Nenhum produto encontrado com os filtros aplicados.
-          </div>
-        ) : (
-          filteredItems.map((p) => {
-            const busy = actingId === p.id;
-
-            return (
-              <div
-                key={p.id}
-                className="grid grid-cols-12 gap-3 border-b px-4 py-3 last:border-b-0"
+            {(search || statusFilter !== "all") ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="h-11 rounded-2xl border border-[#e9e2d6] px-4 text-sm font-semibold text-gray-600 hover:bg-gray-50"
               >
-                <div className="col-span-2">
-                  <div className="h-16 w-16 overflow-hidden rounded-xl border bg-gray-50">
-                    {p.image_url ? (
-                      <img
-                        src={p.image_url}
-                        alt={p.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
-                        Sem foto
+                Limpar filtros
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        <p className="mt-3 text-sm text-zinc-500">
+          Exibindo <strong className="text-[#2b554e]">{filteredItems.length}</strong> de{" "}
+          <strong className="text-[#2b554e]">{items.length}</strong> produtos
+        </p>
+      </section>
+
+      {loading ? (
+        <div className="rounded-2xl border border-[#e9e2d6] bg-white p-6 text-sm text-gray-600 shadow-sm">
+          Carregando produtos...
+        </div>
+      ) : !hasItems ? (
+        <div className="rounded-2xl border border-[#e9e2d6] bg-white p-6 text-sm text-gray-600 shadow-sm">
+          Nenhum produto cadastrado.
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="rounded-2xl border border-[#e9e2d6] bg-white p-6 text-sm text-gray-600 shadow-sm">
+          Nenhum produto encontrado com os filtros aplicados.
+        </div>
+      ) : (
+        <>
+          <section className="md:hidden">
+            <div className="space-y-3">
+              {filteredItems.map((p) => {
+                const busy = actingId === p.id;
+
+                return (
+                  <article
+                    key={p.id}
+                    className="rounded-[24px] border border-[#e9e2d6] bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex gap-3">
+                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[#e9e2d6] bg-[#fcfaf6]">
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            alt={p.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center px-2 text-center text-[11px] text-gray-400">
+                            Sem foto
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <h2 className="min-w-0 truncate text-base font-semibold text-[#2b554e]">
+                            {p.name}
+                          </h2>
+
+                          <span
+                            className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusClass(
+                              p.status
+                            )}`}
+                          >
+                            {statusLabel(p.status)}
+                          </span>
+                        </div>
+
+                        <p className="mt-1 truncate text-xs text-zinc-500">
+                          /{p.slug}
+                        </p>
+
+                        <p className="mt-2 text-xs text-zinc-400">
+                          Criado em {formatDateBR(p.created_at)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => nav(`/admin/produtos/${p.id}`)}
+                        className="h-10 rounded-xl bg-[#2b554e] px-3 text-sm font-semibold text-white"
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(p)}
+                        disabled={busy}
+                        className="h-10 rounded-xl border border-[#e9e2d6] px-3 text-sm font-semibold text-[#2b554e] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {busy
+                          ? "..."
+                          : p.status === "active"
+                          ? "Desativar"
+                          : "Reativar"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => deleteProduct(p)}
+                        disabled={busy}
+                        className="col-span-2 h-10 rounded-xl border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="hidden overflow-hidden rounded-2xl border border-[#e9e2d6] bg-white shadow-sm md:block">
+            <div className="grid grid-cols-12 gap-3 border-b border-[#e9e2d6] bg-[#fcfaf6] px-4 py-3 text-sm text-gray-500">
+              <div className="col-span-2">Foto</div>
+              <div className="col-span-4">Nome</div>
+              <div className="col-span-3">Slug</div>
+              <div className="col-span-1">Status</div>
+              <div className="col-span-2 text-right">Ações</div>
+            </div>
+
+            {filteredItems.map((p) => {
+              const busy = actingId === p.id;
+
+              return (
+                <div
+                  key={p.id}
+                  className="grid grid-cols-12 gap-3 border-b border-[#f1ece4] px-4 py-3 last:border-b-0"
+                >
+                  <div className="col-span-2">
+                    <div className="h-16 w-16 overflow-hidden rounded-xl border bg-gray-50">
+                      {p.image_url ? (
+                        <img
+                          src={p.image_url}
+                          alt={p.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
+                          Sem foto
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="col-span-4 flex min-w-0 items-center font-medium text-gray-900">
+                    <span className="truncate">{p.name}</span>
+                  </div>
+
+                  <div className="col-span-3 flex min-w-0 items-center text-gray-600">
+                    <span className="truncate">{p.slug}</span>
+                  </div>
+
+                  <div className="col-span-1 flex items-center">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusClass(
+                        p.status
+                      )}`}
+                    >
+                      {statusLabel(p.status)}
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => nav(`/admin/produtos/${p.id}`)}
+                      className="text-sm font-semibold text-[#2b554e] underline"
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleStatus(p)}
+                      disabled={busy}
+                      className="rounded-lg border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {busy
+                        ? "..."
+                        : p.status === "active"
+                        ? "Desativar"
+                        : "Reativar"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => deleteProduct(p)}
+                      disabled={busy}
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Excluir
+                    </button>
                   </div>
                 </div>
-
-                <div className="col-span-4 flex items-center font-medium text-gray-900">
-                  {p.name}
-                </div>
-
-                <div className="col-span-3 flex items-center text-gray-600">
-                  {p.slug}
-                </div>
-
-                <div className="col-span-1 flex items-center">
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusClass(
-                      p.status
-                    )}`}
-                  >
-                    {statusLabel(p.status)}
-                  </span>
-                </div>
-
-                <div className="col-span-2 flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => nav(`/admin/produtos/${p.id}`)}
-                    className="text-sm text-[#2b554e] underline"
-                  >
-                    Editar
-                  </button>
-
-                  <button
-                    onClick={() => toggleStatus(p)}
-                    disabled={busy}
-                    className="rounded-lg border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {busy
-                      ? "..."
-                      : p.status === "active"
-                      ? "Desativar"
-                      : "Reativar"}
-                  </button>
-
-                  <button
-                    onClick={() => deleteProduct(p)}
-                    disabled={busy}
-                    className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Excluir
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      <button
-        onClick={load}
-        className="mt-4 text-sm text-gray-600 underline hover:text-gray-800"
-      >
-        Recarregar
-      </button>
+              );
+            })}
+          </section>
+        </>
+      )}
     </div>
   );
 }

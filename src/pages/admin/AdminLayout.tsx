@@ -217,9 +217,107 @@ const NAV_GROUPS: NavGroup[] = [
 
 const FLAT_NAV = NAV_GROUPS.flatMap((group) => group.items);
 
+
+function IconMenu() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconX() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AdminSidebar({
+  adminUser,
+  onNavigate,
+  onLogout,
+}: {
+  adminUser: AdminUser;
+  onNavigate?: () => void;
+  onLogout: () => void;
+}) {
+  return (
+    <aside className="flex h-full min-h-0 flex-col bg-white p-5 text-[#2b554e]">
+      <div className="flex items-center justify-between gap-3 border-b border-[#e9e2d6] pb-4">
+        <div>
+          <div className="text-lg font-semibold leading-tight">Caléa Admin</div>
+
+          <div className="text-xs text-zinc-500">Olá, {adminUser.name}</div>
+        </div>
+
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2b554e] font-semibold text-white">
+          {adminUser.name.charAt(0).toUpperCase()}
+        </div>
+      </div>
+
+      <nav className="mt-5 flex-1 space-y-6 overflow-y-auto pr-1">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.title}>
+            <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+              {group.title}
+            </div>
+
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    [
+                      "flex items-center justify-between rounded-xl px-3 py-2 transition",
+                      isActive
+                        ? "bg-[#eef4f2] font-semibold text-[#2b554e]"
+                        : "text-zinc-700 hover:bg-[#f6f3ee] hover:text-[#2b554e]",
+                    ].join(" ")
+                  }
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="shrink-0">{item.icon}</span>
+                    <span className="text-sm">{item.label}</span>
+                  </span>
+
+                  {item.badge ? (
+                    <span className="rounded-full border border-[#2b554e]/30 bg-[#eef4f2] px-2 py-0.5 text-[10px] font-semibold text-[#2b554e]">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="mt-5 border-t border-[#e9e2d6] pt-4">
+        <button
+          onClick={onLogout}
+          className="w-full rounded-xl bg-[#2b554e] px-3 py-2 text-sm font-medium text-white hover:bg-[#244841]"
+        >
+          Sair
+        </button>
+
+        <div className="mt-3 text-[11px] text-zinc-400">
+          © {new Date().getFullYear()} Caléa
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [adminUser, setAdminUser] = useState<AdminUser>({
     name: "Administrador",
@@ -252,6 +350,10 @@ export default function AdminLayout() {
     loadUser();
   }, []);
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
   async function handleLogout() {
     await supabase.auth.signOut();
     navigate("/", { replace: true });
@@ -267,76 +369,40 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-[#FCFAF6]">
       <div className="flex min-h-screen">
-        <aside className="w-72 bg-white border-r border-[#e9e2d6] p-5 text-[#2b554e] flex flex-col">
-          <div className="flex items-center justify-between gap-3 border-b border-[#e9e2d6] pb-4">
-            <div>
-              <div className="text-lg font-semibold leading-tight">Caléa Admin</div>
+        {/* Sidebar desktop */}
+        <div className="hidden h-screen w-72 shrink-0 border-r border-[#e9e2d6] bg-white lg:sticky lg:top-0 lg:block">
+          <AdminSidebar adminUser={adminUser} onLogout={handleLogout} />
+        </div>
 
-              <div className="text-xs text-zinc-500">
-                Olá, {adminUser.name}
-              </div>
-            </div>
-
-            <div className="h-9 w-9 rounded-xl bg-[#2b554e] text-white flex items-center justify-center font-semibold">
-              {adminUser.name.charAt(0).toUpperCase()}
-            </div>
-          </div>
-
-          <nav className="mt-5 space-y-6 overflow-y-auto pr-1">
-            {NAV_GROUPS.map((group) => (
-              <div key={group.title}>
-                <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                  {group.title}
-                </div>
-
-                <div className="space-y-1">
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end}
-                      className={({ isActive }) =>
-                        [
-                          "flex items-center justify-between rounded-xl px-3 py-2 transition",
-                          isActive
-                            ? "bg-[#eef4f2] text-[#2b554e] font-semibold"
-                            : "text-zinc-700 hover:bg-[#f6f3ee] hover:text-[#2b554e]",
-                        ].join(" ")
-                      }
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="shrink-0">{item.icon}</span>
-                        <span className="text-sm">{item.label}</span>
-                      </span>
-
-                      {item.badge ? (
-                        <span className="rounded-full border border-[#2b554e]/30 bg-[#eef4f2] px-2 py-0.5 text-[10px] font-semibold text-[#2b554e]">
-                          {item.badge}
-                        </span>
-                      ) : null}
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          <div className="mt-auto border-t border-[#e9e2d6] pt-4">
+        {/* Conteúdo */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Header mobile */}
+          <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#e9e2d6] bg-white px-4 lg:hidden">
             <button
-              onClick={handleLogout}
-              className="w-full rounded-xl bg-[#2b554e] px-3 py-2 text-sm font-medium text-white hover:bg-[#244841]"
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e9e2d6] text-[#2b554e]"
+              aria-label="Abrir menu"
             >
-              Sair
+              <IconMenu />
             </button>
 
-            <div className="mt-3 text-[11px] text-zinc-400">
-              © {new Date().getFullYear()} Caléa
+            <div className="min-w-0 px-3 text-center">
+              <div className="truncate text-sm font-semibold text-[#2b554e]">
+                {currentLabel}
+              </div>
+              <div className="truncate text-xs text-zinc-400">
+                Admin / {currentLabel}
+              </div>
             </div>
-          </div>
-        </aside>
 
-        <div className="flex-1 flex flex-col">
-          <header className="h-16 bg-white border-b border-[#e9e2d6] flex items-center justify-between px-6">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2b554e] text-sm font-semibold text-white">
+              {adminUser.name.charAt(0).toUpperCase()}
+            </div>
+          </header>
+
+          {/* Header desktop */}
+          <header className="hidden h-16 items-center justify-between border-b border-[#e9e2d6] bg-white px-6 lg:flex">
             <div className="text-sm text-zinc-500">
               <span className="font-medium text-[#2b554e]">Admin</span>
               <span className="mx-2 text-zinc-300">/</span>
@@ -349,18 +415,56 @@ export default function AdminLayout() {
               </div>
 
               {adminUser.email ? (
-                <div className="text-xs text-zinc-400">
-                  {adminUser.email}
-                </div>
+                <div className="text-xs text-zinc-400">{adminUser.email}</div>
               ) : null}
             </div>
           </header>
 
-          <main className="flex-1 p-6 lg:p-8">
+          <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-5 lg:p-8">
             <Outlet />
           </main>
         </div>
       </div>
+
+      {/* Drawer mobile */}
+      {mobileMenuOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45"
+            aria-label="Fechar menu"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+
+          <div className="relative h-full w-[86vw] max-w-[330px] overflow-hidden border-r border-[#e9e2d6] bg-white shadow-2xl">
+            <div className="flex h-14 items-center justify-between border-b border-[#e9e2d6] px-4">
+              <div>
+                <div className="text-sm font-semibold text-[#2b554e]">
+                  Menu Admin
+                </div>
+                <div className="text-xs text-zinc-400">Caléa</div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e9e2d6] text-[#2b554e]"
+                aria-label="Fechar menu"
+              >
+                <IconX />
+              </button>
+            </div>
+
+            <div className="h-[calc(100%-56px)]">
+              <AdminSidebar
+                adminUser={adminUser}
+                onNavigate={() => setMobileMenuOpen(false)}
+                onLogout={handleLogout}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
