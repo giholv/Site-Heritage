@@ -87,33 +87,32 @@ export default function AdminProducts() {
     };
   }, [items]);
 
-  const filteredItems = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return items.filter((product) => {
-      const matchesSearch =
-        !term ||
-        product.name.toLowerCase().includes(term) ||
-        product.slug.toLowerCase().includes(term);
-
-      const matchesStatus =
-        statusFilter === "all" ? true : product.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [items, search, statusFilter]);
+  const filteredItems = items;
 
   const PAGE_SIZE = 50;
+
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
 
     try {
-      const { data: productsData, error: productsError } = await supabase
+      const term = search.trim();
+
+      let query = supabase
         .from("products")
         .select("id,name,slug,status,created_at")
         .order("created_at", { ascending: false })
-          .range(0, PAGE_SIZE - 1);
+        .range(0, PAGE_SIZE - 1);
+
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
+
+      if (term) {
+        query = query.or(`name.ilike.%${term}%,slug.ilike.%${term}%`);
+      }
+
+      const { data: productsData, error: productsError } = await query;
 
       if (productsError) throw productsError;
 
@@ -137,6 +136,7 @@ export default function AdminProducts() {
       const skuIds = skus.map((s) => s.id);
 
       const skuToProduct = new Map<string, string>();
+
       for (const sku of skus) {
         skuToProduct.set(sku.id, sku.product_id);
       }
@@ -179,11 +179,15 @@ export default function AdminProducts() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search, statusFilter]);
 
   useEffect(() => {
+  const timer = window.setTimeout(() => {
     load();
-  }, [load]);
+  }, 400);
+
+  return () => window.clearTimeout(timer);
+}, [load]);
 
   async function toggleStatus(product: Product) {
     const nextStatus: ProductStatus =
@@ -463,8 +467,8 @@ export default function AdminProducts() {
                         {busy
                           ? "..."
                           : p.status === "active"
-                          ? "Desativar"
-                          : "Reativar"}
+                            ? "Desativar"
+                            : "Reativar"}
                       </button>
 
                       <button
@@ -551,8 +555,8 @@ export default function AdminProducts() {
                       {busy
                         ? "..."
                         : p.status === "active"
-                        ? "Desativar"
-                        : "Reativar"}
+                          ? "Desativar"
+                          : "Reativar"}
                     </button>
 
                     <button
