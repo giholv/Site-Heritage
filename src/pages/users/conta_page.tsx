@@ -1038,23 +1038,6 @@ function StatusPill({ status }: { status?: string | null }) {
   );
 }
 
-function PlainInfoBox({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-[20px] border border-[#e9e2d6] bg-[#fcfaf6] p-5">
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#b08d57]">
-        {label}
-      </p>
-
-      <p className="mt-2 text-[20px] text-[#2b554e]">{value}</p>
-    </div>
-  );
-}
 
 function ProfileField({
   label,

@@ -103,6 +103,7 @@ export default function AdminProducts() {
     });
   }, [items, search, statusFilter]);
 
+  const PAGE_SIZE = 50;
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
@@ -111,7 +112,8 @@ export default function AdminProducts() {
       const { data: productsData, error: productsError } = await supabase
         .from("products")
         .select("id,name,slug,status,created_at")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+          .range(0, PAGE_SIZE - 1);
 
       if (productsError) throw productsError;
 

@@ -461,7 +461,12 @@ export default async (req: Request) => {
     const declaredValue = Math.max(centsToBRL(order.subtotal_cents), 25);
     const orderValue = centsToBRL(order.total_cents);
 
+    const WEBHOOK_URL =
+  "https://zcwwvrzvctzkeufcayon.supabase.co/functions/v1/frenet-tracking-webhook";
+
     const frenetPayload = {
+       TrackingNotificationUrl: WEBHOOK_URL,
+  StatusNotificationUrl: WEBHOOK_URL,
       Order: {
         Id: order.order_number || order.id,
         Value: orderValue,
