@@ -36,6 +36,7 @@ type SkuImageDb = {
 };
 
 const STORAGE_BUCKET = "product-images";
+const PAGE_SIZE = 50;
 
 function getPublicImageUrl(path: string | null) {
   if (!path) return null;
@@ -76,20 +77,22 @@ export default function AdminProducts() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
   const hasItems = useMemo(() => items.length > 0, [items]);
 
   const stats = useMemo(() => {
     return {
-      total: items.length,
+      total: totalCount,
       active: items.filter((item) => item.status === "active").length,
       draft: items.filter((item) => item.status === "draft").length,
       withoutPhoto: items.filter((item) => !item.image_url).length,
     };
-  }, [items]);
+  }, [items, totalCount]);
 
   const filteredItems = items;
-
-  const PAGE_SIZE = 50;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,12 +100,14 @@ export default function AdminProducts() {
 
     try {
       const term = search.trim();
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
 
       let query = supabase
         .from("products")
-        .select("id,name,slug,status,created_at")
+        .select("id,name,slug,status,created_at", { count: "exact" })
         .order("created_at", { ascending: false })
-        .range(0, PAGE_SIZE - 1);
+        .range(from, to);
 
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter);
@@ -112,11 +117,12 @@ export default function AdminProducts() {
         query = query.or(`name.ilike.%${term}%,slug.ilike.%${term}%`);
       }
 
-      const { data: productsData, error: productsError } = await query;
+      const { data: productsData, error: productsError, count } = await query;
 
       if (productsError) throw productsError;
 
       const products = (productsData ?? []) as ProductDb[];
+      setTotalCount(count ?? 0);
 
       if (!products.length) {
         setItems([]);
@@ -179,15 +185,15 @@ export default function AdminProducts() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [page, search, statusFilter]);
 
   useEffect(() => {
-  const timer = window.setTimeout(() => {
-    load();
-  }, 400);
+    const timer = window.setTimeout(() => {
+      load();
+    }, 400);
 
-  return () => window.clearTimeout(timer);
-}, [load]);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   async function toggleStatus(product: Product) {
     const nextStatus: ProductStatus =
@@ -244,6 +250,7 @@ export default function AdminProducts() {
       if (error) throw error;
 
       setItems((prev) => prev.filter((item) => item.id !== product.id));
+      setTotalCount((prev) => Math.max(0, prev - 1));
     } catch (error: any) {
       console.error(error);
 
@@ -262,6 +269,7 @@ export default function AdminProducts() {
   function clearFilters() {
     setSearch("");
     setStatusFilter("all");
+    setPage(0);
   }
 
   return (
@@ -320,7 +328,7 @@ export default function AdminProducts() {
 
         <div className="rounded-2xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
-            Ativos
+            Ativos nesta página
           </p>
           <p className="mt-2 text-2xl font-semibold text-emerald-700">
             {stats.active}
@@ -329,7 +337,7 @@ export default function AdminProducts() {
 
         <div className="rounded-2xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
-            Rascunhos
+            Rascunhos nesta página
           </p>
           <p className="mt-2 text-2xl font-semibold text-amber-700">
             {stats.draft}
@@ -338,7 +346,7 @@ export default function AdminProducts() {
 
         <div className="rounded-2xl border border-[#e9e2d6] bg-white p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
-            Sem foto
+            Sem foto nesta página
           </p>
           <p className="mt-2 text-2xl font-semibold text-rose-700">
             {stats.withoutPhoto}
@@ -351,7 +359,10 @@ export default function AdminProducts() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
             placeholder="Buscar por nome ou slug..."
             className="h-11 w-full rounded-2xl border border-[#e9e2d6] bg-[#fcfaf6] px-4 text-sm text-gray-800 outline-none transition focus:border-[#2b554e] focus:ring-2 focus:ring-[#2b554e]/10 lg:max-w-md"
           />
@@ -359,7 +370,10 @@ export default function AdminProducts() {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[180px_auto]">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as StatusFilter);
+                setPage(0);
+              }}
               className="h-11 w-full rounded-2xl border border-[#e9e2d6] bg-white px-4 text-sm text-gray-800 outline-none transition focus:border-[#2b554e] focus:ring-2 focus:ring-[#2b554e]/10"
             >
               <option value="all">Todos</option>
@@ -367,7 +381,7 @@ export default function AdminProducts() {
               <option value="draft">Rascunhos</option>
             </select>
 
-            {(search || statusFilter !== "all") ? (
+            {search || statusFilter !== "all" ? (
               <button
                 type="button"
                 onClick={clearFilters}
@@ -380,8 +394,8 @@ export default function AdminProducts() {
         </div>
 
         <p className="mt-3 text-sm text-zinc-500">
-          Exibindo <strong className="text-[#2b554e]">{filteredItems.length}</strong> de{" "}
-          <strong className="text-[#2b554e]">{items.length}</strong> produtos
+          Exibindo <strong className="text-[#2b554e]">{items.length}</strong> de{" "}
+          <strong className="text-[#2b554e]">{totalCount}</strong> produtos
         </p>
       </section>
 
@@ -571,6 +585,34 @@ export default function AdminProducts() {
                 </div>
               );
             })}
+          </section>
+
+          <section className="flex flex-col gap-3 rounded-2xl border border-[#e9e2d6] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-zinc-500">
+              Página{" "}
+              <strong className="text-[#2b554e]">{page + 1}</strong> de{" "}
+              <strong className="text-[#2b554e]">{totalPages}</strong>
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((prev) => Math.max(0, prev - 1))}
+                disabled={page === 0 || loading}
+                className="h-10 rounded-xl border border-[#e9e2d6] px-4 text-sm font-semibold text-[#2b554e] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Anterior
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPage((prev) => prev + 1)}
+                disabled={(page + 1) * PAGE_SIZE >= totalCount || loading}
+                className="h-10 rounded-xl bg-[#2b554e] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Próxima página
+              </button>
+            </div>
           </section>
         </>
       )}
