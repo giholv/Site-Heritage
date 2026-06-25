@@ -36,6 +36,9 @@ type SkuRow = {
   variant_name: string;
   title: string | null;
   price_cents: number;
+  compare_at_price_cents: number | null;
+  sale_price_cents: number | null;
+  sale_active: boolean | null;
   active: boolean;
   created_at?: string;
   available_qty: number;
@@ -137,7 +140,21 @@ export default function ProductPage() {
     }));
   }, [skus]);
 
-  const price = selectedSku ? selectedSku.price_cents / 100 : 0;
+  const hasSale = Boolean(
+    selectedSku?.sale_active &&
+      selectedSku?.sale_price_cents &&
+      selectedSku.sale_price_cents > 0 &&
+      selectedSku.sale_price_cents < selectedSku.price_cents
+  );
+
+  const priceCents = selectedSku
+    ? hasSale && selectedSku.sale_price_cents
+      ? selectedSku.sale_price_cents
+      : selectedSku.price_cents
+    : 0;
+
+  const oldPrice = selectedSku && hasSale ? selectedSku.price_cents / 100 : null;
+  const price = priceCents / 100;
 
   const isAvailable = Boolean(
     product?.status === "active" &&
@@ -174,7 +191,7 @@ export default function ProductPage() {
 
         const { data: skuData, error: skuError } = await supabase
           .from("skus")
-          .select("id, product_id, variant_name, title, price_cents, active, created_at")
+          .select("id, product_id, variant_name, title, price_cents, compare_at_price_cents, sale_price_cents, sale_active, active, created_at")
           .eq("product_id", productData.id)
           .eq("active", true)
           .order("created_at", { ascending: true });
@@ -225,6 +242,8 @@ export default function ProductPage() {
               title: sku.title,
               variant_name: sku.variant_name,
               active: sku.active,
+              sale_active: sku.sale_active,
+              sale_price_cents: sku.sale_price_cents,
               available_qty: sku.available_qty,
             }))
           );
@@ -324,6 +343,8 @@ export default function ProductPage() {
       sku_id: selectedSku.id,
       name: product.name,
       price,
+      original_price: oldPrice,
+      sale_active: hasSale,
       image: images[0]?.src || FALLBACK_IMAGE,
       variant: selectedSku.title?.trim() || selectedSku.variant_name?.trim() || "Variação",
       qty: safeQty,
@@ -489,6 +510,7 @@ export default function ProductPage() {
             name={product.name}
             description={product.description || ""}
             price={price}
+            oldPrice={oldPrice}
             variants={variants}
             selectedVariant={selectedSku?.id ?? ""}
             onSelectVariant={setSelectedSkuId}

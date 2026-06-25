@@ -111,12 +111,21 @@ const Footer: React.FC = () => {
             </h3>
 
             <ul className="space-y-2 text-sm text-[#FCFAF6]/75">
-              <li>• 10% OFF na primeira compra: <strong>BOASVINDAS</strong></li>
+              <li>• 5% OFF na primeira compra: <strong>BOASVINDAS</strong></li>
               <li>• Troca fácil</li>
               <li>• Atendimento pelo WhatsApp</li>
             </ul>
 
-            <div className="mt-5">
+            <div className="mt-5 rounded-2xl border border-[#FCFAF6]/15 bg-[#FCFAF6]/10 p-3">
+        
+              <img
+                src="/Bandeiras-horizontal-grande.svg"
+                alt="Pix, Visa, Mastercard, American Express, Elo e Hipercard"
+                className="h-auto max-h-12 w-auto object-contain opacity-90"
+              />
+            </div>
+
+            <div className="mt-4">
               <span className="inline-flex items-center rounded-full border border-[#b08d57]/40 bg-[#FCFAF6]/10 px-3 py-1 text-xs text-[#FCFAF6]">
                 ✦ Acabamento premium • Brilho elegante
               </span>

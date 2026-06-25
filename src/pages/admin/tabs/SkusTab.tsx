@@ -37,6 +37,9 @@ type SkuDbRow = {
   sku_code?: string | null;
   barcode?: string | null;
   price_cents?: number | null;
+  compare_at_price_cents?: number | null;
+  sale_price_cents?: number | null;
+  sale_active?: boolean | null;
   plating_type?: string | null;
   plating_millesimal?: number | null;
   ring_size?: number | null;
@@ -420,6 +423,14 @@ function SkuEditor({
     String((initial as any)?.price_round_step_cents ?? "100")
   );
 
+  const [saleActive, setSaleActive] = useState<boolean>(Boolean(initial?.sale_active));
+  const [compareAtPrice, setCompareAtPrice] = useState(
+    initial?.compare_at_price_cents ? String((initial.compare_at_price_cents ?? 0) / 100) : ""
+  );
+  const [salePrice, setSalePrice] = useState(
+    initial?.sale_price_cents ? String((initial.sale_price_cents ?? 0) / 100) : ""
+  );
+
   const [pricingConfig, setPricingConfig] = useState<{
     marketplace_fee_pct: number;
     packaging_cost_cents: number;
@@ -465,8 +476,28 @@ function SkuEditor({
     if (isRing && (!ringSize.trim() || !Number.isFinite(Number(ringSize)))) return false;
     if (!Number.isFinite(Number(marginPct))) return false;
     if (!Number.isFinite(Number(roundStep)) || Number(roundStep) <= 0) return false;
+
+    if (saleActive) {
+      const oldPriceCents = normalizePriceToCents(compareAtPrice);
+      const promoPriceCents = normalizePriceToCents(salePrice);
+
+      if (!oldPriceCents || !promoPriceCents) return false;
+      if (promoPriceCents >= oldPriceCents) return false;
+    }
+
     return true;
-  }, [cost, platingType, millesimal, ringSize, isRing, marginPct, roundStep]);
+  }, [
+    cost,
+    platingType,
+    millesimal,
+    ringSize,
+    isRing,
+    marginPct,
+    roundStep,
+    saleActive,
+    compareAtPrice,
+    salePrice,
+  ]);
 
   const calculatedPriceCents = useMemo(() => {
     if (!pricingConfig) return 0;
@@ -523,6 +554,27 @@ function SkuEditor({
                 return setErr("Tamanho do anel inválido.");
               }
 
+              const compare_at_price_cents = saleActive
+                ? normalizePriceToCents(compareAtPrice)
+                : null;
+
+              const sale_price_cents = saleActive
+                ? normalizePriceToCents(salePrice)
+                : null;
+
+              if (saleActive && (!compare_at_price_cents || !sale_price_cents)) {
+                return setErr("Informe o preço anterior e o preço promocional.");
+              }
+
+              if (
+                saleActive &&
+                compare_at_price_cents &&
+                sale_price_cents &&
+                sale_price_cents >= compare_at_price_cents
+              ) {
+                return setErr("O preço promocional precisa ser menor que o preço anterior.");
+              }
+
               const finalActive = active && canActivate;
               const finalStoneId = stoneId || null;
               const finalStoneColorId = finalStoneId ? stoneColorId || null : null;
@@ -541,6 +593,9 @@ function SkuEditor({
                 target_margin_pct,
                 price_round_step_cents,
                 price_cents: calculatedPriceCents,
+                sale_active: saleActive,
+                compare_at_price_cents,
+                sale_price_cents,
 
               });
             }}
@@ -723,6 +778,62 @@ function SkuEditor({
         ) : null}
 
         <div className="md:col-span-4">
+          <Field label="Promoção">
+            <select
+              value={saleActive ? "1" : "0"}
+              onChange={(e) => setSaleActive(e.target.value === "1")}
+              className="w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-800/20 focus:border-emerald-800/30"
+            >
+              <option value="0">Sem desconto</option>
+              <option value="1">Com desconto</option>
+            </select>
+          </Field>
+        </div>
+
+        {saleActive ? (
+          <>
+            <div className="md:col-span-4">
+              <Field label="Preço anterior" required hint="Valor que ficará riscado na loja">
+                <TextInput
+                  value={compareAtPrice}
+                  onChange={(e) => setCompareAtPrice(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="Ex: 159,90"
+                />
+              </Field>
+            </div>
+
+            <div className="md:col-span-4">
+              <Field label="Preço promocional" required hint="Valor atual com desconto">
+                <TextInput
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="Ex: 129,90"
+                />
+              </Field>
+            </div>
+
+            <div className="md:col-span-4">
+              <Field label="Prévia da promoção">
+                <div className="rounded-2xl border bg-white px-4 py-3 text-sm">
+                  <span className="text-gray-400 line-through">
+                    {compareAtPrice
+                      ? formatBRL(normalizePriceToCents(compareAtPrice) || 0)
+                      : "R$ 0,00"}
+                  </span>{" "}
+                  <span className="font-semibold text-emerald-700">
+                    {salePrice
+                      ? formatBRL(normalizePriceToCents(salePrice) || 0)
+                      : "R$ 0,00"}
+                  </span>
+                </div>
+              </Field>
+            </div>
+          </>
+        ) : null}
+
+        <div className="md:col-span-4">
           <Field label="Ativo" hint={!canActivate ? "Vai salvar como inativo." : undefined}>
             <select
               value={active ? "1" : "0"}
@@ -854,6 +965,9 @@ export default function SkusTab({
       "sku_code",
       "barcode",
       "price_cents",
+      "compare_at_price_cents",
+      "sale_price_cents",
+      "sale_active",
       "cost_cents",
       "cost_gross_cents",
       "target_margin_pct",
@@ -1168,8 +1282,21 @@ export default function SkusTab({
                   </button>
 
                   <div className="flex items-center gap-3">
-                    <div className="text-sm font-semibold text-[#2b554e]">
-                      {formatBRL(s.price_cents ?? 0)}
+                    <div className="text-right text-sm">
+                      {s.sale_active && s.sale_price_cents ? (
+                        <>
+                          <div className="text-xs text-gray-400 line-through">
+                            {formatBRL(s.compare_at_price_cents ?? s.price_cents ?? 0)}
+                          </div>
+                          <div className="font-semibold text-emerald-700">
+                            {formatBRL(s.sale_price_cents)}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="font-semibold text-[#2b554e]">
+                          {formatBRL(s.price_cents ?? 0)}
+                        </div>
+                      )}
                     </div>
 
                     <button

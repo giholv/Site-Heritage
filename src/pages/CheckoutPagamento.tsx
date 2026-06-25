@@ -1045,6 +1045,7 @@ export default function CheckoutPagamento() {
                   <h2 className="mt-3 text-xl font-semibold text-[#2b554e]">
                     Como deseja pagar?
                   </h2>
+
                 </div>
 
 
@@ -1404,17 +1405,17 @@ export default function CheckoutPagamento() {
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4">
-                  <div className="flex items-start gap-3">
-                    <ShieldCheck
-                      className="mt-0.5 h-5 w-5 shrink-0"
-                      style={{ color: CALEA.primary }}
-                    />
-                    <p className="text-xs leading-5 text-gray-500">
-                      Ambiente seguro para concluir sua compra.
-                    </p>
-                  </div>
-                </div>
+    
+                    <div className="mt-4 rounded-2xl bg-[#2b554e] px-4 py-3">
+                      <div className="flex items-center justify-center">
+                        <img
+                          src="/Selo Pagar.me - Fundo colorido.svg"
+                          alt="Pagamento seguro via Pagar.me"
+                          className="h-10 w-auto object-contain"
+                        />
+                      </div>
+                    </div>
+                
               </div>
             </aside>
           </div>

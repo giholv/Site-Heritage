@@ -42,6 +42,7 @@ type ProductHeroProps = {
   name: string;
   description: string;
   price: number;
+  oldPrice?: number | null;
   installmentText?: string;
   variants?: Variant[];
   selectedVariant?: string;
@@ -92,6 +93,7 @@ export default function ProductHero({
   name,
   description,
   price,
+  oldPrice = null,
   variants = [],
   selectedVariant = "",
   onSelectVariant,
@@ -115,6 +117,7 @@ export default function ProductHero({
   const [activeImage, setActiveImage] = useState(0);
   const [showAddedMessage, setShowAddedMessage] = useState(false);
 
+  const hasDiscount = Boolean(oldPrice && oldPrice > price);
 
   const safeAvailableQty = normalizeQty(availableQty);
 
@@ -439,9 +442,20 @@ export default function ProductHero({
             <p className="text-[11px] uppercase tracking-[0.18em] text-[#81786e]">
               Total
             </p>
-            <p className="text-lg font-semibold text-[#2b554e]">
-              {formatBRL(price)}
-            </p>
+            {hasDiscount ? (
+              <div>
+                <p className="text-xs text-[#9a9187] line-through">
+                  {formatBRL(oldPrice || 0)}
+                </p>
+                <p className="text-lg font-semibold text-[#2b554e]">
+                  {formatBRL(price)}
+                </p>
+              </div>
+            ) : (
+              <p className="text-lg font-semibold text-[#2b554e]">
+                {formatBRL(price)}
+              </p>
+            )}
           </div>
 
           {isAvailable && (

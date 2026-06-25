@@ -28,6 +28,9 @@ type Sku = {
   sku_code: string;
   variant_name: string;
   price_cents: number;
+  compare_at_price_cents?: number | null;
+  sale_price_cents?: number | null;
+  sale_active?: boolean;
   active: boolean;
   barcode?: string | null;
   supplier_sku_code?: string | null;
@@ -109,7 +112,7 @@ export default function AdminProductEdit() {
         supabase
           .from("skus")
           .select(
-            "id, sku_code, variant_name, price_cents, active, barcode, supplier_sku_code"
+            "id, sku_code, variant_name, price_cents, compare_at_price_cents, sale_price_cents, sale_active, active, barcode, supplier_sku_code"
           )
           .eq("product_id", productId)
           .order("created_at", { ascending: true }),
@@ -236,8 +239,22 @@ export default function AdminProductEdit() {
 
             {selectedSku && (
               <div className="mt-2 text-xs text-gray-600">
-                Preço: {formatBRLFromCents(selectedSku.price_cents)} • Ativo:{" "}
-                {selectedSku.active ? "sim" : "não"}
+                {selectedSku.sale_active && selectedSku.sale_price_cents ? (
+                  <>
+                    Preço:{" "}
+                    <span className="line-through text-gray-400">
+                      {formatBRLFromCents(
+                        selectedSku.compare_at_price_cents || selectedSku.price_cents
+                      )}
+                    </span>{" "}
+                    <span className="font-semibold text-emerald-700">
+                      {formatBRLFromCents(selectedSku.sale_price_cents)}
+                    </span>
+                  </>
+                ) : (
+                  <>Preço: {formatBRLFromCents(selectedSku.price_cents)}</>
+                )}{" "}
+                • Ativo: {selectedSku.active ? "sim" : "não"}
               </div>
             )}
           </div>

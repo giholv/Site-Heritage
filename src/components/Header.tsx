@@ -264,7 +264,7 @@ const Header: React.FC<HeaderProps> = ({
           >
             <div className="flex h-8 items-center justify-center px-3">
               <span className="truncate text-center text-[11px] leading-none tracking-[0.04em] opacity-95">
-                Frete grátis a partir de <strong>R$299</strong> · 10% OFF cupom <strong>BOASVINDAS</strong>
+                Frete grátis a partir de <strong>R$299</strong> ·5% OFF cupom <strong>BOASVINDAS</strong>
               </span>
             </div>
           </div>
@@ -440,7 +440,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="mx-auto flex h-10 max-w-[1440px] items-center justify-center px-6">
               <span className="text-center text-[14px] leading-none opacity-95 lg:text-[15px]">
                 Frete grátis a partir de <strong>R$299</strong> •
-                Cupom de 10% OFF para primeira compra: <strong>BOASVINDAS</strong>
+                Cupom de 5% OFF para primeira compra: <strong>BOASVINDAS</strong>
               </span>
             </div>
           </div>
