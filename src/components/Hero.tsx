@@ -38,7 +38,7 @@ const Hero: React.FC = () => {
       if (!data?.length || !active) return;
 
       const mapped = data
-        .filter((banner) => /\.(webp|avif)$/i.test(banner.image_path))
+        .filter((banner) => /\.(webp|avif|png|jpg|jpeg)$/i.test(banner.image_path))
         .map((banner) => ({
           src: getPublicUrl(banner.image_path),
           alt: banner.alt || "Banner Caléa Blanc",
