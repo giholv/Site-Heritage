@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 
 type Banner = {
   src: string;
+  mobileSrc?: string;
   alt: string;
 };
 
@@ -21,9 +22,21 @@ function getPublicUrl(path: string) {
 }
 
 const FALLBACK: Banner[] = [
-  { src: "/Banner4.jpg", alt: "Banner semijoias 1" },
-  { src: "/Banner6.jpg", alt: "Banner semijoias 2" },
-  { src: "/Banner7.jpg", alt: "Banner semijoias 3" },
+  {
+    src: "/Banner4.jpg",
+    mobileSrc: "/Banner4.jpg",
+    alt: "Banner semijoias 1",
+  },
+  {
+    src: "/Banner6.jpg",
+    mobileSrc: "/Banner6.jpg",
+    alt: "Banner semijoias 2",
+  },
+  {
+    src: "/Banner7.jpg",
+    mobileSrc: "/Banner7.jpg",
+    alt: "Banner semijoias 3",
+  },
 ];
 
 const Hero: React.FC = () => {
@@ -36,7 +49,7 @@ const Hero: React.FC = () => {
     async function loadBanners() {
       const { data, error } = await supabase
         .from("hero_banners")
-        .select("image_path, alt")
+        .select("image_path, mobile_image_path, alt")
         .eq("active", true)
         .order("position", { ascending: true });
 
@@ -47,14 +60,21 @@ const Hero: React.FC = () => {
 
       if (!data?.length || !active) return;
 
-      const mapped = data
-        .filter((banner) =>
-          /\.(webp|avif|png|jpg|jpeg)$/i.test(banner.image_path)
-        )
-        .map((banner) => ({
-          src: getPublicUrl(banner.image_path),
-          alt: banner.alt || "Banner Caléa Blanc",
-        }));
+      const mapped: Banner[] = data
+        .filter((banner) => banner.image_path)
+        .map((banner) => {
+          const desktopSrc = getPublicUrl(banner.image_path);
+
+          return {
+            src: desktopSrc,
+
+            mobileSrc: banner.mobile_image_path
+              ? getPublicUrl(banner.mobile_image_path)
+              : desktopSrc,
+
+            alt: banner.alt || "Banner Caléa Blanc",
+          };
+        });
 
       if (mapped.length && active) {
         setBanners(mapped);
@@ -92,11 +112,19 @@ const Hero: React.FC = () => {
     return banners[(idx + 1) % banners.length];
   }, [banners, idx]);
 
+  /*
+    Pré-carrega desktop + mobile do próximo banner.
+  */
   useEffect(() => {
-    if (!nextBanner?.src) return;
+    if (!nextBanner) return;
 
-    const img = new Image();
-    img.src = nextBanner.src;
+    const desktop = new Image();
+    desktop.src = nextBanner.src;
+
+    if (nextBanner.mobileSrc) {
+      const mobile = new Image();
+      mobile.src = nextBanner.mobileSrc;
+    }
   }, [nextBanner]);
 
   const prev = () => {
@@ -120,36 +148,52 @@ const Hero: React.FC = () => {
     >
       <div className="relative w-full overflow-hidden">
 
-        {/* IMAGEM */}
+        {/* BANNER */}
         <div
           className="
             relative
-            h-[360px]
-            sm:h-[440px]
+            h-[450px]
+            sm:h-[520px]
             md:h-[620px]
             lg:h-[720px]
             xl:h-[760px]
           "
         >
-          <img
-            key={currentBanner.src}
-            src={currentBanner.src}
-            alt={currentBanner.alt}
-            className="
-              block
-              h-full
-              w-full
-              object-cover
-            "
-            style={{
-              objectPosition: "center center",
-            }}
-            loading="eager"
-            {...({ fetchpriority: "high" } as any)}
-            decoding="async"
-            width={1600}
-            height={900}
-          />
+          <picture key={`${currentBanner.src}-${idx}`}>
+
+            {/* MOBILE */}
+            <source
+              media="(max-width: 767px)"
+              srcSet={
+                currentBanner.mobileSrc ??
+                currentBanner.src
+              }
+            />
+
+            {/* DESKTOP */}
+            <img
+              src={currentBanner.src}
+              alt={currentBanner.alt}
+              className="
+                block
+                h-full
+                w-full
+                object-cover
+              "
+              style={{
+                objectPosition: "center center",
+              }}
+              loading={idx === 0 ? "eager" : "lazy"}
+              {...(
+                idx === 0
+                  ? { fetchpriority: "high" }
+                  : {}
+              ) as any}
+              decoding="async"
+              width={1600}
+              height={900}
+            />
+          </picture>
         </div>
 
         {banners.length > 1 && (
@@ -226,7 +270,7 @@ const Hero: React.FC = () => {
             <div
               className="
                 absolute
-                bottom-3
+                bottom-4
                 left-0
                 right-0
                 z-10

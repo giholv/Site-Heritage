@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 type CategoryRow = {
@@ -9,15 +9,20 @@ type CategoryRow = {
   position: number;
 };
 
-type HeroFileRow = {
-  name: string;
-  path: string;
-  publicUrl: string;
+type HeroBannerRow = {
+  id: string;
+  image_path: string;
+  mobile_image_path: string | null;
+  alt: string;
+  position: number;
+  active: boolean;
 };
+
 
 const CAT_BUCKET = "product-images";
 const HERO_BUCKET = "product-images";
-const HERO_FOLDER = "banners";
+const HERO_DESKTOP_FOLDER = "banners/desktop";
+const HERO_MOBILE_FOLDER = "banners/mobile";
 
 function publicUrl(bucket: string, path?: string | null) {
   if (!path) return null;
@@ -44,24 +49,24 @@ function buildUploadPath(prefix: string, file: File) {
 
 export default function AdminCategoryImagesPage() {
   // =========================
-  // HERO (STORAGE ONLY)
+  // HERO DESKTOP + MOBILE
   // =========================
-  const [heroRows, setHeroRows] = useState<HeroFileRow[]>([]);
+  const [heroRows, setHeroRows] = useState<HeroBannerRow[]>([]);
   const [heroLoading, setHeroLoading] = useState(true);
   const [heroBusy, setHeroBusy] = useState(false);
   const [heroErr, setHeroErr] = useState<string | null>(null);
-  const [heroFiles, setHeroFiles] = useState<File[]>([]);
+  const [heroDesktopFile, setHeroDesktopFile] = useState<File | null>(null);
+  const [heroMobileFile, setHeroMobileFile] = useState<File | null>(null);
+  const [heroAlt, setHeroAlt] = useState("");
 
   const loadHero = async () => {
     setHeroLoading(true);
     setHeroErr(null);
 
-    const { data, error } = await supabase.storage
-      .from(HERO_BUCKET)
-      .list(HERO_FOLDER, {
-        limit: 100,
-        sortBy: { column: "name", order: "asc" },
-      });
+    const { data, error } = await supabase
+      .from("hero_banners")
+      .select("id,image_path,mobile_image_path,alt,position,active")
+      .order("position", { ascending: true });
 
     if (error) {
       setHeroErr(error.message);
@@ -70,31 +75,24 @@ export default function AdminCategoryImagesPage() {
       return;
     }
 
-    const rows =
-      (data ?? [])
-        .filter((f) => !!f.name && !f.name.endsWith("/"))
-        .filter((f) => /\.(png|jpg|jpeg|webp|avif)$/i.test(f.name))
-        .map((f) => {
-          const path = `${HERO_FOLDER}/${f.name}`;
-          return {
-            name: f.name,
-            path,
-            publicUrl: publicUrl(HERO_BUCKET, path)!,
-          };
-        }) || [];
-
-    setHeroRows(rows);
+    setHeroRows((data ?? []) as HeroBannerRow[]);
     setHeroLoading(false);
   };
 
   const uploadHero = async () => {
-    if (!heroFiles.length) return;
+    if (!heroDesktopFile || !heroMobileFile) {
+      setHeroErr("Selecione uma imagem desktop e uma imagem mobile.");
+      return;
+    }
 
     setHeroBusy(true);
     setHeroErr(null);
 
+    let desktopPath: string | null = null;
+    let mobilePath: string | null = null;
+
     try {
-      for (const file of heroFiles) {
+      for (const file of [heroDesktopFile, heroMobileFile]) {
         if (!file.type.startsWith("image/")) {
           throw new Error(`O arquivo ${file.name} não é uma imagem.`);
         }
@@ -102,36 +100,116 @@ export default function AdminCategoryImagesPage() {
         if (file.size > 8 * 1024 * 1024) {
           throw new Error(`A imagem ${file.name} é muito grande (máx 8MB).`);
         }
-
-        const path = buildUploadPath(HERO_FOLDER, file);
-
-        const { error } = await supabase.storage.from(HERO_BUCKET).upload(path, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type,
-        });
-
-        if (error) throw error;
       }
 
-      setHeroFiles([]);
+      desktopPath = buildUploadPath(HERO_DESKTOP_FOLDER, heroDesktopFile);
+      mobilePath = buildUploadPath(HERO_MOBILE_FOLDER, heroMobileFile);
+
+      const desktopUpload = await supabase.storage
+        .from(HERO_BUCKET)
+        .upload(desktopPath, heroDesktopFile, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: heroDesktopFile.type,
+        });
+
+      if (desktopUpload.error) throw desktopUpload.error;
+
+      const mobileUpload = await supabase.storage
+        .from(HERO_BUCKET)
+        .upload(mobilePath, heroMobileFile, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: heroMobileFile.type,
+        });
+
+      if (mobileUpload.error) throw mobileUpload.error;
+
+      const nextPosition =
+        heroRows.length > 0
+          ? Math.max(...heroRows.map((row) => row.position ?? 0)) + 1
+          : 1;
+
+      const { error: insertError } = await supabase
+        .from("hero_banners")
+        .insert({
+          image_path: desktopPath,
+          mobile_image_path: mobilePath,
+          alt: heroAlt.trim() || "Banner Caléa Blanc",
+          position: nextPosition,
+          active: true,
+        });
+
+      if (insertError) throw insertError;
+
+      setHeroDesktopFile(null);
+      setHeroMobileFile(null);
+      setHeroAlt("");
+
       await loadHero();
     } catch (e: any) {
+      const cleanup = [desktopPath, mobilePath].filter(Boolean) as string[];
+      if (cleanup.length) {
+        await supabase.storage.from(HERO_BUCKET).remove(cleanup);
+      }
+
       setHeroErr(e?.message ?? "Erro ao enviar banner.");
     } finally {
       setHeroBusy(false);
     }
   };
 
-  const removeHero = async (row: HeroFileRow) => {
-    if (!confirm("Apagar esse banner?")) return;
+  const toggleHeroActive = async (row: HeroBannerRow) => {
+    setHeroBusy(true);
+    setHeroErr(null);
+
+    try {
+      const { error } = await supabase
+        .from("hero_banners")
+        .update({ active: !row.active })
+        .eq("id", row.id);
+
+      if (error) throw error;
+
+      setHeroRows((prev) =>
+        prev.map((item) =>
+          item.id === row.id ? { ...item, active: !item.active } : item,
+        ),
+      );
+    } catch (e: any) {
+      setHeroErr(e?.message ?? "Erro ao alterar banner.");
+    } finally {
+      setHeroBusy(false);
+    }
+  };
+
+  const removeHero = async (row: HeroBannerRow) => {
+    if (!confirm("Apagar esse banner desktop e mobile?")) return;
 
     setHeroBusy(true);
     setHeroErr(null);
 
     try {
-      const { error } = await supabase.storage.from(HERO_BUCKET).remove([row.path]);
-      if (error) throw error;
+      const paths = [row.image_path, row.mobile_image_path].filter(
+        (path): path is string =>
+          Boolean(path) && !/^https?:\/\//i.test(path as string),
+      );
+
+      if (paths.length) {
+        const { error: storageError } = await supabase.storage
+          .from(HERO_BUCKET)
+          .remove(paths);
+
+        if (storageError) throw storageError;
+      }
+
+      const { error: dbError } = await supabase
+        .from("hero_banners")
+        .delete()
+        .eq("id", row.id);
+
+      if (dbError) throw dbError;
+
       await loadHero();
     } catch (e: any) {
       setHeroErr(e?.message ?? "Erro ao apagar banner.");
@@ -241,8 +319,12 @@ export default function AdminCategoryImagesPage() {
       <div>
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-[#2b554e]">Banners do Hero</h1>
-            <p className="text-sm text-black/60">Gerencie as imagens do topo da home.</p>
+            <h1 className="text-2xl font-semibold text-[#2b554e]">
+              Banners do Hero
+            </h1>
+            <p className="text-sm text-black/60">
+              Cadastre desktop e mobile juntos para cada banner.
+            </p>
           </div>
 
           <button
@@ -260,61 +342,168 @@ export default function AdminCategoryImagesPage() {
           </div>
         )}
 
-        <div className="mt-5 rounded-2xl border border-black/10 bg-white p-4">
-          <div className="grid gap-3 md:grid-cols-2">
+        <div className="mt-5 rounded-2xl border border-black/10 bg-white p-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <label className="block">
+              <div className="mb-2">
+                <div className="text-sm font-semibold text-[#2b554e]">
+                  Desktop
+                </div>
+                <div className="text-xs text-black/45">
+                  Ideal: 1600 × 900 px
+                </div>
+              </div>
+
+              <input
+                className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/avif"
+                onChange={(e) =>
+                  setHeroDesktopFile(e.target.files?.[0] ?? null)
+                }
+              />
+            </label>
+
+            <label className="block">
+              <div className="mb-2">
+                <div className="text-sm font-semibold text-[#2b554e]">
+                  Mobile
+                </div>
+                <div className="text-xs text-black/45">
+                  Ideal: 1080 × 1350 px
+                </div>
+              </div>
+
+              <input
+                className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/avif"
+                onChange={(e) =>
+                  setHeroMobileFile(e.target.files?.[0] ?? null)
+                }
+              />
+            </label>
+          </div>
+
+          <div className="mt-5">
+            <label className="block text-sm font-semibold text-[#2b554e]">
+              Texto alternativo
+            </label>
+
             <input
-              className="w-full rounded-xl border px-3 py-2"
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => setHeroFiles(Array.from(e.target.files ?? []))}
+              type="text"
+              value={heroAlt}
+              onChange={(e) => setHeroAlt(e.target.value)}
+              placeholder="Ex.: Campanha Caléa"
+              className="mt-2 w-full rounded-xl border border-black/10 px-3 py-2.5 text-sm"
             />
           </div>
 
           <button
             type="button"
             onClick={uploadHero}
-            disabled={!heroFiles.length || heroBusy}
-            className="mt-3 h-10 px-4 rounded-xl bg-[#2b554e] text-white text-sm font-semibold disabled:opacity-50"
+            disabled={!heroDesktopFile || !heroMobileFile || heroBusy}
+            className="mt-5 h-11 rounded-xl bg-[#2b554e] px-5 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {heroBusy ? "Enviando..." : `Adicionar ${heroFiles.length || ""} banner${heroFiles.length > 1 ? "s" : ""}`}
+            {heroBusy ? "Enviando..." : "Adicionar banner"}
           </button>
-
-          <div className="mt-2 text-xs text-black/45">
-            Dica: use imagem 1600×900 ou maior.
-          </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
           {heroLoading &&
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-2xl border border-black/10 bg-white/70 p-4 animate-pulse">
-                <div className="h-40 bg-black/5 rounded-xl" />
-                <div className="mt-4 h-4 bg-black/5 rounded w-2/3" />
+            Array.from({ length: 2 }).map((_, i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-2xl border border-black/10 bg-white/70 p-4"
+              >
+                <div className="grid gap-3 sm:grid-cols-[1.6fr_.8fr]">
+                  <div className="h-48 rounded-xl bg-black/5" />
+                  <div className="h-48 rounded-xl bg-black/5" />
+                </div>
               </div>
             ))}
 
           {!heroLoading &&
-            heroRows.map((r) => (
-              <div key={r.path} className="rounded-2xl border border-black/10 bg-white overflow-hidden">
-                <div className="h-40 bg-black/5">
-                  <img src={r.publicUrl} alt={r.name} className="w-full h-full object-cover" />
-                </div>
+            heroRows.map((row) => {
+              const desktopUrl = publicUrl(HERO_BUCKET, row.image_path);
+              const mobileUrl = publicUrl(
+                HERO_BUCKET,
+                row.mobile_image_path ?? row.image_path,
+              );
 
-                <div className="p-4 space-y-3">
-                  <div className="text-sm font-medium text-[#2b554e] truncate">{r.name}</div>
+              return (
+                <div
+                  key={row.id}
+                  className="overflow-hidden rounded-2xl border border-black/10 bg-white"
+                >
+                  <div className="grid gap-px bg-black/10 sm:grid-cols-[1.6fr_.8fr]">
+                    <div className="bg-black/5">
+                      {desktopUrl && (
+                        <img
+                          src={desktopUrl}
+                          alt={row.alt}
+                          className="h-48 w-full object-cover"
+                        />
+                      )}
+                    </div>
 
-                  <button
-                    type="button"
-                    onClick={() => removeHero(r)}
-                    disabled={heroBusy}
-                    className="h-9 px-3 rounded-xl border border-black/10 bg-white text-sm text-red-600"
-                  >
-                    Apagar
-                  </button>
+                    <div className="bg-black/5">
+                      {mobileUrl && (
+                        <img
+                          src={mobileUrl}
+                          alt={`${row.alt} mobile`}
+                          className="h-48 w-full object-cover"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-semibold text-[#2b554e]">
+                          {row.alt || "Banner Caléa"}
+                        </div>
+                        <div className="mt-1 text-xs text-black/45">
+                          posição {row.position}
+                        </div>
+                      </div>
+
+                      <span
+                        className={[
+                          "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                          row.active
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-black/5 text-black/45",
+                        ].join(" ")}
+                      >
+                        {row.active ? "Ativo" : "Inativo"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleHeroActive(row)}
+                        disabled={heroBusy}
+                        className="h-9 rounded-xl border border-black/10 bg-white px-3 text-sm"
+                      >
+                        {row.active ? "Desativar" : "Ativar"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => removeHero(row)}
+                        disabled={heroBusy}
+                        className="h-9 rounded-xl border border-red-100 bg-red-50 px-3 text-sm text-red-600"
+                      >
+                        Apagar
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       </div>
 
