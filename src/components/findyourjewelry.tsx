@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { supabase } from "../lib/supabase"; // ajuste o caminho
+import { supabase } from "../lib/supabase";
 
 type Category = {
   id: string;
@@ -11,11 +11,12 @@ type Category = {
   position: number;
 };
 
-const CATEGORY_BUCKET = "product-images"; // ajuste se necessário
+const CATEGORY_BUCKET = "product-images";
 
 function publicUrl(bucket: string, path?: string | null) {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
+
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
@@ -25,7 +26,6 @@ export default function EncontreSuaJoia() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // carousel controls
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
@@ -33,6 +33,7 @@ export default function EncontreSuaJoia() {
   const updateArrows = () => {
     const el = scrollerRef.current;
     if (!el) return;
+
     setCanLeft(el.scrollLeft > 2);
     setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
   };
@@ -40,8 +41,13 @@ export default function EncontreSuaJoia() {
   const scrollByCards = (dir: "left" | "right") => {
     const el = scrollerRef.current;
     if (!el) return;
-    const amount = Math.round(el.clientWidth * 0.85);
-    el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
+
+    const amount = Math.max(el.clientWidth * 0.72, 300);
+
+    el.scrollBy({
+      left: dir === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
   };
 
   useEffect(() => {
@@ -68,8 +74,6 @@ export default function EncontreSuaJoia() {
       }
 
       setLoading(false);
-
-      // dá um tempo pro DOM calcular scrollWidth
       requestAnimationFrame(updateArrows);
     })();
 
@@ -91,108 +95,150 @@ export default function EncontreSuaJoia() {
     window.addEventListener("resize", onResize);
 
     return () => {
-      el.removeEventListener("scroll", onScroll as any);
+      el.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
     };
   }, [cats.length]);
 
   return (
-    <section id="categorias" className="bg-[#FCFAF6] pt-4 pb-8 md:pt-10 md:pb-12">
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <div className="text-xs tracking-[0.18em] text-black/45 uppercase">Catálogo</div>
-            <h2 className="mt-2 text-[28px] leading-tight md:text-4xl font-semibold text-[#2b554e]">
-              Encontre sua joia
-            </h2>
-            <div className="mt-3 h-[2px] w-20 bg-[#b08d57] rounded-full" />
-            <p className="mt-3 text-[13px] md:text-sm text-black/55 max-w-[260px] md:max-w-none">
-              Selecione uma categoria para ver todas as peças.
+    <section
+      id="categorias"
+      className="bg-[#FCFAF6] pt-0 pb-10 md:pt-2 md:pb-14 lg:pt-3 lg:pb-16 scroll-mt-[120px]"
+    >
+      <div className="mx-auto w-full max-w-[1560px] px-4 md:px-6 lg:px-10">
+        {/* CABEÇALHO */}
+        <div className="flex items-end justify-between gap-6">
+          <div className="max-w-[560px]">
+            <p className="text-[12px] font-medium uppercase tracking-[0.22em] text-[#8b8176] md:text-[12px]">
+              Catálogo
             </p>
-            {err && <div className="mt-3 text-sm text-red-600">Erro: {err}</div>}
+
+            <h2 className="mt-2 text-[36px] font-medium leading-[1.03] tracking-[-0.02em] text-[#2b554e] md:text-[44px]">
+              Encontre sua
+              <span className="block font-serif font-normal italic">
+                joia.
+              </span>
+            </h2>
+
+            <div className="mt-4 h-px w-14 bg-[#b08d57]" />
+
+            <p className="mt-4 text-[15px] leading-7 text-[#6f655b] md:text-[17px]">
+              Explore por categoria e descubra a peça que combina com o seu momento.
+            </p>
+
+            {err && (
+              <div className="mt-3 text-sm text-red-600">
+                Erro ao carregar categorias: {err}
+              </div>
+            )}
           </div>
 
           <Link
             to="/joias"
-            className="hidden md:inline-flex h-11 px-5 rounded-2xl bg-white/80 border border-black/10 text-sm font-semibold text-[#2b554e] hover:shadow-sm transition"
+            className="group hidden items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2b554e] transition hover:text-[#b08d57] md:inline-flex"
           >
-            Ver tudo
+            Ver todo o catálogo
+            <span className="h-px w-10 bg-[#b08d57] transition-all duration-300 group-hover:w-14" />
           </Link>
         </div>
 
-        {/* CAROUSEL */}
-        <div className="relative mt-5 md:mt-8">
-          {/* botão esquerda */}
+        {/* CARROSSEL */}
+        <div className="relative mt-7 md:mt-9">
           {canLeft && (
             <button
               type="button"
               onClick={() => scrollByCards("left")}
               aria-label="Voltar categorias"
-              className="hidden md:inline-flex absolute -left-6 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-white shadow-xl border border-black/10 items-center justify-center"
+              className="absolute -left-1 top-[42%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#173a35]/10 bg-[#FCFAF6]/92 text-[#173a35] shadow-sm backdrop-blur-md transition hover:bg-white lg:flex"
             >
-              <ChevronLeft className="h-5 w-5 text-[#2b554e]" />
+              <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
             </button>
           )}
 
-          {/* botão direita */}
           {canRight && (
             <button
               type="button"
               onClick={() => scrollByCards("right")}
               aria-label="Avançar categorias"
-              className="hidden md:inline-flex absolute -right-6 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-white shadow-xl border border-black/10 items-center justify-center"
+              className="absolute -right-1 top-[42%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#173a35]/10 bg-[#FCFAF6]/92 text-[#173a35] shadow-sm backdrop-blur-md transition hover:bg-white lg:flex"
             >
-              <ChevronRight className="h-5 w-5 text-[#2b554e]" />
+              <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
             </button>
           )}
 
           <div
             ref={scrollerRef}
-            className="flex gap-3 md:gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 px-4 md:px-0
-             [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="
+              grid grid-flow-col
+              auto-cols-[72vw]
+              gap-4 overflow-x-auto
+              scroll-smooth pb-3
+              snap-x snap-mandatory
+              [scrollbar-width:none]
+              [&::-webkit-scrollbar]:hidden
+
+              sm:auto-cols-[44vw]
+              md:auto-cols-[30vw] md:gap-6
+              lg:auto-cols-[260px]
+              xl:auto-cols-[280px]
+            "
           >
             {loading &&
-              Array.from({ length: 8 }).map((_, i) => (
+              Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={`sk-${i}`}
-                  className="snap-center shrink-0 w-[78vw] max-w-[280px] md:w-[300px] rounded-[28px] overflow-hidden border border-black/10 bg-white/80 animate-pulse"
+                  className="snap-start animate-pulse"
                 >
-                  <div className="aspect-[4/3] bg-black/5" />
-                  <div className="p-4">
-                    <div className="h-4 bg-black/5 rounded w-2/3" />
-                    <div className="h-3 bg-black/5 rounded w-1/3 mt-3" />
-                  </div>
+                  <div className="aspect-[3/4] bg-[#eee7dc]" />
+                  <div className="mt-3 h-4 w-1/2 bg-[#eee7dc]" />
+                  <div className="mt-2 h-3 w-1/3 bg-[#eee7dc]" />
                 </div>
               ))}
 
             {!loading &&
               cats.map((c) => {
                 const img = publicUrl(CATEGORY_BUCKET, c.cover_image_path);
+
                 return (
                   <Link
                     key={c.id}
-                    to={`/joias/categoria/${c.slug}`} className="snap-center shrink-0 w-[78vw] max-w-[280px] md:w-[300px] group rounded-[28px] overflow-hidden border border-black/10 bg-white/80 shadow-sm hover:shadow-md transition"
-
+                    to={`/joias/categoria/${c.slug}`}
+                    className="group snap-start"
                   >
-                    <div className="aspect-[4/3.2] md:aspect-[4/3] bg-black/5">
+                    <div className="relative aspect-[3/4] overflow-hidden bg-[#f3efe8]">
                       {img ? (
                         <img
                           src={img}
                           alt={c.name}
-                          className="w-full h-full object-cover group-hover:scale-[1.02] transition"
+                          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.025]"
                           loading="lazy"
                         />
-                      ) : null}
+                      ) : (
+                        <div className="h-full w-full bg-[#eee7dc]" />
+                      )}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-70" />
+
+                      <span className="absolute bottom-4 left-4 text-[12px] font-medium uppercase tracking-[0.18em] text-white/90">
+                        Explorar
+                      </span>
                     </div>
 
-                    <div className="p-3.5 md:p-4 flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold text-[15px] md:text-base text-[#2b554e] leading-tight">
+                    <div className="pt-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <h3 className="text-[16px] font-medium leading-tight text-[#2b554e] md:text-[17px]">
                           {c.name}
-                        </div>
-                        <div className="mt-1 text-[11px] md:text-xs text-black/50">Ver peças</div>
+                        </h3>
+
+                        <ChevronRight
+                          className="h-4 w-4 shrink-0 text-[#2b554e]/45 transition-transform duration-300 group-hover:translate-x-1"
+                          strokeWidth={1.5}
+                        />
                       </div>
-                      <ChevronRight className="h-5 w-5 text-[#2b554e]/40" />
+
+                      <p className="mt-1 text-[12px] text-[#6f655b] md:text-[13px]">
+                        Ver peças
+                      </p>
                     </div>
                   </Link>
                 );
@@ -203,9 +249,10 @@ export default function EncontreSuaJoia() {
         <div className="mt-5 md:hidden">
           <Link
             to="/joias"
-            className="inline-flex w-full h-11 items-center justify-center rounded-2xl bg-[#2b554e] text-white text-sm font-semibold"
+            className="group inline-flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2b554e]"
           >
             Ver todo o catálogo
+            <span className="h-px w-9 bg-[#b08d57]" />
           </Link>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { X, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { X, SlidersHorizontal, ChevronDown, Heart } from "lucide-react";
 import Header from "../components/Header";
 import { supabase } from "../lib/supabase";
 
@@ -32,6 +32,7 @@ const CALEA = {
 
 const VIEW_NAME = "v_catalog_products_with_filters";
 const STORAGE_BUCKET = "product-images";
+const FAVORITES_KEY = "calea_favorites";
 
 const SORTS: Option[] = [
   { label: "Relevância", value: "relevance" },
@@ -181,6 +182,29 @@ export default function JewelryListing() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(FAVORITES_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+      setFavoriteIds(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setFavoriteIds([]);
+    }
+  }, []);
+
+  function toggleFavorite(productId: string) {
+    setFavoriteIds((current) => {
+      const next = current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId];
+
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+      window.dispatchEvent(new Event("calea-favorites-updated"));
+      return next;
+    });
+  }
 
   const filtersKey = searchParams.toString();
 
@@ -670,50 +694,50 @@ export default function JewelryListing() {
   const total = products.length;
 
   const FiltersPanel = ({ compact }: { compact?: boolean }) => (
-    <div className={compact ? "" : "sticky top-[176px]"}>
-      <div className="rounded-[28px] border border-black/10 bg-white/70 p-5 shadow-sm backdrop-blur">
-        <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
-            Filtros
+    <div className={compact ? "" : "sticky top-[150px]"}>
+      <div className={compact ? "" : "border-t border-[#2b554e]/12"}>
+        <div className="flex items-center justify-between border-b border-[#2b554e]/12 py-4">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#2b554e]">
+            Filtrar por
           </div>
 
           <button
             type="button"
             onClick={clearAll}
-            className="text-xs text-black/40 transition hover:text-black"
+            className="text-[12px] text-[#8b8176] transition hover:text-[#2b554e]"
           >
             Limpar
           </button>
         </div>
 
-        <div className="mt-4 border-t border-black/10 pt-4">
+        <div className="border-b border-[#2b554e]/12 py-5">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-black">Preço</div>
-            <div className="text-xs text-black/45">
+            <div className="text-[14px] font-medium text-[#2b554e]">Preço</div>
+            <div className="text-[12px] text-[#8b8176]">
               {moneyBRL(effMin)} – {moneyBRL(effMax)}
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-black/45">Mín</label>
+              <label className="text-[11px] uppercase tracking-[0.12em] text-[#8b8176]">Mín</label>
               <input
                 type="number"
                 value={effMin}
                 min={0}
                 onChange={(event) => setPriceParams(Number(event.target.value || 0), effMax)}
-                className="mt-1 h-11 w-full rounded-2xl border border-black/10 bg-[#FCFAF6] px-3 text-sm outline-none focus:ring-2 focus:ring-black/10"
+                className="mt-2 h-11 w-full border border-[#2b554e]/15 bg-transparent px-3 text-[14px] text-[#2b554e] outline-none transition focus:border-[#2b554e]"
               />
             </div>
 
             <div>
-              <label className="text-xs text-black/45">Máx</label>
+              <label className="text-[11px] uppercase tracking-[0.12em] text-[#8b8176]">Máx</label>
               <input
                 type="number"
                 value={effMax}
                 min={0}
                 onChange={(event) => setPriceParams(effMin, Number(event.target.value || 0))}
-                className="mt-1 h-11 w-full rounded-2xl border border-black/10 bg-[#FCFAF6] px-3 text-sm outline-none focus:ring-2 focus:ring-black/10"
+                className="mt-2 h-11 w-full border border-[#2b554e]/15 bg-transparent px-3 text-[14px] text-[#2b554e] outline-none transition focus:border-[#2b554e]"
               />
             </div>
           </div>
@@ -724,25 +748,25 @@ export default function JewelryListing() {
           ["Pedra", "pedra", stoneOptions, selectedPedra] as const,
           ["Cor", "cor", colorOptions, selectedCor] as const,
         ] as const).map(([title, key, options, selected]) => (
-          <div key={key} className="mt-4 border-t border-black/10 pt-4">
-            <div className="mb-3 text-sm font-semibold text-black">{title}</div>
+          <div key={key} className="border-b border-[#2b554e]/12 py-5">
+            <div className="mb-3 text-[14px] font-medium text-[#2b554e]">{title}</div>
 
             {options.length === 0 ? (
-              <div className="text-sm text-black/45">Sem opções.</div>
+              <div className="text-[13px] text-[#8b8176]">Sem opções.</div>
             ) : (
               <div className="space-y-2">
                 {options.map((option) => (
                   <label
                     key={option.value}
-                    className="flex cursor-pointer items-center justify-between gap-3 text-sm"
+                    className="flex cursor-pointer items-center justify-between gap-3 py-1 text-[14px]"
                   >
-                    <span className="text-black/75">{option.label}</span>
+                    <span className="text-[#5f5b57]">{option.label}</span>
 
                     <input
                       type="checkbox"
                       checked={selected.includes(option.value)}
                       onChange={() => toggleMulti(key, option.value)}
-                      className="h-4 w-4"
+                      className="h-4 w-4 rounded-none"
                       style={{ accentColor: CALEA.primary }}
                     />
                   </label>
@@ -756,7 +780,7 @@ export default function JewelryListing() {
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(false)}
-            className="mt-6 h-11 w-full rounded-2xl text-sm font-semibold text-white"
+            className="mt-6 h-12 w-full text-[12px] font-semibold uppercase tracking-[0.16em] text-white"
             style={{ backgroundColor: CALEA.primary }}
           >
             Aplicar
@@ -774,9 +798,9 @@ export default function JewelryListing() {
         onSearchSubmit={setQueryParam}
       />
 
-      <main className="pt-[160px] md:pt-[210px]">
-        <section className="container mx-auto px-4 pt-4 md:px-6">
-          <div className="overflow-hidden rounded-[32px] border border-black/10 bg-white/60 shadow-sm">
+      <main className="pt-[92px] md:pt-[108px]">
+        <section className="container mx-auto px-4 pt-0 md:px-6">
+          <div className="overflow-hidden border border-black/10 bg-white/60 shadow-sm">
             <div className="relative h-[220px] md:h-[340px]">
               {heroImage ? (
                 <img
@@ -809,9 +833,9 @@ export default function JewelryListing() {
         </section>
 
         <section className="container mx-auto mt-8 px-4 pb-16 md:px-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-5 border-b border-[#2b554e]/10 pb-5 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="text-sm text-black/55">
+              <div className="text-[13px] text-[#7a736b]">
                 {loading ? "Carregando..." : `${total} peça(s)`}
 
                 {err ? (
@@ -826,22 +850,22 @@ export default function JewelryListing() {
                       key={`${chip.key}-${index}`}
                       type="button"
                       onClick={() => removeChip(chip)}
-                      className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-4 py-2 text-sm backdrop-blur transition hover:bg-black/5"
+                      className="inline-flex items-center gap-2 border border-[#2b554e]/12 bg-transparent px-3 py-2 text-[12px] transition hover:border-[#2b554e]/30"
                     >
-                      <span className="text-black/55">{chip.label}:</span>
+                      <span className="text-[#8b8176]">{chip.label}:</span>
 
                       <span className="font-medium" style={{ color: CALEA.primary }}>
                         {chip.value}
                       </span>
 
-                      <X className="h-4 w-4 text-black/35" />
+                      <X className="h-3.5 w-3.5 text-[#8b8176]" />
                     </button>
                   ))}
 
                   <button
                     type="button"
                     onClick={clearAll}
-                    className="ml-1 text-sm hover:underline"
+                    className="ml-1 text-[12px] hover:underline"
                     style={{ color: CALEA.accent }}
                   >
                     Limpar tudo
@@ -854,19 +878,21 @@ export default function JewelryListing() {
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen(true)}
-                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 text-sm md:hidden"
+                className="inline-flex h-11 items-center gap-2 border border-[#2b554e]/15 bg-transparent px-4 text-[13px] text-[#2b554e] md:hidden"
               >
                 <SlidersHorizontal className="h-4 w-4 text-black/60" />
                 Filtros
               </button>
 
-              <span className="hidden text-sm text-black/50 md:inline">Ordenar</span>
+              <div className="hidden text-[11px] font-medium uppercase tracking-[0.16em] text-[#8b8176] md:block">
+                Ordenar por
+              </div>
 
-              <div className="relative">
+              <div className="relative min-w-[180px]">
                 <select
                   value={sort}
                   onChange={(event) => setSort(event.target.value)}
-                  className="h-11 appearance-none rounded-2xl border border-black/10 bg-white px-4 pr-10 text-sm outline-none"
+                  className="h-11 w-full appearance-none border-0 border-b border-[#2b554e]/20 bg-transparent px-0 pr-8 text-[14px] font-medium text-[#2b554e] outline-none transition focus:border-[#2b554e]"
                 >
                   {SORTS.map((item) => (
                     <option key={item.value} value={item.value}>
@@ -875,27 +901,27 @@ export default function JewelryListing() {
                   ))}
                 </select>
 
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/45" />
+                <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2b554e]/55" />
               </div>
             </div>
           </div>
 
-          <div className="mt-8 grid gap-6 md:grid-cols-[260px_1fr] lg:grid-cols-[290px_1fr]">
+          <div className="mt-7 grid gap-8 md:grid-cols-[220px_1fr] lg:grid-cols-[240px_1fr] xl:gap-10">
             <aside className="hidden md:block">
               <FiltersPanel />
             </aside>
 
             <div>
               {loading && (
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:gap-x-6 lg:grid-cols-3 xl:grid-cols-4">
                   {Array.from({ length: 8 }).map((_, index) => (
                     <div
                       key={index}
-                      className="overflow-hidden rounded-[28px] border border-black/10 bg-white/60"
+                      className=""
                     >
-                      <div className="aspect-[4/5] animate-pulse bg-black/5" />
+                      <div className="aspect-[3/4] animate-pulse bg-[#eee7dc]" />
 
-                      <div className="space-y-3 p-4">
+                      <div className="space-y-2 pt-3">
                         <div className="h-4 w-4/5 animate-pulse rounded bg-black/5" />
                         <div className="h-5 w-24 animate-pulse rounded bg-black/5" />
                       </div>
@@ -917,18 +943,18 @@ export default function JewelryListing() {
                         key={product.id}
                         type="button"
                         onClick={() => navigate(`/produto/${product.slug}`)}
-                        className="group overflow-hidden rounded-[28px] border border-black/10 bg-white/80 text-left shadow-sm backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(43,85,78,0.08)]"
+                        className="group min-w-0 text-left"
                       >
                         <div className="relative">
                           {!isAvailable && (
-                            <span className="absolute left-3 top-3 z-10 rounded-full bg-white/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b746b] shadow-sm">
+                            <span className="absolute left-3 top-3 z-10 bg-[#FCFAF6]/92 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6f675e] backdrop-blur-sm">
                               Esgotado
                             </span>
                           )}
 
                           {badge && isAvailable && (
                             <span
-                              className="absolute left-3 top-3 z-10 rounded-full px-3 py-1 text-xs font-semibold"
+                              className="absolute left-3 top-3 z-10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
                               style={{
                                 backgroundColor: CALEA.primary,
                                 color: "#F8F3EA",
@@ -938,15 +964,15 @@ export default function JewelryListing() {
                             </span>
                           )}
 
-                          <div className="aspect-[4/5] bg-gradient-to-b from-black/5 to-black/0">
+                          <div className="aspect-[3/4] overflow-hidden bg-[#f3efe8]">
                             {img ? (
                               <img
                                 src={img}
                                 alt={product.image_alt ?? product.name}
                                 className={[
-                                  "h-full w-full object-cover transition duration-500",
+                                  "h-full w-full object-cover transition-transform duration-700 ease-out",
                                   isAvailable
-                                    ? "group-hover:scale-[1.03]"
+                                    ? "group-hover:scale-[1.025]"
                                     : "opacity-70 grayscale-[15%]",
                                 ].join(" ")}
                                 loading="lazy"
@@ -957,57 +983,62 @@ export default function JewelryListing() {
                               </div>
                             )}
                           </div>
+
+                          <button
+                            type="button"
+                            aria-label={
+                              favoriteIds.includes(product.id)
+                                ? `Remover ${product.name} dos favoritos`
+                                : `Favoritar ${product.name}`
+                            }
+                            aria-pressed={favoriteIds.includes(product.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleFavorite(product.id);
+                            }}
+                            className={[
+                              "absolute bottom-3 left-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full",
+                              "shadow-sm backdrop-blur-sm transition duration-200 hover:scale-105",
+                              favoriteIds.includes(product.id)
+                                ? "bg-[#173a35] text-white"
+                                : "bg-[#FCFAF6]/90 text-[#173a35] hover:bg-white",
+                            ].join(" ")}
+                          >
+                            <Heart
+                              className="h-[19px] w-[19px]"
+                              strokeWidth={1.5}
+                              fill={
+                                favoriteIds.includes(product.id)
+                                  ? "currentColor"
+                                  : "none"
+                              }
+                            />
+                          </button>
                         </div>
-
-                        <div className="p-4">
-                          <div
-                            className="min-h-[42px] line-clamp-2 text-[15px] font-semibold leading-5"
-                            style={{ color: CALEA.primary }}
-                          >
+                        <div className="pt-3 pb-1">
+                          <h3 className="truncate text-[15px] font-normal leading-snug text-[#2b2b2b] md:text-[16px]">
                             {product.name}
-                          </div>
+                          </h3>
 
-                          <div
-                            className="mt-2 text-lg font-semibold"
-                            style={{ color: CALEA.accent }}
-                          >
-                            {product.min_price_cents !== null && product.min_price_cents !== undefined
-                              ? `A partir de ${centsToBRL(product.min_price_cents)}`
+                          <div className="mt-2 text-[16px] font-semibold leading-none text-[#173a35] md:text-[17px]">
+                            {product.min_price_cents !== null &&
+                            product.min_price_cents !== undefined
+                              ? centsToBRL(product.min_price_cents)
                               : centsToBRL(product.min_price_cents)}
                           </div>
 
-                          {product.min_price_cents !== null && product.min_price_cents !== undefined && (
-                            <div className="mt-0.5 text-xs text-black/45">
-                              Consulte as opções disponíveis
-                            </div>
-                          )}
+                          {product.min_price_cents !== null &&
+                            product.min_price_cents !== undefined && (
+                              <div className="mt-1.5 text-[13px] text-[#6e6a64]">
+                                6x de {moneyBRL((product.min_price_cents / 100) / 6)} sem juros
+                              </div>
+                            )}
+
                           {!isAvailable && (
-                            <div className="mt-1 text-xs text-black/45">
+                            <div className="mt-1.5 text-[12px] text-[#8b8176]">
                               Sem estoque
                             </div>
                           )}
-
-                          <div className="mt-4 flex gap-2">
-                            <span
-                              className="inline-flex h-11 flex-1 items-center justify-center rounded-full text-sm font-semibold transition-all"
-                              style={{
-                                backgroundColor: isAvailable ? CALEA.primary : "#d8d1c6",
-                                color: isAvailable ? "#ffffff" : "#7b746b",
-                              }}
-                            >
-                              {isAvailable ? "Comprar" : "Indisponível"}
-                            </span>
-
-                            <span
-                              className="inline-flex h-11 items-center justify-center rounded-full border px-5 text-sm font-semibold"
-                              style={{
-                                borderColor: `${CALEA.primary}22`,
-                                color: CALEA.primary,
-                              }}
-                            >
-                              Ver
-                            </span>
-                          </div>
                         </div>
                       </button>
                     );
@@ -1052,7 +1083,7 @@ export default function JewelryListing() {
             onClick={() => setMobileFiltersOpen(false)}
           />
 
-          <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-auto rounded-t-[30px] bg-[#FCFAF6] p-4 shadow-2xl">
+          <div className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-auto bg-[#FCFAF6] p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <p
                 className="text-base font-semibold"
@@ -1064,7 +1095,7 @@ export default function JewelryListing() {
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen(false)}
-                className="rounded-full bg-white p-2 shadow-sm"
+                className="border border-[#2b554e]/10 bg-transparent p-2"
               >
                 <X className="h-5 w-5" />
               </button>

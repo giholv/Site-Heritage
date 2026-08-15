@@ -44,8 +44,11 @@ const Hero: React.FC = () => {
           alt: banner.alt || "Banner Caléa Blanc",
         }));
 
-      if (mapped.length && active) setBanners(mapped);
+      if (mapped.length && active) {
+        setBanners(mapped);
+      }
     }
+
     loadBanners();
 
     return () => {
@@ -62,7 +65,7 @@ const Hero: React.FC = () => {
 
     const id = window.setInterval(() => {
       setIdx((v) => (v + 1) % banners.length);
-    }, 4000);
+    }, 6000);
 
     return () => window.clearInterval(id);
   }, [banners.length]);
@@ -90,63 +93,77 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section id="home" className="bg-[#FCFAF6] -mt-6 md:mt-0">
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="relative overflow-hidden rounded-2xl">
-          <div className="relative h-[400px] md:h-[560px]">
-            <img
-              key={currentBanner.src}
-              src={currentBanner.src}
-              alt={currentBanner.alt}
-              className="block h-full w-full rounded-2xl object-cover"
-              style={{
-                objectPosition: idx === 0 ? "50% 35%" : "50% 30%",
-              }}
-              loading="eager"
-               {...({ fetchpriority: "high" } as any)}
-              decoding="async"
-              width={1600}
-              height={700}
-            />
-          </div>
-
-          {banners.length > 1 && (
-            <>
-              <button
-                type="button"
-                aria-label="Banner anterior"
-                onClick={prev}
-                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 h-11 w-11 items-center justify-center rounded-full bg-white/85 text-black shadow-md"
-              >
-                ‹
-              </button>
-
-              <button
-                type="button"
-                aria-label="Próximo banner"
-                onClick={next}
-                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 h-11 w-11 items-center justify-center rounded-full bg-white/85 text-black shadow-md"
-              >
-                ›
-              </button>
-
-              <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-2">
-                {banners.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-label={`Ir para banner ${i + 1}`}
-                    onClick={() => setIdx(i)}
-                    className={[
-                      "h-2 w-2 rounded-full transition-all",
-                      i === idx ? "bg-black/70 w-5" : "bg-black/25",
-                    ].join(" ")}
-                  />
-                ))}
-              </div>
-            </>
-          )}
+    <section id="home" className="relative bg-[#FCFAF6]">
+      <div className="relative w-full overflow-hidden">
+        <div className="relative h-[520px] md:h-[680px] lg:h-[760px]">
+          <img
+            key={currentBanner.src}
+            src={currentBanner.src}
+            alt={currentBanner.alt}
+            className="block h-full w-full object-cover"
+            style={{ objectPosition: "50% 30%" }}
+            loading="eager"
+            {...({ fetchpriority: "high" } as any)}
+            decoding="async"
+            width={1600}
+            height={900}
+          />
         </div>
+
+        {banners.length > 1 && (
+          <>
+            <button
+              type="button"
+              aria-label="Banner anterior"
+              onClick={prev}
+              className="
+                absolute left-5 top-1/2 hidden
+                h-11 w-11 -translate-y-1/2
+                items-center justify-center rounded-full
+                border border-white/30
+                bg-white/75 text-[#173a35]
+                shadow-md backdrop-blur-md
+                transition hover:bg-white
+                md:flex
+              "
+            >
+              ‹
+            </button>
+
+            <button
+              type="button"
+              aria-label="Próximo banner"
+              onClick={next}
+              className="
+                absolute right-5 top-1/2 hidden
+                h-11 w-11 -translate-y-1/2
+                items-center justify-center rounded-full
+                border border-white/30
+                bg-white/75 text-[#173a35]
+                shadow-md backdrop-blur-md
+                transition hover:bg-white
+                md:flex
+              "
+            >
+              ›
+            </button>
+
+            <div className="absolute bottom-5 left-0 right-0 flex items-center justify-center gap-2">
+              {banners.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  aria-label={`Ir para banner ${i + 1}`}
+                  onClick={() => setIdx(i)}
+                  className={[
+                    "h-[6px] rounded-full transition-all duration-300",
+                    i === idx ? "w-8 bg-white" : "w-[6px] bg-white/45",
+                  ].join(" ")}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </section>
   );

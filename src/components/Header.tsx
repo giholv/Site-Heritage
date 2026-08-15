@@ -4,8 +4,8 @@ import {
   X,
   Search,
   ShoppingBag,
+  Heart,
   User,
-  ChevronDown,
   Home,
   MessageCircle,
   LogOut,
@@ -18,12 +18,17 @@ import { useCart } from "../context/CartContext";
 import { supabase } from "../lib/supabase";
 import { WhatsAppFloatingButton } from "../components/WhatsAppFloatingButton";
 
+const FAVORITES_KEY = "calea_favorites";
 
 type HeaderProps = {
   searchValue?: string;
   onSearchChange?: (v: string) => void;
   onSearchSubmit?: (v: string) => void;
 };
+
+type MenuItem =
+  | { label: string; type: "route"; to: string }
+  | { label: string; type: "section"; id: string };
 
 const Header: React.FC<HeaderProps> = ({
   searchValue,
@@ -34,38 +39,37 @@ const Header: React.FC<HeaderProps> = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [qLocal, setQLocal] = useState("");
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [soundPlaying, setSoundPlaying] = useState(false);
+  const [favoriteCount, setFavoriteCount] = useState(0);
 
   const q = searchValue ?? qLocal;
-
   const navigate = useNavigate();
   const location = useLocation();
+
+  const isHomePage = location.pathname === "/";
   const isProductPage = location.pathname.startsWith("/produto/");
   const isAdminPage = location.pathname.startsWith("/admin");
   const isCheckoutPage = location.pathname.startsWith("/checkout");
-  const [soundPlaying, setSoundPlaying] = useState(false);
+
+  const transparentHeader = isHomePage && !scrolled && !isOpen && !searchOpen;
+  const glassHeader = isHomePage && !scrolled && !isOpen && !searchOpen;
 
   const showFloatingSound =
     !isAdminPage && !isCheckoutPage && !cartOpen && !isOpen && !isProductPage;
 
-  const showHeaderSound =
-    !isAdminPage && !showFloatingSound;
+  const showHeaderSound = !isAdminPage && !showFloatingSound;
 
-  const toggleHeaderSound = () => {
-    window.dispatchEvent(new Event("calea-toggle-sound"));
-  };
-
-
-  const menuItems = [
-    { label: "Início", id: "home" },
-    { label: "Encontre Sua Joia", id: "categorias" },
-    { label: "Lançamentos", id: "semijoias" },
-    { label: "Sobre Nós", id: "about" },
-    { label: "Contato", id: "contact" },
+  const menuItems: MenuItem[] = [
+    { label: "SHOP", type: "route", to: "/joias" },
+    { label: "COLEÇÕES", type: "section", id: "colecoes" },
+    { label: "BEST SELLERS", type: "section", id: "best-sellers" },
+    { label: "SOBRE", type: "section", id: "about" },
+    { label: "SEU MATCH CALÉA", type: "section", id: "style-quiz" },
   ];
 
   const setQ = (v: string) => {
@@ -85,6 +89,7 @@ const Header: React.FC<HeaderProps> = ({
 
   const goSection = (id: string) => {
     setIsOpen(false);
+    setSearchOpen(false);
 
     if (location.pathname === "/") {
       scrollToId(id);
@@ -94,10 +99,8 @@ const Header: React.FC<HeaderProps> = ({
     navigate("/", { replace: false });
 
     let tries = 0;
-
     const timer = window.setInterval(() => {
       tries += 1;
-
       const el = document.getElementById(id);
 
       if (el) {
@@ -110,6 +113,18 @@ const Header: React.FC<HeaderProps> = ({
     }, 50);
   };
 
+  const handleMenuItem = (item: MenuItem) => {
+    setIsOpen(false);
+    setSearchOpen(false);
+
+    if (item.type === "route") {
+      navigate(item.to);
+      return;
+    }
+
+    goSection(item.id);
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -117,6 +132,7 @@ const Header: React.FC<HeaderProps> = ({
     if (!term) return;
 
     setIsOpen(false);
+    setSearchOpen(false);
 
     if (onSearchSubmit) {
       onSearchSubmit(term);
@@ -126,38 +142,28 @@ const Header: React.FC<HeaderProps> = ({
     navigate(`/joias?q=${encodeURIComponent(term)}`);
   };
 
-
   const openCart = () => {
     setIsOpen(false);
+    setSearchOpen(false);
     setCartOpen(true);
   };
 
-  const badge = (n: number, mobile = false) =>
+  const toggleHeaderSound = () => {
+    window.dispatchEvent(new Event("calea-toggle-sound"));
+  };
+
+  const badge = (n: number) =>
     n > 0 ? (
-      <span
-        className={[
-          "absolute flex items-center justify-center rounded-full bg-[#b08d57] px-1 leading-none text-white",
-          mobile
-            ? "-right-1 -top-1 h-[17px] min-w-[17px] text-[10px]"
-            : "-right-1 -top-1 h-[20px] min-w-[20px] text-[11px]",
-        ].join(" ")}
-      >
+      <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#b08d57] px-1 text-[10px] leading-none text-white">
         {n > 99 ? "99+" : n}
       </span>
     ) : null;
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 8);
-    };
-
+    const handleScroll = () => setScrolled(window.scrollY > 16);
     handleScroll();
-
     window.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
@@ -168,10 +174,7 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     window.addEventListener("keydown", onKey);
-
-    return () => {
-      window.removeEventListener("keydown", onKey);
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [isOpen]);
 
   useEffect(() => {
@@ -179,12 +182,10 @@ const Header: React.FC<HeaderProps> = ({
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
       document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
-
 
   useEffect(() => {
     async function checkUser() {
@@ -198,10 +199,9 @@ const Header: React.FC<HeaderProps> = ({
       setIsLoggedIn(!!session?.user);
     });
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => listener.subscription.unsubscribe();
   }, []);
+
   useEffect(() => {
     function handleSoundState(event: Event) {
       const customEvent = event as CustomEvent<{ playing: boolean }>;
@@ -209,437 +209,267 @@ const Header: React.FC<HeaderProps> = ({
     }
 
     window.addEventListener("calea-sound-state", handleSoundState);
+    return () => window.removeEventListener("calea-sound-state", handleSoundState);
+  }, []);
+
+  useEffect(() => {
+    const syncFavorites = () => {
+      try {
+        const saved = localStorage.getItem(FAVORITES_KEY);
+        const ids = saved ? JSON.parse(saved) : [];
+        setFavoriteCount(Array.isArray(ids) ? ids.length : 0);
+      } catch {
+        setFavoriteCount(0);
+      }
+    };
+
+    syncFavorites();
+
+    window.addEventListener("storage", syncFavorites);
+    window.addEventListener("calea-favorites-updated", syncFavorites);
 
     return () => {
-      window.removeEventListener("calea-sound-state", handleSoundState);
+      window.removeEventListener("storage", syncFavorites);
+      window.removeEventListener("calea-favorites-updated", syncFavorites);
     };
   }, []);
 
-  const SoundButton = ({ mobile = false }: { mobile?: boolean }) => (
-    <button
-      type="button"
-      onClick={toggleHeaderSound}
-      aria-label={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
-      title={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
-      className={[
-        mobile
-          ? "inline-flex h-10 w-10 items-center justify-center"
-          : "inline-flex h-12 w-12 items-center justify-center",
-        "text-[#2b554e] transition hover:text-[#b08d57] active:scale-95",
-      ].join(" ")}
-    >
-      {soundPlaying ? (
-        <Music
-          className={mobile ? "h-[21px] w-[21px]" : "h-6 w-6"}
-          strokeWidth={1.8}
-        />
-      ) : (
-        <VolumeX
-          className={mobile ? "h-[21px] w-[21px]" : "h-6 w-6"}
-          strokeWidth={1.8}
-        />
-      )}
-    </button>
-  );
+  const navigationColor = transparentHeader
+  ? "text-[#173a35]"
+  : "text-[#173a35]";
+  const subtleColor = transparentHeader
+  ? "text-[#173a35]"
+  : "text-[#173a35]";
 
   return (
     <>
-      <header
-        className={[
-          "fixed left-0 top-0 z-50 w-full transition-all duration-300",
-          isOpen ? "h-screen overflow-hidden" : "",
-          scrolled ? "backdrop-blur-xl" : "",
-        ].join(" ")}
-      >
-        {/* ========================= */}
-        {/* MOBILE HEADER */}
-        {/* ========================= */}
-        <div className="md:hidden">
-          {/* TOP BAR MOBILE */}
-          <div
-            className={[
-              "border-b border-white/10 text-[#f3f0e0] transition-all duration-300",
-              scrolled ? "bg-[#2b554e]/95 shadow-sm" : "bg-[#2b554e]",
-            ].join(" ")}
-          >
-            <div className="flex h-8 items-center justify-center px-3">
-              <span className="truncate text-center text-[11px] leading-none tracking-[0.04em] opacity-95">
-                Frete grátis a partir de <strong>R$299</strong> ·5% OFF cupom <strong>BOASVINDAS</strong>
+      {!isAdminPage && !isCheckoutPage && (
+        <header className="fixed left-0 top-0 z-50 w-full">
+          {/* BARRA PROMOCIONAL */}
+          <div className="border-b border-white/10 bg-[#173a35] text-[#FCFAF6]">
+            <div className="mx-auto flex h-[28px] max-w-[1600px] items-center justify-center px-4 md:h-[32px]">
+              <span className="text-center text-[10px] font-medium uppercase tracking-[0.18em]">
+                Frete grátis para todo Brasil acima de R$299
               </span>
             </div>
           </div>
 
-          {/* NAV MOBILE */}
+          {/* HEADER PRINCIPAL */}
           <div
             className={[
-              "border-b transition-all duration-300",
-              scrolled
-                ? "border-[#2b554e]/10 bg-white/75 shadow-[0_8px_30px_rgba(43,85,78,0.08)] supports-[backdrop-filter]:bg-white/50"
-                : "border-transparent bg-[#FCFAF6]",
+              "relative overflow-hidden border-b transition-all duration-500",
+              glassHeader
+                ? "border-white/15 bg-[#182725]/42 backdrop-blur-[16px] backdrop-saturate-125 shadow-[0_8px_24px_rgba(0,0,0,0.12)] ring-1 ring-inset ring-white/10 supports-[backdrop-filter]:bg-[#182725]/34"
+                : "border-[#173a35]/10 bg-[#FCFAF6]/82 backdrop-blur-[14px] shadow-[0_6px_20px_rgba(16,48,43,0.06)] supports-[backdrop-filter]:bg-[#FCFAF6]/74",
             ].join(" ")}
           >
-            <div className="relative flex h-[58px] items-center justify-between px-4">
-              <button
-                type="button"
-                onClick={() => setIsOpen((v) => !v)}
-                aria-label={isOpen ? "Fechar menu" : "Abrir menu"}
-                className="
-                  inline-flex h-10 w-10 items-center justify-center
-                  rounded-full text-[#2b554e]
-                  transition active:scale-95
-                "
-              >
-                {isOpen ? (
-                  <X className="h-6 w-6" strokeWidth={1.8} />
-                ) : (
-                  <Menu className="h-6 w-6" strokeWidth={1.8} />
-                )}
-              </button>
+            <div
+              className={[
+                "pointer-events-none absolute inset-0 transition-opacity duration-500",
+                glassHeader
+                  ? "bg-gradient-to-b from-white/10 via-white/[0.03] to-transparent opacity-100"
+                  : "bg-gradient-to-b from-white/25 via-white/[0.04] to-transparent opacity-60",
+              ].join(" ")}
+            />
 
-              <div className="justify-self-center">
+            <div className="relative mx-auto flex h-[68px] max-w-[1600px] items-center px-4 md:h-[76px] md:px-7 xl:px-10">
+              {/* MOBILE: MENU */}
+              <div className="flex flex-1 items-center md:hidden">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsOpen(false);
-                    navigate("/");
-                  }}
-                  className="inline-flex items-center justify-center"
-                  aria-label="Ir para Home"
+                  onClick={() => setIsOpen(true)}
+                  aria-label="Abrir menu"
+                  className={["inline-flex h-10 w-10 items-center justify-center transition", navigationColor].join(" ")}
                 >
-                  <img
-                    src="/logo_fundo_escuro_mobile.png"
-                    alt="Logo da loja"
-                    className="h-9 w-auto object-contain sm:h-10 md:h-10"
-                  />
+                  <Menu className="h-[21px] w-[21px]" strokeWidth={1.5} />
                 </button>
               </div>
 
-              <div className="flex items-center justify-end gap-1 justify-self-end">
-                {showHeaderSound && <SoundButton mobile />}
+              {/* DESKTOP: MENU À ESQUERDA */}
+              <nav className="hidden flex-1 items-center gap-5 md:flex lg:gap-7 xl:gap-8">
+                {menuItems.map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => handleMenuItem(item)}
+                    className={[
+                      "whitespace-nowrap text-[12px] font-medium uppercase tracking-[0.16em] transition-colors hover:text-[#b08d57]",
+                      navigationColor,
+                    ].join(" ")}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+
+              {/* LOGO CENTRAL ABSOLUTA */}
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                aria-label="Ir para Home"
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              >
+                <img
+                  src="/logo_fundo_escuro_mobile.png"
+                  alt="Caléa Blanc"
+                  className="w-[142px] h-auto object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.08)] md:w-[156px] lg:w-[168px] xl:w-[178px]"
+                />
+              </button>
+
+              {/* AÇÕES À DIREITA */}
+              <div className="flex flex-1 items-center justify-end gap-0 md:gap-1">
+                {showHeaderSound && (
+                  <button
+                    type="button"
+                    onClick={toggleHeaderSound}
+                    aria-label={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
+                    className={["hidden h-10 w-10 items-center justify-center transition hover:text-[#b08d57] lg:inline-flex", subtleColor].join(" ")}
+                  >
+                    {soundPlaying ? (
+                      <Music className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                    ) : (
+                      <VolumeX className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                    )}
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  aria-label="Pesquisar"
-                  onClick={() => setIsOpen(true)}
-                  className="
-                    inline-flex h-10 w-10 items-center justify-center
-                    rounded-full text-[#2b554e]
-                    transition hover:text-[#b08d57] active:scale-95
-                  "
+                  onClick={() => setSearchOpen((v) => !v)}
+                  aria-label="Buscar"
+                  className={[
+                    "inline-flex h-10 items-center justify-center gap-2 px-2 transition hover:text-[#b08d57] md:px-3",
+                    subtleColor,
+                  ].join(" ")}
                 >
-                  <Search className="h-[21px] w-[21px]" strokeWidth={1.8} />
+                  <span className="hidden text-[11px] font-medium uppercase tracking-[0.14em] xl:inline">Buscar</span>
+                  <Search className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </button>
 
-                <div className="relative">
+                <div className="relative hidden md:block">
                   <button
                     type="button"
                     onClick={() => setAccountMenuOpen((v) => !v)}
-                    className="
-      inline-flex h-10 w-10 items-center justify-center
-      rounded-full text-[#2b554e]
-      transition hover:text-[#b08d57] active:scale-95
-    "
+                    className={[
+                      "inline-flex h-10 items-center gap-2 px-2 transition hover:text-[#b08d57] lg:px-3",
+                      subtleColor,
+                    ].join(" ")}
                   >
-                    <User className="h-[21px] w-[21px]" strokeWidth={1.8} />
+                    <span className="hidden text-[11px] font-medium uppercase tracking-[0.14em] xl:inline">Minha conta</span>
+                    <User className="h-[18px] w-[18px]" strokeWidth={1.5} />
                   </button>
 
-
                   {accountMenuOpen && (
-                    <div
-
-                      className="
-        absolute right-0 top-[120%] z-50
-        w-[240px] overflow-hidden
-        rounded-[24px]
-        border border-[#ece3d7]
-        bg-white
-        shadow-[0_30px_80px_rgba(0,0,0,0.12)]
-      "
-                    >
+                    <div className="absolute right-0 top-[115%] z-50 w-[250px] overflow-hidden border border-[#e8dfd2] bg-[#FCFAF6] text-[#173a35] shadow-[0_24px_70px_rgba(0,0,0,0.12)]">
                       <button
+                        type="button"
                         onClick={() => {
                           navigate(isLoggedIn ? "/conta" : "/login");
                           setAccountMenuOpen(false);
                         }}
-                        className="
-          flex w-full items-center gap-3
-          px-5 py-4 text-left
-          text-[14px] text-[#2b554e]
-          transition hover:bg-[#fcfaf6]
-        "
+                        className="flex w-full items-center gap-3 px-5 py-4 text-left text-[13px] transition hover:bg-white"
                       >
-                        <Home className="h-5 w-5" />
+                        <Home className="h-4 w-4" />
                         Minha conta
                       </button>
 
                       <a
                         href="https://wa.me/5511997946257"
                         target="_blank"
-                        className="
-          flex items-center gap-3
-          px-5 py-4
-          text-[14px] text-[#2b554e]
-          transition hover:bg-[#fcfaf6]
-        "
+                        rel="noreferrer"
+                        className="flex items-center gap-3 px-5 py-4 text-[13px] transition hover:bg-white"
                       >
-                        <MessageCircle className="h-5 w-5" />
+                        <MessageCircle className="h-4 w-4" />
                         Suporte
                       </a>
 
                       {isLoggedIn && (
                         <button
+                          type="button"
                           onClick={async () => {
                             await supabase.auth.signOut();
                             setAccountMenuOpen(false);
                             window.location.href = "/login";
                           }}
-                          className="
-            flex w-full items-center gap-3
-            border-t border-[#f1ebe3]
-            px-5 py-4 text-left
-            text-[14px] text-[#a35a5a]
-            transition hover:bg-[#fcfaf6]
-          "
+                          className="flex w-full items-center gap-3 border-t border-[#eee6da] px-5 py-4 text-left text-[13px] text-[#9c5555] transition hover:bg-white"
                         >
-                          <LogOut className="h-5 w-5" />
+                          <LogOut className="h-4 w-4" />
                           Sair
                         </button>
                       )}
                     </div>
                   )}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/favoritos")}
+                  aria-label="Favoritos"
+                  className={[
+                    "relative inline-flex h-10 items-center justify-center gap-2 px-2 transition hover:text-[#b08d57] md:px-3",
+                    subtleColor,
+                  ].join(" ")}
+                >
+                  <span className="hidden text-[11px] font-medium uppercase tracking-[0.14em] xl:inline">
+                    Favoritos
+                  </span>
+                  <Heart className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  <span className="hidden text-[11px] font-medium tabular-nums md:inline">
+                    {favoriteCount}
+                  </span>
+                  <span className="md:hidden">{badge(favoriteCount)}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={openCart}
-                  aria-label="Carrinho"
-                  className="
-    relative inline-flex h-10 w-10 items-center justify-center
-    rounded-full text-[#2b554e]
-    transition hover:text-[#b08d57] active:scale-95
-  "
+                  aria-label="Sacola"
+                  className={[
+                    "relative inline-flex h-10 items-center justify-center gap-2 px-2 transition hover:text-[#b08d57] md:px-3",
+                    subtleColor,
+                  ].join(" ")}
                 >
-                  <ShoppingBag className="h-[21px] w-[21px]" strokeWidth={1.8} />
-                  {badge(count, true)}
+                  <ShoppingBag className="h-[19px] w-[19px]" strokeWidth={1.5} />
+                  <span className="hidden text-[11px] font-medium tabular-nums md:inline">{count}</span>
+                  <span className="md:hidden">{badge(count)}</span>
                 </button>
               </div>
             </div>
           </div>
 
-        </div>
-
-        {/* ========================= */}
-        {/* DESKTOP HEADER */}
-        {/* ========================= */}
-        <div className="hidden md:block">
-          {/* TOP BAR DESKTOP */}
+          {/* BUSCA EXPANSÍVEL */}
           <div
             className={[
-              "border-b border-white/10 text-[#f3f0e0] transition-all duration-300",
-              scrolled ? "bg-[#2b554e]/95 shadow-sm" : "bg-[#2b554e]",
+              "overflow-hidden border-b border-[#173a35]/10 bg-[#FCFAF6] transition-all duration-300",
+              searchOpen ? "max-h-28 opacity-100" : "max-h-0 opacity-0",
             ].join(" ")}
           >
-            <div className="mx-auto flex h-10 max-w-[1440px] items-center justify-center px-6">
-              <span className="text-center text-[14px] leading-none opacity-95 lg:text-[15px]">
-                Frete grátis a partir de <strong>R$299</strong> •
-                Cupom de 5% OFF para primeira compra: <strong>BOASVINDAS</strong>
-              </span>
-            </div>
-          </div>
-
-          {/* NAV DESKTOP */}
-          <div
-            className={[
-              "border-b transition-all duration-300",
-              scrolled
-                ? "border-[#2b554e]/10 bg-white/55 shadow-[0_8px_30px_rgba(43,85,78,0.10)] supports-[backdrop-filter]:bg-white/35"
-                : "border-transparent bg-[#FCFAF6]",
-            ].join(" ")}
-          >
-            <div className="mx-auto w-full max-w-[1440px] px-6">
-              <div
-                className={[
-                  "grid grid-cols-[240px_1fr_240px] items-center gap-6 transition-all duration-300 lg:grid-cols-[280px_1fr_280px]",
-                  scrolled ? "h-20 lg:h-24" : "h-24 lg:h-28",
-                ].join(" ")}
+            <form onSubmit={handleSearchSubmit} className="mx-auto flex max-w-[900px] items-center gap-3 px-5 py-5 md:px-8">
+              <Search className="h-5 w-5 shrink-0 text-[#173a35]" strokeWidth={1.5} />
+              <input
+                autoFocus={searchOpen}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="O que você procura?"
+                className="h-10 flex-1 border-0 bg-transparent text-[14px] text-[#173a35] outline-none placeholder:text-[#7e8e89]"
+              />
+              <button
+                type="button"
+                onClick={() => setSearchOpen(false)}
+                aria-label="Fechar busca"
+                className="inline-flex h-9 w-9 items-center justify-center text-[#173a35]"
               >
-                <div className="flex items-center justify-start">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/")}
-                    className="inline-flex items-center"
-                    aria-label="Ir para Home"
-                  >
-                    <img
-                      src="/logo_fundo_claro.svg"
-                      alt="Logo da loja"
-                      className={[
-                        "w-auto object-contain transition-all duration-300",
-                        scrolled
-                          ? "h-[92px] lg:h-[110px]"
-                          : "h-[115px] lg:h-[135px] xl:h-[145px]",
-                      ].join(" ")}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex w-full justify-center">
-                  <form
-                    onSubmit={handleSearchSubmit}
-                    className="relative w-full max-w-[700px]"
-                  >
-                    <input
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      placeholder="Buscar por nome ou código"
-                      className="
-                        h-14 w-full rounded-lg border border-[#dcd6cc]
-                        bg-white px-6 pr-14 text-base text-[#2b554e]
-                        outline-none transition
-                        placeholder:text-[#9aa8a3]
-                        focus:border-[#2b554e]
-                        focus:ring-2 focus:ring-[#2b554e]/10
-                      "
-                    />
-
-                    <button
-                      type="submit"
-                      aria-label="Pesquisar"
-                      className="
-                        absolute right-4 top-1/2 -translate-y-1/2
-                        text-[#54716b] transition-colors hover:text-[#b08d57]
-                      "
-                    >
-                      <Search className="h-6 w-6" strokeWidth={1.8} />
-                    </button>
-                  </form>
-                </div>
-
-                <div className="relative flex items-center justify-end gap-2">
-                  {showHeaderSound && <SoundButton />}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setAccountMenuOpen((v) => !v)}
-                      className="
-        flex h-[52px] items-center gap-3 rounded-2xl
-        px-4 text-[#2b554e]
-        transition hover:bg-[#f7f2ea]
-      "
-                    >
-                      <User className="h-6 w-6" strokeWidth={1.8} />
-
-                      <span className="text-[15px] font-medium">
-                        Minha conta
-                      </span>
-
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-
-                    {accountMenuOpen && (
-                      <div
-                        className="
-      absolute right-0 top-[115%] z-50
-      w-[270px] overflow-hidden
-      rounded-[28px]
-      border border-[#ece3d7]
-      bg-white
-      shadow-[0_30px_80px_rgba(0,0,0,0.12)]
-    "
-                      >
-                        <button
-                          onClick={() => {
-                            navigate(isLoggedIn ? "/conta" : "/login");
-                            setAccountMenuOpen(false);
-                          }}
-                          className="
-        flex w-full items-center gap-3
-        px-6 py-5 text-left
-        text-[15px] text-[#2b554e]
-        transition hover:bg-[#fcfaf6]
-      "
-                        >
-                          <Home className="h-5 w-5" />
-                          Minha conta
-                        </button>
-
-                        <a
-                          href="https://wa.me/5511999999999"
-                          target="_blank"
-                          className="
-        flex items-center gap-3
-        px-6 py-5
-        text-[15px] text-[#2b554e]
-        transition hover:bg-[#fcfaf6]
-      "
-                        >
-                          <MessageCircle className="h-5 w-5" />
-                          Suporte no WhatsApp
-                        </a>
-
-                        {isLoggedIn && (
-                          <button
-                            onClick={async () => {
-                              await supabase.auth.signOut();
-                              setAccountMenuOpen(false);
-                              window.location.href = "/login";
-                            }}
-                            className="
-          flex w-full items-center gap-3
-          border-t border-[#f1ebe3]
-          px-6 py-5 text-left
-          text-[15px] text-[#a35a5a]
-          transition hover:bg-[#fcfaf6]
-        "
-                          >
-                            <LogOut className="h-5 w-5" />
-                            Sair
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={openCart}
-                    aria-label="Carrinho"
-                    className="
-      relative inline-flex h-12 w-12 items-center justify-center
-      rounded-2xl text-[#2b554e]
-      transition hover:bg-[#f7f2ea]
-    "
-                  >
-                    <ShoppingBag className="h-7 w-7" strokeWidth={1.8} />
-                    {badge(count)}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* MENU DESKTOP */}
-            <nav className="border-t border-[#eee8dc]/80">
-              <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-center gap-12 px-6">
-                {menuItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => goSection(item.id)}
-                    className="
-                      text-base font-medium tracking-[0.12em]
-                      text-[#2b554e] transition-colors hover:text-[#b08d57]
-                      lg:text-[17px]
-                    "
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </nav>
+                <X className="h-5 w-5" strokeWidth={1.5} />
+              </button>
+            </form>
           </div>
-        </div>
-      </header>
-      {/* DRAWER MOBILE */}
+        </header>
+      )}
+
+      {/* MENU MOBILE */}
       <div
         className={[
-          "fixed inset-0 z-[9999]",
+          "fixed inset-0 z-[9999] md:hidden",
           isOpen ? "pointer-events-auto" : "pointer-events-none",
         ].join(" ")}
       >
@@ -648,83 +478,76 @@ const Header: React.FC<HeaderProps> = ({
           aria-label="Fechar menu"
           onClick={() => setIsOpen(false)}
           className={[
-            "absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity",
+            "absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-300",
             isOpen ? "opacity-100" : "opacity-0",
           ].join(" ")}
         />
 
         <div
           className={[
-            "absolute right-0 top-0 h-full w-[86%] max-w-[360px]",
-            "bg-[#fcfaf6] text-[#2b554e] shadow-2xl",
-            "transition-transform duration-300",
-            "overflow-y-auto",
-            isOpen ? "translate-x-0" : "translate-x-full",
+            "absolute left-0 top-0 h-full w-[88%] max-w-[380px] overflow-y-auto bg-[#173a35] text-[#FCFAF6] shadow-2xl transition-transform duration-300",
+            isOpen ? "translate-x-0" : "-translate-x-full",
           ].join(" ")}
         >
-          <div className="border-b border-[#e9e2d6] px-6 py-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-[0.28em] text-[#b08d57]">
-                Menu
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                aria-label="Fechar"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#2b554e] shadow-sm"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <p className="mt-4 text-sm leading-6 text-[#6f6558]">
-              Navegue pela Caléa e encontre sua próxima joia.
-            </p>
+          <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+            <img src="/logo_fundo_escuro_mobile.png" alt="Caléa Blanc" className="h-12 w-auto" />
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              aria-label="Fechar"
+              className="inline-flex h-10 w-10 items-center justify-center"
+            >
+              <X className="h-5 w-5" strokeWidth={1.5} />
+            </button>
           </div>
 
-          <div className="px-6 py-6">
-            <form onSubmit={handleSearchSubmit}>
-              <div className="relative">
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar joias"
-                  className="h-12 w-full rounded-2xl border border-[#e9e2d6] bg-white pl-4 pr-12 text-sm text-[#2b554e] outline-none focus:border-[#b08d57] focus:ring-2 focus:ring-[#b08d57]/15"
-                />
-
-                <button
-                  type="submit"
-                  aria-label="Pesquisar"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#2b554e]"
-                >
-                  <Search className="h-5 w-5" />
-                </button>
-              </div>
+          <div className="px-6 py-7">
+            <form onSubmit={handleSearchSubmit} className="mb-8 flex items-center border-b border-white/30 pb-3">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar joias"
+                className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-white/55"
+              />
+              <button type="submit" aria-label="Pesquisar">
+                <Search className="h-5 w-5" strokeWidth={1.5} />
+              </button>
             </form>
 
-            <div className="mt-7 space-y-1">
+            <nav className="space-y-1">
               {menuItems.map((item) => (
                 <button
-                  key={item.id}
+                  key={item.label}
                   type="button"
-                  onClick={() => goSection(item.id)}
-                  className="flex w-full items-center justify-between rounded-2xl px-4 py-4 text-left text-[15px] font-medium text-[#2b554e] transition hover:bg-white"
+                  onClick={() => handleMenuItem(item)}
+                  className="flex w-full items-center justify-between border-b border-white/10 py-5 text-left text-[12px] font-medium uppercase tracking-[0.18em]"
                 >
                   {item.label}
-                  <span className="text-[#b08d57]">›</span>
+                  <span className="text-[#b08d57]">→</span>
                 </button>
               ))}
-            </div>
+            </nav>
 
-            <div className="mt-7 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                navigate("/favoritos");
+              }}
+              className="mt-8 flex h-12 w-full items-center justify-center gap-2 border border-white/20 text-[11px] font-medium uppercase tracking-[0.12em]"
+            >
+              <Heart className="h-4 w-4" strokeWidth={1.5} />
+              Favoritos {favoriteCount > 0 ? `(${favoriteCount})` : ""}
+            </button>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setIsOpen(false);
                   navigate(isLoggedIn ? "/conta" : "/login");
                 }}
-                className="h-12 rounded-2xl bg-[#2b554e] text-sm font-semibold text-white"
+                className="h-12 border border-white/20 text-[11px] font-medium uppercase tracking-[0.12em]"
               >
                 {isLoggedIn ? "Minha conta" : "Entrar"}
               </button>
@@ -732,28 +555,15 @@ const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={openCart}
-                className="relative h-12 rounded-2xl border border-[#2b554e]/15 bg-white text-sm font-semibold text-[#2b554e]"
+                className="h-12 bg-[#FCFAF6] text-[11px] font-medium uppercase tracking-[0.12em] text-[#173a35]"
               >
                 Sacola {count > 0 ? `(${count})` : ""}
               </button>
             </div>
-
-            {isLoggedIn && (
-              <button
-                type="button"
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  window.location.href = "/login";
-                }}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm font-medium text-[#a35a5a]"
-              >
-                <LogOut className="h-4 w-4" />
-                Sair da conta
-              </button>
-            )}
           </div>
         </div>
       </div>
+
       {showFloatingSound && (
         <button
           type="button"
@@ -761,12 +571,7 @@ const Header: React.FC<HeaderProps> = ({
           aria-label={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
           title={soundPlaying ? "Desligar som ambiente" : "Ligar som ambiente"}
           className={[
-            "fixed left-4 bottom-[142px] z-[9998]",
-            "md:bottom-6 md:left-5",
-            "flex h-11 w-11 items-center justify-center rounded-full md:h-12 md:w-12",
-            "border border-[#e8dfd2]/80 bg-[#FCFAF6]/90 text-[#2b554e]",
-            "backdrop-blur-xl shadow-[0_10px_28px_rgba(43,85,78,0.16)]",
-            "transition hover:bg-white active:scale-95",
+            "fixed bottom-[142px] left-4 z-[9998] flex h-11 w-11 items-center justify-center rounded-full border border-[#e8dfd2]/80 bg-[#FCFAF6]/90 text-[#2b554e] shadow-[0_10px_28px_rgba(43,85,78,0.16)] backdrop-blur-xl transition hover:bg-white active:scale-95 md:bottom-6 md:left-5 md:h-12 md:w-12",
             soundPlaying ? "border-[#2b554e] bg-[#2b554e] text-white" : "",
           ].join(" ")}
         >
@@ -781,6 +586,7 @@ const Header: React.FC<HeaderProps> = ({
       {!isAdminPage && !isCheckoutPage && (
         <WhatsAppFloatingButton hidden={cartOpen || isOpen || isProductPage} />
       )}
+
       <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}

@@ -1,155 +1,250 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
+import  { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../context/CartContext";
 import { supabase } from "../lib/supabase";
 
 type Peca = {
   id: string;
   slug: string;
   nome: string;
-  descricao?: string;
   preco: number;
   imagem: string;
   tag?: string;
+  searchTags: string[];
+  tagSlugs: string[];
 };
+
+type TabKey = "novidades" | "best-sellers" | "essenciais";
 
 const VIEW = "v_catalog_products_with_filters";
 const BUCKET = "product-images";
-const SEO_TAG = "lancamento";
+const FAVORITES_KEY = "calea_favorites";
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "novidades", label: "Novidades" },
+  { key: "best-sellers", label: "Best Sellers" },
+  { key: "essenciais", label: "Essenciais" },
+];
 
 function imgUrl(path?: string | null) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
+
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
 
-function pickBadge(tagSlugs?: string[] | null) {
-  const t = tagSlugs ?? [];
-  if (t.includes("novo")) return "Novo";
-  if (t.includes("destaque")) return "Destaque";
-  if (t.includes("mais-vendido")) return "Mais vendido";
-  return "Lançamento";
+function formatBRL(value: number) {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 }
 
-function formatBRL(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+function getInstallment(value: number) {
+  return formatBRL(value / 6);
 }
 
-function wrapIndex(index: number, total: number) {
-  return ((index % total) + total) % total;
+function includesAny(values: string[], options: string[]) {
+  const normalized = values.map((value) => value.toLowerCase());
+  return options.some((option) => normalized.includes(option.toLowerCase()));
 }
 
-type CardProps = {
+function getBadge(peca: Peca) {
+  if (includesAny(peca.searchTags, ["lancamento"])) return "NOVIDADE";
+  return null;
+}
+
+function ProductCard({
+  peca,
+  onOpen,
+  isFavorite,
+  onToggleFavorite,
+}: {
   peca: Peca;
-  compact?: boolean;
-  onClick: () => void;
-  onAdd: (e: React.MouseEvent) => void;
-  onDetails: (e: React.MouseEvent) => void;
-};
+  onOpen: () => void;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+}) {
+  const badge = getBadge(peca);
 
-function Card({ peca, compact = false, onClick, onAdd, onDetails }: CardProps) {
   return (
-    <div
-      onClick={onClick}
-      className="bg-white/90 rounded-[28px] shadow-md overflow-hidden border border-[#2b554e]/10 cursor-pointer"
+    <article
+      onClick={onOpen}
+      className="group min-w-0 cursor-pointer"
     >
-      <div className="relative">
-        <div className="aspect-[4/5] overflow-hidden bg-black/5">
+      <div className="relative overflow-hidden bg-[#f3efe8]">
+        <div className="aspect-[3/4] overflow-hidden">
           {peca.imagem ? (
             <img
               src={peca.imagem}
               alt={peca.nome}
-              className="block w-full h-full object-cover"
               loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.025]"
             />
-          ) : null}
+          ) : (
+            <div className="h-full w-full bg-[#eee7dc]" />
+          )}
         </div>
 
-        {peca.tag && (
-          <span className="absolute top-3 left-3 text-xs font-semibold bg-[#2b554e] text-[#F8F3EA] px-3 py-1 rounded-full">
-            {peca.tag}
+        {badge && (
+          <span className="absolute left-3 top-3 bg-[#173a35]/88 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur-sm">
+            {badge}
           </span>
         )}
+
+        <button
+          type="button"
+          aria-label={
+            isFavorite
+              ? `Remover ${peca.nome} dos favoritos`
+              : `Favoritar ${peca.nome}`
+          }
+          aria-pressed={isFavorite}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleFavorite();
+          }}
+          className={[
+            "absolute bottom-3 left-3 inline-flex h-9 w-9 items-center justify-center rounded-full",
+            "shadow-sm backdrop-blur-sm transition duration-200 hover:scale-105",
+            isFavorite
+              ? "bg-[#173a35] text-white"
+              : "bg-[#FCFAF6]/90 text-[#173a35] hover:bg-white",
+          ].join(" ")}
+        >
+          <Heart
+            className="h-[19px] w-[19px]"
+            strokeWidth={1.5}
+            fill={isFavorite ? "currentColor" : "none"}
+          />
+        </button>
       </div>
 
-      {!compact && (
-        <div className="p-2 md:p-5">
-          <h3 className="text-[17px] md:text-lg font-semibold text-[#2b554e] leading-tight line-clamp-2">
-            {peca.nome}
-          </h3>
+      <div className="pt-3 pb-1">
+        <h3 className="truncate text-[15px] font-normal leading-snug text-[#2b2b2b] md:text-[17px]">
+          {peca.nome}
+        </h3>
 
-          {peca.descricao && (
-            <p className="text-[14px] md:text-sm text-[#2b554e]/70 mt-1 line-clamp-2">
-              {peca.descricao}
-            </p>
-          )}
-
-          <div className="mt-4 flex items-center justify-between gap-2 md:gap-3">
-            <div className="text-sm font-semibold text-[#b08d57]">
-              {formatBRL(peca.preco)}
-            </div>
-
-            <button
-              type="button"
-              onClick={onAdd}
-              className="inline-flex items-center gap-1 rounded-xl bg-[#2b554e] text-[#FCFAF6] px-2.5 md:px-4 py-2 text-xs md:text-sm font-semibold hover:opacity-95 transition"            >
-              <ShoppingBag className="h-4 w-4" />
-              Adicionar
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={onDetails}
-            className="mt-3 w-full rounded-2xl border border-[#2b554e]/20 px-4 py-2.5 text-sm font-semibold text-[#2b554e] hover:border-[#b08d57]/40 hover:text-[#b08d57] transition-colors"
-          >
-            Ver detalhes
-          </button>
+        <div className="mt-2 text-[16px] font-semibold leading-none text-[#173a35] md:text-[17px]">
+          {formatBRL(peca.preco)}
         </div>
-      )}
-    </div>
+
+        <div className="mt-1.5 text-[13px] text-[#6e6a64] md:text-[13px]">
+          6x de {getInstallment(peca.preco)} sem juros
+        </div>
+      </div>
+    </article>
   );
 }
 
 export default function SemijoiasCarousel() {
   const navigate = useNavigate();
-  const { add } = useCart();
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   const [pecas, setPecas] = useState<Peca[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  const total = pecas.length;
+  const [activeTab, setActiveTab] = useState<TabKey>("novidades");
+  const [sales90d, setSales90d] = useState<Record<string, number>>({});
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    try {
+      const saved = localStorage.getItem(FAVORITES_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+
+      setFavoriteIds(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setFavoriteIds([]);
+    }
   }, []);
+
+  function toggleFavorite(productId: string) {
+    setFavoriteIds((current) => {
+      const next = current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId];
+
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+      window.dispatchEvent(new Event("calea-favorites-updated"));
+      return next;
+    });
+  }
 
   useEffect(() => {
     let alive = true;
 
-    (async () => {
+    async function loadBestSellers90d() {
+      const since = new Date();
+      since.setDate(since.getDate() - 90);
+
+      const { data, error } = await supabase
+        .from("order_items")
+        .select(`
+          quantity,
+          orders!inner(
+            status,
+            payment_status,
+            created_at
+          ),
+          skus!inner(
+            product_id
+          )
+        `)
+        .gte("orders.created_at", since.toISOString());
+
+      if (!alive) return;
+
+      if (error) {
+        console.error(
+          "Erro ao carregar Best Sellers pela mesma regra do Controle de Vendas:",
+          error.message
+        );
+        setSales90d({});
+        return;
+      }
+
+      const totals: Record<string, number> = {};
+
+      (data ?? []).forEach((item: any) => {
+        const order = item?.orders;
+        const productId = item?.skus?.product_id;
+
+        if (!order || !productId) return;
+
+        const status = String(order.status ?? "").toLowerCase().trim();
+        const paymentStatus = String(order.payment_status ?? "")
+          .toLowerCase()
+          .trim();
+
+        // Mesma regra usada no AdminOrdersPage para considerar uma venda "Paga":
+        // status = paid / processing / shipped / delivered OU payment_status = paid
+        const isPaidOrder =
+          ["paid", "processing", "shipped", "delivered"].includes(status) ||
+          paymentStatus === "paid";
+
+        if (!isPaidOrder) return;
+
+        totals[productId] =
+          (totals[productId] ?? 0) + Number(item.quantity ?? 0);
+      });
+
+      setSales90d(totals);
+    }
+
+    async function loadProducts() {
       setLoading(true);
       setErr(null);
 
       const { data, error } = await supabase
         .from(VIEW)
         .select(
-          "id,slug,name,min_price_cents,image_path,image_alt,created_at,status,seo_description,search_tags,tag_slugs"
+          "id,slug,name,min_price_cents,image_path,status,search_tags,tag_slugs,created_at"
         )
         .eq("status", "active")
-        .contains("search_tags", [SEO_TAG])
         .order("created_at", { ascending: false })
-        .limit(30);
+        .limit(200);
 
       if (!alive) return;
 
@@ -164,218 +259,217 @@ export default function SemijoiasCarousel() {
         id: p.id,
         slug: p.slug,
         nome: p.name,
-        descricao: p.seo_description ?? undefined,
         preco: Number((p.min_price_cents ?? 0) / 100),
         imagem: imgUrl(p.image_path),
-        tag: pickBadge(p.tag_slugs),
+        searchTags: Array.isArray(p.search_tags) ? p.search_tags : [],
+        tagSlugs: Array.isArray(p.tag_slugs) ? p.tag_slugs : [],
       }));
 
       setPecas(mapped);
-      setActiveIndex(0);
       setLoading(false);
-    })();
+    }
+
+    loadProducts();
+    loadBestSellers90d();
 
     return () => {
       alive = false;
     };
   }, []);
 
+  const filtered = useMemo(() => {
+    if (activeTab === "novidades") {
+      return pecas.filter((peca) =>
+        includesAny(peca.searchTags, ["lancamento"])
+      );
+    }
+
+    if (activeTab === "best-sellers") {
+      return [...pecas]
+        .filter((peca) => (sales90d[peca.id] ?? 0) > 0)
+        .sort(
+          (a, b) =>
+            (sales90d[b.id] ?? 0) - (sales90d[a.id] ?? 0)
+        )
+        .slice(0, 12);
+    }
+
+    return pecas.filter((peca) =>
+      includesAny(peca.searchTags, [
+        "essencial",
+        "essenciais",
+        "basico",
+        "básico",
+        "basics",
+      ])
+    );
+  }, [activeTab, pecas, sales90d]);
+
   useEffect(() => {
-    if (paused || isMobile || total === 0) return;
+    carouselRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+  }, [activeTab]);
 
-    const timer = setInterval(() => {
-      setActiveIndex((prev) => wrapIndex(prev + 1, total));
-    }, 6500);
+  function scroll(direction: "left" | "right") {
+    const el = carouselRef.current;
+    if (!el) return;
 
-    return () => clearInterval(timer);
-  }, [paused, isMobile, total]);
+    const amount = Math.max(el.clientWidth * 0.72, 300);
 
-  const prev = () => {
-    if (!total) return;
-    setActiveIndex((prev) => wrapIndex(prev - 1, total));
-  };
-
-  const next = () => {
-    if (!total) return;
-    setActiveIndex((prev) => wrapIndex(prev + 1, total));
-  };
-
-  const active = useMemo(() => pecas[activeIndex], [pecas, activeIndex]);
-  const left = useMemo(() => pecas[wrapIndex(activeIndex - 1, total)], [pecas, activeIndex, total]);
-  const right = useMemo(() => pecas[wrapIndex(activeIndex + 1, total)], [pecas, activeIndex, total]);
-
-  const addToCart = (e: React.MouseEvent, peca: Peca) => {
-    e.stopPropagation();
-    add({
-      id: peca.id,
-      name: peca.nome,
-      price: peca.preco,
-      image: peca.imagem,
-      variant: peca.tag ?? "Semijoia",
-      qty: 1,
+    el.scrollBy({
+      left: direction === "right" ? amount : -amount,
+      behavior: "smooth",
     });
-  };
+  }
 
   return (
-    <section id="semijoias"  className="pt-6 pb-8 md:pt-14 md:pb-16 bg-[#FCFAF6] scroll-mt-[140px]">
-      <div className="container mx-auto px-4 md:px-8 lg:px-10">
-        <div className="text-center mb-8 md:mb-10">
-          <h2 className="text-[30px] leading-tight md:text-4xl font-semibold text-[#2b554e]">
-            Coleção <span className="text-[#b08d57]">NOUVEAU</span>
-          </h2>
+    <section
+      id="semijoias"
+      className="bg-[#FCFAF6] py-8 md:py-12 lg:py-14 scroll-mt-[110px]"
+    >
+      <div className="mx-auto w-full max-w-[1560px]">
+        <div className="mx-auto mb-5 max-w-[1500px] px-4 md:mb-6 md:px-6 lg:px-10">
+          <div className="max-w-[520px]">
+            <h2 className="mt-2 text-[36px] font-medium leading-[1.02] text-[#2b554e] md:text-[44px]">
+              <span className="mt-1 block font-serif font-normal italic tracking-[-0.02em]">
+                Escolhas Caléa
+              </span>
+            </h2>
 
-          <div className="h-[2px] w-24 bg-[#b08d57] mx-auto mt-4 mb-4 rounded-full" />
+            <div className="mt-3 h-px w-14 bg-[#b08d57]" />
 
-          <p className="text-[#2b554e]/80 text-[15px] leading-relaxed md:text-lg max-w-[320px] md:max-w-none mx-auto">
-            Peças com banho premium e acabamento impecável.
-          </p>
-
-          {err && <p className="mt-3 text-sm text-red-600">Erro: {err}</p>}
+            <p className="mt-4 text-[15px] leading-7 text-[#6f655b] md:text-[17px]">
+              Descubra as peças que estão em alta na Caléa.
+            </p>
+          </div>
         </div>
 
-        <div
-          className="relative max-w-6xl mx-auto"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          {loading && (
-            <div className="flex items-center justify-start md:justify-center gap-3 md:gap-6 overflow-x-auto pb-2 px-4 md:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-[74vw] max-w-[260px] md:w-[320px] shrink-0 rounded-[28px] border border-[#2b554e]/10 bg-white/80 overflow-hidden animate-pulse"
+        <div className="mb-5 flex justify-center md:mb-6">
+          <nav
+            className="flex items-center gap-8 md:gap-16 lg:gap-20"
+            aria-label="Filtrar produtos"
+          >
+            {TABS.map((tab) => {
+              const active = activeTab === tab.key;
+
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={[
+                    "relative pb-2 text-[16px] transition-colors md:text-[18px]",
+                    active
+                      ? "font-medium text-[#173a35]"
+                      : "font-normal text-[#45423f] hover:text-[#173a35]",
+                  ].join(" ")}
                 >
-                  <div className="aspect-[4/5] bg-black/5" />
-                  <div className="p-4 md:p-5">
-                    <div className="h-4 bg-black/5 rounded w-3/4" />
-                    <div className="h-4 bg-black/5 rounded w-1/2 mt-3" />
-                    <div className="h-10 bg-black/5 rounded-xl mt-5" />
-                  </div>
+                  {tab.label}
+
+                  <span
+                    className={[
+                      "absolute bottom-0 left-1/2 h-px -translate-x-1/2 bg-[#173a35] transition-all duration-300",
+                      active ? "w-full opacity-100" : "w-0 opacity-0",
+                    ].join(" ")}
+                  />
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {err && (
+          <div className="px-5 pb-5 text-center text-sm text-red-600">
+            Erro ao carregar produtos: {err}
+          </div>
+        )}
+
+        <div className="relative">
+          {loading ? (
+            <div className="flex justify-center gap-4 overflow-hidden px-4 md:gap-6 md:px-6 lg:px-10">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="w-[72vw] max-w-[300px] shrink-0 animate-pulse sm:w-[44vw] md:w-[30vw] lg:w-[260px] xl:w-[280px]"
+                >
+                  <div className="aspect-[3/4] bg-[#eee7dc]" />
+                  <div className="mt-3 h-4 w-3/4 bg-[#eee7dc]" />
+                  <div className="mt-2 h-4 w-1/3 bg-[#eee7dc]" />
                 </div>
               ))}
             </div>
-          )}
-
-          {!loading && total === 0 && (
-            <div className="text-center text-sm text-black/60 py-10">
-              Nenhum item com tag SEO “{SEO_TAG}”.
-            </div>
-          )}
-
-          {!loading && total > 0 && (
+          ) : filtered.length ? (
             <>
-              {/* MOBILE */}
-              <div className="md:hidden flex items-center gap-3 overflow-x-auto snap-x snap-mandatory pb-2 px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {pecas.map((peca, index) => (
-                  <motion.div
-                    key={`${peca.id}-${index}-mobile`}
-                    className="w-[62vw] max-w-[220px] snap-center shrink-0"
-                    initial={false}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <Card
-                      peca={peca}
-                      onClick={() => navigate(`/produto/${peca.slug}?from=semijoias`)}
-                      onAdd={(e) => addToCart(e, peca)}
-                      onDetails={(e) => {
-                        e.stopPropagation();
-                        navigate(`/produto/${peca.slug}`);
-                      }}
-                    />
-                  </motion.div>
+              <div
+                ref={carouselRef}
+                className="
+                  grid grid-flow-col
+                  auto-cols-[72vw]
+                  gap-4 overflow-x-auto
+                  scroll-smooth px-4 pb-3
+                  [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+
+                  sm:auto-cols-[44vw]
+                  md:auto-cols-[30vw] md:gap-6 md:px-6
+
+                  lg:auto-cols-[260px]
+                  lg:justify-start
+                  lg:px-10
+
+                  xl:auto-cols-[280px]
+                  xl:gap-6
+                "
+              >
+                {filtered.map((peca) => (
+                  <ProductCard
+                    key={peca.id}
+                    peca={peca}
+                    onOpen={() =>
+                      navigate(`/produto/${peca.slug}?from=semijoias`)
+                    }
+                    isFavorite={favoriteIds.includes(peca.id)}
+                    onToggleFavorite={() => toggleFavorite(peca.id)}
+                  />
                 ))}
               </div>
 
-              {/* DESKTOP */}
-              <div className="hidden md:grid grid-cols-[280px_380px_280px] justify-center items-center gap-4 lg:gap-6 min-h-[560px]">                <motion.div
-                key={`left-${left?.id}-${activeIndex}`}
-                initial={{ opacity: 0, x: -30, scale: 0.92 }}
-                animate={{ opacity: 0.68, x: 0, scale: 0.9 }}
-                transition={{ duration: 0.35 }}
-                className="justify-self-end w-[260px] lg:w-[280px]"              >
-                {left && (
-                  <Card
-                    peca={left}
-                    compact
-                    onClick={prev}
-                    onAdd={(e) => e.stopPropagation()}
-                    onDetails={(e) => e.stopPropagation()}
-                  />
-                )}
-              </motion.div>
-
-                <motion.div
-                  key={`center-${active?.id}-${activeIndex}`}
-                  initial={{ opacity: 0, y: 16, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.4 }}
-                  className="w-[320px] lg:w-[380px] mx-auto"
-                >
-                  {active && (
-                    <Card
-                      peca={active}
-                      onClick={() => navigate(`/produto/${active.slug}?from=semijoias`)}
-                      onAdd={(e) => addToCart(e, active)}
-                      onDetails={(e) => {
-                        e.stopPropagation();
-                        navigate(`/produto/${active.slug}`);
-                      }}
-                    />
-                  )}
-                </motion.div>
-
-                <motion.div
-                  key={`right-${right?.id}-${activeIndex}`}
-                  initial={{ opacity: 0, x: 30, scale: 0.92 }}
-                  animate={{ opacity: 0.68, x: 0, scale: 0.9 }}
-                  transition={{ duration: 0.35 }}
-                  className="justify-self-start w-[260px] lg:w-[280px]"
-                >
-                  {right && (
-                    <Card
-                      peca={right}
-                      compact
-                      onClick={next}
-                      onAdd={(e) => e.stopPropagation()}
-                      onDetails={(e) => e.stopPropagation()}
-                    />
-                  )}
-                </motion.div>
-              </div>
-
-              <button
-                type="button"
-                onClick={prev}
-                aria-label="Anterior"
-                className="hidden md:flex absolute left-0 top-[42%] -translate-y-1/2 bg-white/90 border border-[#2b554e]/15 rounded-full shadow-sm w-11 h-11 items-center justify-center text-[#2b554e] hover:text-[#b08d57] hover:border-[#b08d57]/40"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={next}
-                aria-label="Próximo"
-                className="hidden md:flex absolute right-0 top-[42%] -translate-y-1/2 bg-white/90 border border-[#2b554e]/15 rounded-full shadow-sm w-11 h-11 items-center justify-center text-[#2b554e] hover:text-[#b08d57] hover:border-[#b08d57]/40"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-
-              <div className="flex justify-center mt-7 gap-2">
-                {pecas.map((_, i) => (
+              {filtered.length > 4 && (
+                <>
                   <button
-                    key={i}
-                    onClick={() => setActiveIndex(i)}
-                    aria-label={`Ir para item ${i + 1}`}
-                    className={`h-2.5 rounded-full transition-all ${i === activeIndex
-                      ? "w-8 bg-[#b08d57]"
-                      : "w-2.5 bg-[#2b554e]/20 hover:bg-[#2b554e]/35"
-                      }`}
-                  />
-                ))}
-              </div>
+                    type="button"
+                    aria-label="Produtos anteriores"
+                    onClick={() => scroll("left")}
+                    className="
+                      absolute -left-1 top-[40%] hidden h-10 w-10 -translate-y-1/2
+                      items-center justify-center rounded-full border border-[#173a35]/10
+                      bg-[#FCFAF6]/92 text-[#173a35] shadow-sm backdrop-blur-md
+                      transition hover:bg-white lg:flex
+                    "
+                  >
+                    <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-label="Próximos produtos"
+                    onClick={() => scroll("right")}
+                    className="
+                      absolute -right-1 top-[40%] hidden h-10 w-10 -translate-y-1/2
+                      items-center justify-center rounded-full border border-[#173a35]/10
+                      bg-[#FCFAF6]/92 text-[#173a35] shadow-sm backdrop-blur-md
+                      transition hover:bg-white lg:flex
+                    "
+                  >
+                    <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+                  </button>
+                </>
+              )}
             </>
+          ) : (
+            <div className="px-5 py-16 text-center">
+              <p className="text-[14px] text-[#6e6a64]">
+                Nenhuma peça cadastrada nesta categoria ainda.
+              </p>
+            </div>
           )}
         </div>
       </div>

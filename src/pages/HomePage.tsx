@@ -2,10 +2,11 @@ import { useEffect, lazy, Suspense } from "react";
 import Header from "../components/Header";
 import Hero from "../components/Hero";
 import Footer from "../components/Footer";
+import BenefitsBar from "../components/BenefitsBar_Calea";
 
 const EncontreSuaJoia = lazy(() => import("../components/findyourjewelry"));
 const Semijoias = lazy(() => import("../components/Semijoias"));
-const About = lazy(() => import("../components/About"));
+const StyleQuiz = lazy(() => import("../components/StyleQuiz_Calea"));
 const Faq = lazy(() => import("../components/FAQ"));
 const Contact = lazy(() => import("../components/Contact"));
 
@@ -26,13 +27,14 @@ export default function HomePage() {
     <div className="min-h-screen bg-[#FCFAF6] antialiased">
       <Header />
 
-      <main className="pt-[120px] md:pt-[180px]">
+      <main className="pt-[96px] md:pt-[108px]">
         <Hero />
+        <BenefitsBar />
 
         <Suspense fallback={<SectionLoading />}>
-          <EncontreSuaJoia />
           <Semijoias />
-          <About />
+          <EncontreSuaJoia />
+          <StyleQuiz />
           <Faq />
           <Contact />
         </Suspense>

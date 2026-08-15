@@ -6,7 +6,6 @@ import { AdminGuard } from "./routes/AdminGuard";
 import AmbientSound from "./components/AmbientSound";
 import ClarityScript from "./components/ClarityScript";
 
-
 const HomePage = lazy(() => import("./pages/HomePage"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
 const CadastroUsuariosPage = lazy(() => import("./pages/cadastro_users"));
@@ -22,7 +21,7 @@ const RedefinirSenhaPage = lazy(() => import("./pages/RedefinirSenhaPage"));
 const ContaPage = lazy(() => import("./pages/users/conta_page"));
 const PedidoDetalhePage = lazy(() => import("./pages/users/PedidoDetalhePage"));
 const MinhaContaRedirect = lazy(() => import("./pages/MinhaContaRedirect"));
-
+const FavoritosPages = lazy(() => import("./pages/FavoritosPages"));
 // ADMIN
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminInicio = lazy(() => import("./pages/admin/AdminInicio"));
@@ -82,6 +81,7 @@ export default function App() {
           <Route path="/minha-conta" element={<MinhaContaRedirect />} />
           <Route path="/minha-conta/pedidos/:orderId" element={<PedidoDetalhePage />} />
           <Route path="/conta" element={<ContaPage />} />
+          <Route path="/favoritos" element={<FavoritosPages />} />
           <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
           <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
 
@@ -121,8 +121,6 @@ export default function App() {
           <Route path="*" element={<div className="p-6">404</div>} />
         </Routes>
       </Suspense>
-
-
 
       {!isAdmin && <CookieBanner />}
       {!isAdmin && <AmbientSound hidden />}

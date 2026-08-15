@@ -491,7 +491,7 @@ export default function ProductPage() {
     <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
       <Header />
 
-      <main className="pt-[90px] pb-[118px] md:pt-[240px] md:pb-0">
+      <main className="pt-[90px] pb-[118px] md:pt-[112px] md:pb-0">
         <section className="mx-auto w-full max-w-[1440px] px-0 pb-8 md:px-6 md:pb-16 lg:px-8">
           <div className="mb-4 hidden items-center gap-2 px-1 text-[12px] text-[#8b8175] md:flex">
             <button
