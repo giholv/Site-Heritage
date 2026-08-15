@@ -151,13 +151,12 @@ const Hero: React.FC = () => {
         {/* BANNER */}
         <div
           className="
-            relative
-            h-[450px]
-            sm:h-[520px]
-            md:h-[620px]
-            lg:h-[720px]
-            xl:h-[760px]
-          "
+    relative
+    w-full
+    md:h-[620px]
+    lg:h-[720px]
+    xl:h-[760px]
+  "
         >
           <picture key={`${currentBanner.src}-${idx}`}>
 
@@ -175,11 +174,13 @@ const Hero: React.FC = () => {
               src={currentBanner.src}
               alt={currentBanner.alt}
               className="
-                block
-                h-full
-                w-full
-                object-cover
-              "
+  block
+  h-auto
+  w-full
+  object-contain
+  md:h-full
+  md:object-cover
+"
               style={{
                 objectPosition: "center center",
               }}
