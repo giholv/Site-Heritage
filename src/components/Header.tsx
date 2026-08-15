@@ -257,7 +257,7 @@ const Header: React.FC<HeaderProps> = ({
           {/* HEADER PRINCIPAL */}
           <div
             className={[
-              "relative overflow-hidden border-b transition-all duration-500",
+             "relative overflow-visible border-b transition-all duration-500",
               glassHeader
                 ? "border-white/15 bg-[#182725]/42 backdrop-blur-[16px] backdrop-saturate-125 shadow-[0_8px_24px_rgba(0,0,0,0.12)] ring-1 ring-inset ring-white/10 supports-[backdrop-filter]:bg-[#182725]/34"
                 : "border-[#173a35]/10 bg-[#FCFAF6]/82 backdrop-blur-[14px] shadow-[0_6px_20px_rgba(16,48,43,0.06)] supports-[backdrop-filter]:bg-[#FCFAF6]/74",
@@ -360,7 +360,7 @@ const Header: React.FC<HeaderProps> = ({
                   </button>
 
                   {accountMenuOpen && (
-                    <div className="absolute right-0 top-[115%] z-50 w-[250px] overflow-hidden border border-[#e8dfd2] bg-[#FCFAF6] text-[#173a35] shadow-[0_24px_70px_rgba(0,0,0,0.12)]">
+                   <div className="absolute right-0 top-[115%] z-[9999] w-[250px] overflow-hidden border border-[#e8dfd2] bg-[#FCFAF6] text-[#173a35] shadow-[0_24px_70px_rgba(0,0,0,0.12)]">
                       <button
                         type="button"
                         onClick={() => {
