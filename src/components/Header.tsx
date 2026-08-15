@@ -6,7 +6,6 @@ import {
   ShoppingBag,
   Heart,
   User,
-  Home,
   MessageCircle,
   LogOut,
   Music,
@@ -64,13 +63,12 @@ const Header: React.FC<HeaderProps> = ({
 
   const showHeaderSound = !isAdminPage && !showFloatingSound;
 
-  const menuItems: MenuItem[] = [
-    { label: "SHOP", type: "route", to: "/joias" },
-    { label: "COLEÇÕES", type: "section", id: "colecoes" },
-    { label: "BEST SELLERS", type: "section", id: "best-sellers" },
-    { label: "SOBRE", type: "section", id: "about" },
-    { label: "SEU MATCH CALÉA", type: "section", id: "style-quiz" },
-  ];
+const menuItems: MenuItem[] = [
+  { label: "SHOP", type: "route", to: "/joias" },
+  { label: "BEST SELLERS", type: "route", to: "/?tab=best-sellers#semijoias" },
+  { label: "FAQ", type: "section", id: "faq" },
+  { label: "SEU MATCH CALÉA", type: "section", id: "style-quiz" },
+];
 
   const setQ = (v: string) => {
     onSearchChange?.(v);
@@ -235,11 +233,11 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const navigationColor = transparentHeader
-  ? "text-[#173a35]"
-  : "text-[#173a35]";
+    ? "text-[#173a35]"
+    : "text-[#173a35]";
   const subtleColor = transparentHeader
-  ? "text-[#173a35]"
-  : "text-[#173a35]";
+    ? "text-[#173a35]"
+    : "text-[#173a35]";
 
   return (
     <>
@@ -257,7 +255,7 @@ const Header: React.FC<HeaderProps> = ({
           {/* HEADER PRINCIPAL */}
           <div
             className={[
-             "relative overflow-visible border-b transition-all duration-500",
+              "relative overflow-visible border-b transition-all duration-500",
               glassHeader
                 ? "border-white/15 bg-[#182725]/42 backdrop-blur-[16px] backdrop-saturate-125 shadow-[0_8px_24px_rgba(0,0,0,0.12)] ring-1 ring-inset ring-white/10 supports-[backdrop-filter]:bg-[#182725]/34"
                 : "border-[#173a35]/10 bg-[#FCFAF6]/82 backdrop-blur-[14px] shadow-[0_6px_20px_rgba(16,48,43,0.06)] supports-[backdrop-filter]:bg-[#FCFAF6]/74",
@@ -360,7 +358,9 @@ const Header: React.FC<HeaderProps> = ({
                   </button>
 
                   {accountMenuOpen && (
-                   <div className="absolute right-0 top-[115%] z-[9999] w-[250px] overflow-hidden border border-[#e8dfd2] bg-[#FCFAF6] text-[#173a35] shadow-[0_24px_70px_rgba(0,0,0,0.12)]">
+                    <div className="absolute right-0 top-[115%] z-[9999] w-[260px] overflow-hidden rounded-2xl border border-[#e8dfd2] bg-[#FCFAF6] text-[#173a35] shadow-[0_24px_70px_rgba(0,0,0,0.14)]">
+
+
                       <button
                         type="button"
                         onClick={() => {
@@ -369,8 +369,21 @@ const Header: React.FC<HeaderProps> = ({
                         }}
                         className="flex w-full items-center gap-3 px-5 py-4 text-left text-[13px] transition hover:bg-white"
                       >
-                        <Home className="h-4 w-4" />
-                        Minha conta
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#173a35]/5">
+                          <User className="h-4 w-4" strokeWidth={1.6} />
+                        </div>
+
+                        <div>
+                          <p className="font-medium">
+                            {isLoggedIn ? "Minha conta" : "Entrar"}
+                          </p>
+
+                          <p className="mt-0.5 text-[11px] text-[#7e8e89]">
+                            {isLoggedIn
+                              ? "Pedidos, dados e endereços"
+                              : "Acesse pedidos e favoritos"}
+                          </p>
+                        </div>
                       </button>
 
                       <a
@@ -379,8 +392,16 @@ const Header: React.FC<HeaderProps> = ({
                         rel="noreferrer"
                         className="flex items-center gap-3 px-5 py-4 text-[13px] transition hover:bg-white"
                       >
-                        <MessageCircle className="h-4 w-4" />
-                        Suporte
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#173a35]/5">
+                          <MessageCircle className="h-4 w-4" strokeWidth={1.6} />
+                        </div>
+
+                        <div>
+                          <p className="font-medium">Suporte</p>
+                          <p className="mt-0.5 text-[11px] text-[#7e8e89]">
+                            Fale com a Caléa
+                          </p>
+                        </div>
                       </a>
 
                       {isLoggedIn && (
@@ -391,10 +412,10 @@ const Header: React.FC<HeaderProps> = ({
                             setAccountMenuOpen(false);
                             window.location.href = "/login";
                           }}
-                          className="flex w-full items-center gap-3 border-t border-[#eee6da] px-5 py-4 text-left text-[13px] text-[#9c5555] transition hover:bg-white"
+                          className="flex w-full items-center gap-3 border-t border-[#eee6da] px-5 py-3.5 text-left text-[12px] text-[#9c5555] transition hover:bg-[#9c5555]/5"
                         >
-                          <LogOut className="h-4 w-4" />
-                          Sair
+                          <LogOut className="h-4 w-4" strokeWidth={1.6} />
+                          Sair da conta
                         </button>
                       )}
                     </div>

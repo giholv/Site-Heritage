@@ -1,6 +1,6 @@
-import  { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 type Peca = {
@@ -140,6 +140,7 @@ function ProductCard({
 
 export default function SemijoiasCarousel() {
   const navigate = useNavigate();
+  const location = useLocation();
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const [pecas, setPecas] = useState<Peca[]>([]);
@@ -148,7 +149,28 @@ export default function SemijoiasCarousel() {
   const [activeTab, setActiveTab] = useState<TabKey>("novidades");
   const [sales90d, setSales90d] = useState<Record<string, number>>({});
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
 
+    if (
+      tab === "novidades" ||
+      tab === "best-sellers" ||
+      tab === "essenciais"
+    ) {
+      setActiveTab(tab);
+    }
+
+    if (location.hash === "#semijoias") {
+      window.setTimeout(() => {
+        document
+          .getElementById("semijoias")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [location.search, location.hash]);
+
+  
   useEffect(() => {
     try {
       const saved = localStorage.getItem(FAVORITES_KEY);

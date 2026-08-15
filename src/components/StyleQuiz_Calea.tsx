@@ -717,7 +717,7 @@ return productsWithReasons;
     <>
       <section
         id="style-quiz"
-        className="relative overflow-hidden bg-[#173a35] py-16 text-[#FCFAF6] md:py-20 lg:py-24"
+        className="relative overflow-hidden scroll-mt-[125px]  bg-[#173a35] py-16 text-[#FCFAF6] md:py-20 lg:py-24"
       >
         <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full border border-white/5" />
         <div className="pointer-events-none absolute -right-12 -top-12 h-52 w-52 rounded-full border border-[#d9bd8c]/10" />
