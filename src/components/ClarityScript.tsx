@@ -1,6 +1,12 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
+declare global {
+  interface Window {
+    clarity?: (...args: any[]) => void;
+  }
+}
+
 const CLARITY_ID = "x2c3lpblet";
 
 export default function ClarityScript() {
@@ -9,17 +15,45 @@ export default function ClarityScript() {
   useEffect(() => {
     const isAdmin = location.pathname.startsWith("/admin");
 
-    if (isAdmin) return;
+    const isLocalhost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+
+    // Não rastrear localhost nem admin
+    if (isAdmin || isLocalhost) {
+      if (typeof window.clarity === "function") {
+        window.clarity("consent", false);
+      }
+
+      return;
+    }
+
+    // Fora das áreas bloqueadas
+    if (typeof window.clarity === "function") {
+      window.clarity("consent", true);
+      return;
+    }
+
+    // Evita duplicar o script
     if (document.getElementById("clarity-script")) return;
 
     const script = document.createElement("script");
+
     script.id = "clarity-script";
     script.type = "text/javascript";
+
     script.innerHTML = `
       (function(c,l,a,r,i,t,y){
-          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+        c[a]=c[a]||function(){
+          (c[a].q=c[a].q||[]).push(arguments)
+        };
+
+        t=l.createElement(r);
+        t.async=1;
+        t.src="https://www.clarity.ms/tag/"+i;
+
+        y=l.getElementsByTagName(r)[0];
+        y.parentNode.insertBefore(t,y);
       })(window, document, "clarity", "script", "${CLARITY_ID}");
     `;
 
