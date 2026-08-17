@@ -194,8 +194,47 @@ export default function Checkout() {
   const [stockLoading, setStockLoading] = useState(false);
   const [stockError, setStockError] = useState<string | null>(null);
 
+  // Autenticação é exigida apenas quando a cliente avança para identificação.
+  // Assim ela pode revisar a sacola, calcular frete e aplicar cupom sem atrito.
+  const [authLoading, setAuthLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showAuthGate, setShowAuthGate] = useState(false);
+
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!active) return;
+        setCurrentUser(session?.user ?? null);
+      } finally {
+        if (active) setAuthLoading(false);
+      }
+    }
+
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      setCurrentUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const count = useMemo(
@@ -621,22 +660,30 @@ export default function Checkout() {
     }
   }
 
-  async function handleContinue() {
-    if (!canContinue || stockLoading) return;
+ async function handleContinue() {
+  if (!canContinue || stockLoading || authLoading) return;
 
-    const stockOk = await checkCartStock();
+  const stockOk = await checkCartStock();
 
-    if (!stockOk) return;
+  if (!stockOk) return;
 
-    saveCheckoutDraft();
-    navigate("/checkout/identificacao");
+  // Preserva frete, cupom, presente e totais.
+  saveCheckoutDraft();
+
+  // Não sai do checkout.
+  if (!currentUser) {
+    setShowAuthGate(true);
+    return;
   }
+
+  navigate("/checkout/identificacao");
+}
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
       <Header />
 
-      <main className="pb-16 pt-[112px] md:pt-[145px]">
+      <main className="pb-32 pt-[112px] md:pb-16 md:pt-[145px]">
         <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
             <button
@@ -645,22 +692,21 @@ export default function Checkout() {
               className="mb-5 inline-flex items-center gap-2 text-sm text-[#756d63] transition hover:text-[#2b554e]"
             >
               <ArrowLeft className="h-4 w-4" />
-              Voltar
+              Continuar comprando
             </button>
 
             <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.28em] text-[#b08d57]">
-                  Checkout
+                  Sua seleção
                 </p>
 
                 <h1 className="mt-2 text-[30px] font-light leading-tight tracking-[-0.04em] text-[#2b554e] sm:text-[40px]">
-                  Revise sua sacola
+                  Sua sacola
                 </h1>
 
                 <p className="mt-2 max-w-xl text-sm leading-6 text-[#7a746c]">
-                  Confira seus produtos, escolha a entrega e avance para a
-                  identificação com segurança.
+                  Confira suas escolhas, calcule a entrega e veja o valor final antes de continuar.
                 </p>
               </div>
 
@@ -671,7 +717,7 @@ export default function Checkout() {
               <div className="flex min-w-max items-center gap-4 sm:min-w-0 sm:justify-between">
                 <Step label="Sacola" active Icon={ShoppingBag} />
                 <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-                <Step label="Identificação" Icon={User} />
+                <Step label="Dados" Icon={User} />
                 <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
                 <Step label="Pagamento" Icon={CreditCard} />
                 <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
@@ -684,7 +730,7 @@ export default function Checkout() {
         <section className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_390px] lg:items-start">
             <div className="space-y-5">
-              <div className="rounded-[28px] border border-[#eee5d8] bg-white p-4 shadow-[0_14px_40px_rgba(43,85,78,0.05)] sm:p-6">
+              <div className="rounded-[22px] border border-[#eee5d8] bg-white p-4 shadow-[0_14px_40px_rgba(43,85,78,0.05)] sm:p-6">
                 <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-semibold text-[#2b554e]">
@@ -807,6 +853,8 @@ export default function Checkout() {
                 canContinue={canContinue}
                 handleContinue={handleContinue}
                 stockLoading={stockLoading}
+                authLoading={authLoading}
+                isAuthenticated={Boolean(currentUser)}
                 stockError={stockError}
                 hasCouponFreeShipping={hasCouponFreeShipping}
               />
@@ -815,7 +863,359 @@ export default function Checkout() {
         </section>
       </main>
 
+      {items.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e9e2d6] bg-[#fcfaf6]/95 p-3 backdrop-blur lg:hidden">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-[112px]">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[#8a8175]">
+                Total
+              </p>
+              <p className="font-serif text-xl text-[#2b554e]">
+                {moneyBRL(total)}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleContinue}
+              disabled={
+                !canContinue || stockLoading || authLoading || Boolean(stockError)
+              }
+              className="flex-1 rounded-full bg-[#2b554e] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(43,85,78,0.18)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {authLoading
+                ? "Só um instante..."
+                : stockLoading
+                  ? "Verificando..."
+                  : "Continuar"}
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {showAuthGate && (
+  <CheckoutAuthGate
+    onClose={() => setShowAuthGate(false)}
+    onAuthenticated={() => {
+      setShowAuthGate(false);
+      navigate("/checkout/identificacao");
+    }}
+  />
+)}
+
       <Footer />
+    </div>
+  );
+}
+function CheckoutAuthGate({
+  onClose,
+  onAuthenticated,
+}: {
+  onClose: () => void;
+  onAuthenticated: () => void;
+}) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function handleLogin(event: React.FormEvent) {
+    event.preventDefault();
+
+    setError(null);
+    setMessage(null);
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password) {
+      setError("Informe seu e-mail e senha.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data.user) {
+        throw new Error("Não foi possível acessar sua conta.");
+      }
+
+      onAuthenticated();
+    } catch (error: any) {
+      console.error("Erro no login do checkout:", error);
+
+      if (
+        error?.message?.toLowerCase().includes("invalid login credentials")
+      ) {
+        setError("E-mail ou senha incorretos.");
+      } else {
+        setError(error?.message || "Não foi possível entrar.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRegister(event: React.FormEvent) {
+    event.preventDefault();
+
+    setError(null);
+    setMessage(null);
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setError("Informe seu e-mail.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Sua senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("As senhas não coincidem.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      /*
+       * Quando o Supabase cria sessão imediatamente,
+       * podemos continuar a compra sem sair do checkout.
+       */
+      if (data.session && data.user) {
+        onAuthenticated();
+        return;
+      }
+
+      /*
+       * Caso confirmação de e-mail esteja habilitada
+       * no Supabase.
+       */
+      setMessage(
+        "Conta criada. Confirme seu e-mail para continuar sua compra."
+      );
+    } catch (error: any) {
+      console.error("Erro no cadastro do checkout:", error);
+
+      const message = String(error?.message || "").toLowerCase();
+
+      if (
+        message.includes("already registered") ||
+        message.includes("already been registered") ||
+        message.includes("user already")
+      ) {
+        setError("Este e-mail já possui uma conta. Entre com sua senha.");
+        setMode("login");
+      } else {
+        setError(error?.message || "Não foi possível criar sua conta.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/35 backdrop-blur-[2px] sm:items-center sm:p-6">
+      <button
+        type="button"
+        aria-label="Fechar"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default"
+      />
+
+      <div className="relative z-10 w-full bg-[#FCFAF6] px-5 pb-7 pt-5 shadow-2xl sm:max-w-[470px] sm:px-8 sm:pb-8 sm:pt-7">
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-[#b08d57]">
+              Checkout Caléa
+            </p>
+
+            <h2 className="mt-3 font-serif text-[30px] font-normal leading-none text-[#2b554e]">
+              Continue sua compra
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-[#2b554e]/60">
+              Entre na sua conta ou crie uma agora. Sua sacola continua salva.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center text-[#2b554e]/55 transition hover:bg-[#2b554e]/5 hover:text-[#2b554e]"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="mt-7 grid grid-cols-2 border-b border-[#2b554e]/10">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setError(null);
+              setMessage(null);
+            }}
+            className={[
+              "border-b-2 px-3 pb-3 text-sm font-medium transition",
+              mode === "login"
+                ? "border-[#2b554e] text-[#2b554e]"
+                : "border-transparent text-[#2b554e]/45",
+            ].join(" ")}
+          >
+            Já tenho conta
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode("register");
+              setError(null);
+              setMessage(null);
+            }}
+            className={[
+              "border-b-2 px-3 pb-3 text-sm font-medium transition",
+              mode === "register"
+                ? "border-[#2b554e] text-[#2b554e]"
+                : "border-transparent text-[#2b554e]/45",
+            ].join(" ")}
+          >
+            Criar conta
+          </button>
+        </div>
+
+        <form
+          onSubmit={mode === "login" ? handleLogin : handleRegister}
+          className="mt-6 space-y-4"
+        >
+          <div>
+            <label className="text-xs font-medium text-[#2b554e]/70">
+              E-mail
+            </label>
+
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="voce@exemplo.com"
+              autoComplete="email"
+              className="mt-2 h-12 w-full border border-[#2b554e]/15 bg-white px-4 text-sm text-[#2b554e] outline-none transition focus:border-[#2b554e]"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-[#2b554e]/70">
+              Senha
+            </label>
+
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={
+                mode === "login" ? "Sua senha" : "Crie uma senha"
+              }
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
+              className="mt-2 h-12 w-full border border-[#2b554e]/15 bg-white px-4 text-sm text-[#2b554e] outline-none transition focus:border-[#2b554e]"
+            />
+          </div>
+
+          {mode === "register" && (
+            <div>
+              <label className="text-xs font-medium text-[#2b554e]/70">
+                Confirme sua senha
+              </label>
+
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Digite novamente"
+                autoComplete="new-password"
+                className="mt-2 h-12 w-full border border-[#2b554e]/15 bg-white px-4 text-sm text-[#2b554e] outline-none transition focus:border-[#2b554e]"
+              />
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="bg-[#f4efe6] px-4 py-3 text-sm leading-6 text-[#2b554e]">
+              {message}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex h-13 w-full items-center justify-center bg-[#2b554e] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#23463f] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading
+              ? "Só um instante..."
+              : mode === "login"
+                ? "Entrar e continuar"
+                : "Criar conta e continuar"}
+          </button>
+        </form>
+
+        {mode === "login" && (
+          <button
+            type="button"
+            onClick={() => {
+              /*
+               * Podemos transformar recuperação de senha em modal
+               * depois também.
+               */
+              window.location.href = "/esqueci-senha";
+            }}
+            className="mt-4 w-full text-center text-xs text-[#2b554e]/55 underline-offset-4 hover:underline"
+          >
+            Esqueci minha senha
+          </button>
+        )}
+
+        <div className="mt-6 flex items-start gap-2 border-t border-[#2b554e]/10 pt-5">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#2b554e]" />
+
+          <p className="text-[11px] leading-5 text-[#2b554e]/50">
+            Sua conta permite acompanhar pedidos, entregas e manter suas
+            preferências Caléa em um só lugar.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1022,7 +1422,7 @@ function GiftWrapCard({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <div className="rounded-[28px] border border-[#eadfce] bg-white p-4 shadow-[0_14px_40px_rgba(43,85,78,0.04)] sm:p-5">
+    <div className="rounded-[22px] border border-[#eadfce] bg-white p-4 shadow-[0_14px_40px_rgba(43,85,78,0.04)] sm:p-5">
       <div className="flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#efe6d7] text-[#b08d57]">
           <Gift className="h-5 w-5" />
@@ -1066,7 +1466,7 @@ function GiftWrapCard({
 
 function CheckoutPanel(props: any) {
   return (
-    <div className="rounded-[28px] border border-[#eee5d8] bg-white p-4 shadow-[0_18px_50px_rgba(43,85,78,0.07)] sm:p-6">
+    <div className="rounded-[22px] border border-[#eee5d8] bg-white p-4 shadow-[0_18px_50px_rgba(43,85,78,0.07)] sm:p-6">
       <DeliverySection {...props} />
       <Divider />
       <CouponSection {...props} />
@@ -1221,68 +1621,80 @@ function CouponSection({
   removeCoupon,
   itemsLength,
 }: any) {
+  const [open, setOpen] = useState(Boolean(appliedCoupon));
+
   return (
     <section>
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f7f1e7] text-[#b08d57]">
-          <TicketPercent className="h-4 w-4" />
+      <button
+        type="button"
+        onClick={() => setOpen((value: boolean) => !value)}
+        className="flex w-full items-center justify-between gap-4 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f7f1e7] text-[#b08d57]">
+            <TicketPercent className="h-4 w-4" />
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-[#2b554e]">
+              Tem um cupom?
+            </h3>
+            <p className="text-xs text-[#8a8175]">Opcional</p>
+          </div>
         </div>
 
-        <div>
-          <h3 className="text-base font-semibold text-[#2b554e]">
-            Cupom
-          </h3>
-          <p className="text-xs text-[#8a8175]">
-            Aplique antes de continuar.
-          </p>
-        </div>
-      </div>
+        <span className="text-lg leading-none text-[#2b554e]/60">
+          {open ? "−" : "+"}
+        </span>
+      </button>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_110px]">
-        <input
-          value={couponCode}
-          onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
-          placeholder="Digite seu cupom"
-          className="h-12 w-full rounded-full border border-[#d8d1c6] bg-[#fcfaf6] px-4 text-sm uppercase outline-none transition focus:border-[#2b554e]"
-          disabled={couponLoading || Boolean(appliedCoupon)}
-        />
+      {open && (
+        <div className="mt-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_104px]">
+            <input
+              value={couponCode}
+              onChange={(event) =>
+                setCouponCode(event.target.value.toUpperCase())
+              }
+              placeholder="Digite seu cupom"
+              className="h-11 w-full rounded-full border border-[#d8d1c6] bg-[#fcfaf6] px-4 text-sm uppercase outline-none transition focus:border-[#2b554e]"
+              disabled={couponLoading || Boolean(appliedCoupon)}
+            />
 
-        {appliedCoupon ? (
-          <button
-            onClick={removeCoupon}
-            className="flex h-12 items-center justify-center gap-2 rounded-full border border-[#d8d1c6] px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-            type="button"
-          >
-            <X className="h-4 w-4" />
-            Remover
-          </button>
-        ) : (
-          <button
-            onClick={applyCoupon}
-            disabled={couponLoading || itemsLength === 0}
-            className="h-12 rounded-full bg-[#2b554e] px-4 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-          >
-            {couponLoading ? "..." : "Aplicar"}
-          </button>
-        )}
-      </div>
+            {appliedCoupon ? (
+              <button
+                onClick={removeCoupon}
+                className="flex h-11 items-center justify-center gap-2 rounded-full border border-[#d8d1c6] px-4 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                type="button"
+              >
+                <X className="h-4 w-4" />
+                Remover
+              </button>
+            ) : (
+              <button
+                onClick={applyCoupon}
+                disabled={couponLoading || itemsLength === 0}
+                className="h-11 rounded-full bg-[#2b554e] px-4 text-xs font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+              >
+                {couponLoading ? "..." : "Aplicar"}
+              </button>
+            )}
+          </div>
 
-      {couponError && (
-        <div className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-sm text-red-600">
-          {couponError}
-        </div>
-      )}
+          {couponError && (
+            <p className="mt-2 text-xs text-red-600">{couponError}</p>
+          )}
 
-      {couponSuccess && (
-        <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          {couponSuccess}
-        </div>
-      )}
+          {couponSuccess && (
+            <p className="mt-2 text-xs text-emerald-700">{couponSuccess}</p>
+          )}
 
-      {appliedCoupon?.first_purchase_only && (
-        <div className="mt-2 text-xs text-[#8a8175]">
-          Este cupom será revalidado antes do pagamento.
+          {appliedCoupon?.first_purchase_only && (
+            <p className="mt-2 text-xs text-[#8a8175]">
+              Este cupom será revalidado antes do pagamento.
+            </p>
+          )}
         </div>
       )}
     </section>
@@ -1304,6 +1716,8 @@ function OrderSummary({
   canContinue,
   handleContinue,
   stockLoading,
+  authLoading,
+  isAuthenticated,
   stockError,
   hasCouponFreeShipping,
 }: any) {
@@ -1358,10 +1772,22 @@ function OrderSummary({
         className="mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] py-4 text-sm font-semibold tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={handleContinue}
         type="button"
-        disabled={!canContinue || stockLoading || Boolean(stockError)}
+        disabled={
+          !canContinue || stockLoading || authLoading || Boolean(stockError)
+        }
       >
-        {stockLoading ? "Verificando estoque..." : "Continuar"}
+        {authLoading
+          ? "Verificando acesso..."
+          : stockLoading
+            ? "Verificando estoque..."
+            : "Continuar compra"}
       </button>
+
+      {!isAuthenticated && !authLoading && (
+        <p className="mt-3 text-center text-[11px] leading-4 text-[#8a8175]">
+          Na próxima etapa você entra ou cria sua conta sem perder a sacola.
+        </p>
+      )}
 
       {stockError && (
         <p className="mt-3 text-center text-xs text-red-600">
@@ -1415,4 +1841,3 @@ function SummaryLine({
 function Divider() {
   return <div className="my-6 h-px bg-[#eee5d8]" />;
 }
-

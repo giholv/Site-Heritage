@@ -18,7 +18,7 @@ import {
 
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { supabase } from "../lib/supabase";
+
 
 function moneyBRL(value: number) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -294,40 +294,104 @@ export default function CheckoutConfirmacao() {
     let mounted = true;
     let intervalId: number | null = null;
 
-    async function loadOrderStatusFromDatabase() {
-      if (!internalOrderId || !isUuid(internalOrderId)) return;
-
-      const { data, error } = await supabase
-        .from("orders")
-        .select("status, payment_status")
-        .eq("id", internalOrderId)
-        .maybeSingle();
-
-      if (!mounted) return;
-
-      if (error) {
-        console.error("Erro ao buscar status do pedido:", error);
+    async function loadOrderStatus() {
+      if (!internalOrderId || !isUuid(internalOrderId)) {
         return;
       }
 
-      if (data) {
-        setDbOrderStatus(data.status || null);
-        setDbPaymentStatus(data.payment_status || null);
+      const email = String(identification?.email || "")
+        .trim()
+        .toLowerCase();
 
-        if (data.status === "paid" || data.payment_status === "paid") {
-          if (intervalId) window.clearInterval(intervalId);
+      if (!email) {
+        console.error(
+          "E-mail do checkout não encontrado para consultar o pedido."
+        );
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          "/.netlify/functions/get-order-status",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              orderId: internalOrderId,
+              email,
+            }),
+          }
+        );
+
+        const result = await response.json().catch(() => null);
+
+        if (!mounted) return;
+
+        if (!response.ok || !result?.ok) {
+          console.error(
+            "Erro ao buscar status do pedido:",
+            result?.error || `HTTP ${response.status}`
+          );
+
+          return;
         }
+
+        const nextOrderStatus =
+          result.order?.status || null;
+
+        const nextPaymentStatus =
+          result.order?.paymentStatus || null;
+
+        setDbOrderStatus(nextOrderStatus);
+        setDbPaymentStatus(nextPaymentStatus);
+
+        const normalizedOrderStatus =
+          normalizeStatus(nextOrderStatus);
+
+        const normalizedPaymentStatus =
+          normalizeStatus(nextPaymentStatus);
+
+        // Para o polling quando chegarmos a um estado final.
+        if (
+          normalizedOrderStatus === "paid" ||
+          normalizedOrderStatus === "failed" ||
+          normalizedOrderStatus === "canceled" ||
+          normalizedPaymentStatus === "paid" ||
+          normalizedPaymentStatus === "failed" ||
+          normalizedPaymentStatus === "canceled"
+        ) {
+          if (intervalId !== null) {
+            window.clearInterval(intervalId);
+            intervalId = null;
+          }
+        }
+      } catch (error) {
+        if (!mounted) return;
+
+        console.error(
+          "Erro ao consultar status do pedido:",
+          error
+        );
       }
     }
 
-    loadOrderStatusFromDatabase();
-    intervalId = window.setInterval(loadOrderStatusFromDatabase, 5000);
+    loadOrderStatus();
+
+    intervalId = window.setInterval(
+      loadOrderStatus,
+      5000
+    );
 
     return () => {
       mounted = false;
-      if (intervalId) window.clearInterval(intervalId);
+
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
     };
-  }, [internalOrderId]);
+  }, [internalOrderId, identification?.email]);
 
   const pixQrCode =
     transaction?.qr_code ||

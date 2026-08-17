@@ -170,7 +170,7 @@ export default function SemijoiasCarousel() {
     }
   }, [location.search, location.hash]);
 
-  
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem(FAVORITES_KEY);
@@ -198,63 +198,82 @@ export default function SemijoiasCarousel() {
     let alive = true;
 
     async function loadBestSellers90d() {
-      const since = new Date();
-      since.setDate(since.getDate() - 90);
-
-      const { data, error } = await supabase
-        .from("order_items")
-        .select(`
-          quantity,
-          orders!inner(
-            status,
-            payment_status,
-            created_at
-          ),
-          skus!inner(
-            product_id
-          )
-        `)
-        .gte("orders.created_at", since.toISOString());
+      const { data, error } = await supabase.rpc(
+        "get_public_best_sellers"
+      );
 
       if (!alive) return;
 
       if (error) {
         console.error(
-          "Erro ao carregar Best Sellers pela mesma regra do Controle de Vendas:",
+          "Erro ao carregar Best Sellers:",
           error.message
         );
+
         setSales90d({});
         return;
       }
 
+      const ranking = Array.isArray(data) ? data : [];
+
+      if (!ranking.length) {
+        setSales90d({});
+        return;
+      }
+
+      const skuIds = ranking
+        .map((item: any) => item.sku_id)
+        .filter(Boolean);
+
+      if (!skuIds.length) {
+        setSales90d({});
+        return;
+      }
+
+      /*
+       * A RPC retorna SKU.
+       * O carousel trabalha com PRODUCT ID.
+       * Então convertemos SKU -> product_id.
+       */
+      const { data: skus, error: skuError } = await supabase
+        .from("skus")
+        .select("id, product_id")
+        .in("id", skuIds);
+
+      if (!alive) return;
+
+      if (skuError) {
+        console.error(
+          "Erro ao relacionar SKUs aos produtos:",
+          skuError.message
+        );
+
+        setSales90d({});
+        return;
+      }
+
+      const skuToProduct = new Map<string, string>();
+
+      (skus ?? []).forEach((sku: any) => {
+        if (sku?.id && sku?.product_id) {
+          skuToProduct.set(sku.id, sku.product_id);
+        }
+      });
+
       const totals: Record<string, number> = {};
 
-      (data ?? []).forEach((item: any) => {
-        const order = item?.orders;
-        const productId = item?.skus?.product_id;
+      ranking.forEach((item: any) => {
+        const productId = skuToProduct.get(item.sku_id);
 
-        if (!order || !productId) return;
-
-        const status = String(order.status ?? "").toLowerCase().trim();
-        const paymentStatus = String(order.payment_status ?? "")
-          .toLowerCase()
-          .trim();
-
-        // Mesma regra usada no AdminOrdersPage para considerar uma venda "Paga":
-        // status = paid / processing / shipped / delivered OU payment_status = paid
-        const isPaidOrder =
-          ["paid", "processing", "shipped", "delivered"].includes(status) ||
-          paymentStatus === "paid";
-
-        if (!isPaidOrder) return;
+        if (!productId) return;
 
         totals[productId] =
-          (totals[productId] ?? 0) + Number(item.quantity ?? 0);
+          (totals[productId] ?? 0) +
+          Number(item.total_sold ?? 0);
       });
 
       setSales90d(totals);
     }
-
     async function loadProducts() {
       setLoading(true);
       setErr(null);

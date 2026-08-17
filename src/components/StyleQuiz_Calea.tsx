@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -385,10 +385,10 @@ function getPublicImageUrl(path?: string | null) {
 function canonicalPieceType(product: Product) {
   const raw = normalize(
     product.piece_type_slug ??
-      product.piece_type ??
-      product.category_slug ??
-      product.category ??
-      "",
+    product.piece_type ??
+    product.category_slug ??
+    product.category ??
+    "",
   );
 
   if (["brinco", "brincos"].includes(raw)) return "brinco";
@@ -448,6 +448,17 @@ export default function StyleQuiz() {
   const [finished, setFinished] = useState(false);
   const [selectedOccasion, setSelectedOccasion] = useState<string | null>(null);
   const [choosingOccasion, setChoosingOccasion] = useState(false);
+
+  const quizScrollRef = useRef<HTMLElement>(null);
+
+  function scrollQuizToTop() {
+    requestAnimationFrame(() => {
+      quizScrollRef.current?.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    });
+  }
 
   const scores = useMemo(() => {
     const total: Record<string, number> = {};
@@ -559,34 +570,34 @@ export default function StyleQuiz() {
 
       if (error) {
         console.error("Erro ao gerar justificativas:", error);
-        
+
         return matchedProducts;
       }
 
       console.log("CALEA AI RESPONSE:", data);
 
-const matches = Array.isArray(data?.matches)
-  ? data.matches
-  : [];
+      const matches = Array.isArray(data?.matches)
+        ? data.matches
+        : [];
 
-console.log("CALEA AI MATCHES:", matches);
+      console.log("CALEA AI MATCHES:", matches);
 
-const reasonMap = new Map<string, string>();
+      const reasonMap = new Map<string, string>();
 
-matches.forEach((item: { id?: string; reason?: string }) => {
-  if (item.id && item.reason) {
-    reasonMap.set(String(item.id), item.reason);
-  }
-});
+      matches.forEach((item: { id?: string; reason?: string }) => {
+        if (item.id && item.reason) {
+          reasonMap.set(String(item.id), item.reason);
+        }
+      });
 
-const productsWithReasons = matchedProducts.map((product) => ({
-  ...product,
-  match_reason: reasonMap.get(String(product.id)) ?? "",
-}));
+      const productsWithReasons = matchedProducts.map((product) => ({
+        ...product,
+        match_reason: reasonMap.get(String(product.id)) ?? "",
+      }));
 
-console.log("PRODUTOS COM JUSTIFICATIVA:", productsWithReasons);
+      console.log("PRODUTOS COM JUSTIFICATIVA:", productsWithReasons);
 
-return productsWithReasons;
+      return productsWithReasons;
     } catch (error) {
       console.error("Erro inesperado na Caléa AI:", error);
       return matchedProducts;
@@ -686,10 +697,12 @@ return productsWithReasons;
 
     if (step === QUESTIONS.length - 1) {
       setChoosingOccasion(true);
+      scrollQuizToTop();
       return;
     }
 
     setStep((value) => value + 1);
+    scrollQuizToTop();
   }
 
   async function chooseOccasion(occasion: string) {
@@ -711,7 +724,7 @@ return productsWithReasons;
   }
 
   const selected = answers[step];
-  const progress = ((step + 1) / QUESTIONS.length) * 100;
+
 
   return (
     <>
@@ -823,10 +836,12 @@ return productsWithReasons;
             </header>
 
             {!finished && !choosingOccasion ? (
-              <main className="flex flex-1 overflow-y-auto bg-[#F8F5EF]">
+              <main
+                ref={quizScrollRef}
+                className="flex flex-1 overflow-y-auto bg-[#F8F5EF]">
                 <div className="mx-auto flex min-h-full w-full max-w-[1680px] flex-col px-5 py-6 md:px-8 md:py-8 lg:px-12 lg:py-10">
-                  <div className="grid flex-1 grid-cols-1 gap-8 lg:grid-cols-[0.92fr_1.08fr] lg:gap-14 xl:gap-20">
-                    <section className="flex min-h-[520px] flex-col justify-between py-4 lg:min-h-[650px] lg:py-8">
+                  <div className="grid flex-1 grid-cols-1 gap-5 lg:grid-cols-[0.92fr_1.08fr] lg:gap-14 xl:gap-20">
+                    <section className="flex flex-col py-2 lg:min-h-[650px] lg:justify-between lg:py-8">
                       <div className="max-w-[720px]">
                         <div className="inline-flex items-center gap-2 text-[#b08d57]">
                           <Sparkles className="h-4 w-4" strokeWidth={1.5} />
@@ -932,7 +947,10 @@ return productsWithReasons;
                   <div className="mt-7 flex items-center justify-between border-t border-[#173a35]/10 pt-6 md:mt-9 md:pt-7">
                     <button
                       type="button"
-                      onClick={() => setStep((value) => Math.max(0, value - 1))}
+                      onClick={() => {
+                        setStep((value) => Math.max(0, value - 1));
+                        scrollQuizToTop();
+                      }}
                       disabled={step === 0}
                       className="inline-flex items-center gap-2 rounded-full px-1 py-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-[#173a35]/55 transition hover:text-[#173a35] disabled:cursor-not-allowed disabled:opacity-20"
                     >

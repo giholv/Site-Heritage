@@ -1,24 +1,34 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   User,
   Package,
   MapPin,
-  ShieldCheck,
+  Bell,
   Heart,
   Loader2,
   Pencil,
-  ShoppingBag,
   ChevronRight,
-  CreditCard,
-  Truck,
-  
+  Check,
+  Copy,
+  ArrowRight,
+  X,
 } from "lucide-react";
+
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { supabase } from "../../lib/supabase";
 import { useNavigate } from "react-router-dom";
 
-type TabKey = "pedidos" | "perfil" | "enderecos" | "trocas" | "fidelidade";
+/* =========================================================
+   TIPOS
+========================================================= */
+
+type TabKey =
+  | "pedidos"
+  | "perfil"
+  | "enderecos"
+  | "notificacoes"
+  | "indicacoes";
 
 type AuthUser = {
   id: string;
@@ -53,12 +63,21 @@ type Order = {
   id: string;
   order_number: string | null;
   created_at: string;
+
   status: string | null;
   payment_status: string | null;
+  fulfillment_status: string | null;
+  shipping_status: string | null;
+
+  tracking_code: string | null;
+  tracking_url: string | null;
+  carrier: string | null;
+
   subtotal_cents: number | null;
   shipping_cents: number | null;
   discount_cents: number | null;
   total_cents: number | null;
+
   payment_method: string | null;
 };
 
@@ -69,12 +88,14 @@ type OrderItem = {
   unit_price_cents: number;
   quantity: number;
   line_total_cents: number | null;
+
   skus:
   | {
     id: string;
     variant_name: string | null;
     title: string | null;
     plating_type: string | null;
+
     products:
     | {
       id: string;
@@ -82,6 +103,7 @@ type OrderItem = {
       slug: string;
     }
     | null;
+
     sku_images:
     | {
       id: string;
@@ -95,12 +117,6 @@ type OrderItem = {
   | null;
 };
 
-type LoyaltySummary = {
-  totalOrders: number;
-  totalSpentCents: number;
-  lastOrderDate: string | null;
-};
-
 type ProfileFormState = {
   full_name: string;
   email: string;
@@ -109,35 +125,52 @@ type ProfileFormState = {
   birth_date: string;
 };
 
-const CALEA = {
-  bg: "#FCFAF6",
-  soft: "#f6f3ee",
-  line: "#e9e2d6",
-  primary: "#2b554e",
-  accent: "#b08d57",
-  textSoft: "#6f6558",
-};
+/* =========================================================
+   PÁGINA
+========================================================= */
 
 export default function ContaPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("pedidos");
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] =
+    useState<TabKey>("pedidos");
 
   const [loading, setLoading] = useState(true);
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+
+  const [authUser, setAuthUser] =
+    useState<AuthUser | null>(null);
+
+  const [profile, setProfile] =
+    useState<CustomerProfile | null>(null);
+
   const [orders, setOrders] = useState<Order[]>([]);
-  const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
+
+  const [orderItems, setOrderItems] = useState<
+    Record<string, OrderItem[]>
+  >({});
+
   const [addresses, setAddresses] = useState<Address[]>([]);
+
   const [error, setError] = useState<string | null>(null);
 
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState<ProfileFormState>({
-    full_name: "",
-    email: "",
-    phone: "",
-    document: "",
-    birth_date: "",
-  });
+  const [editingProfile, setEditingProfile] =
+    useState(false);
+
+  const [savingProfile, setSavingProfile] =
+    useState(false);
+
+  const [profileForm, setProfileForm] =
+    useState<ProfileFormState>({
+      full_name: "",
+      email: "",
+      phone: "",
+      document: "",
+      birth_date: "",
+    });
+
+  /* =======================================================
+     CARREGAMENTO
+  ======================================================= */
 
   useEffect(() => {
     let mounted = true;
@@ -162,6 +195,7 @@ export default function ContaPage() {
             setOrderItems({});
             setAddresses([]);
           }
+
           return;
         }
 
@@ -173,89 +207,162 @@ export default function ContaPage() {
           });
         }
 
-        const customerData = await getOrLinkCustomer(user);
+        const customerData =
+          await getOrLinkCustomer(user);
 
-        const nextProfile = (customerData as CustomerProfile | null) || null;
+        const nextProfile =
+          (customerData as CustomerProfile | null) ||
+          null;
 
         if (mounted) {
           setProfile(nextProfile);
+
           setProfileForm({
-            full_name: nextProfile?.full_name || "",
-            email: nextProfile?.email || user.email || "",
-            phone: nextProfile?.phone || user.phone || "",
-            document: nextProfile?.document || "",
-            birth_date: nextProfile?.birth_date || "",
+            full_name:
+              nextProfile?.full_name || "",
+            email:
+              nextProfile?.email ||
+              user.email ||
+              "",
+            phone:
+              nextProfile?.phone ||
+              user.phone ||
+              "",
+            document:
+              nextProfile?.document || "",
+            birth_date:
+              nextProfile?.birth_date || "",
           });
         }
+
         if (!customerData?.id) {
           if (mounted) {
             setOrders([]);
             setOrderItems({});
             setAddresses([]);
           }
+
           return;
         }
 
-        const { data: ordersData, error: ordersError } = await supabase
+        /* -----------------------------------------------
+           PEDIDOS
+
+           Não filtramos status = paid.
+           A conta deve continuar mostrando pedidos
+           em preparação, envio e entrega.
+        ------------------------------------------------ */
+
+        const {
+          data: ordersData,
+          error: ordersError,
+        } = await supabase
           .from("orders")
-          .select(
-            "id, order_number, created_at, status, payment_status, subtotal_cents, shipping_cents, discount_cents, total_cents, payment_method"
-          )
+          .select(`
+            id,
+            order_number,
+            created_at,
+
+            status,
+            payment_status,
+            fulfillment_status,
+            shipping_status,
+
+            tracking_code,
+            tracking_url,
+            carrier,
+
+            subtotal_cents,
+            shipping_cents,
+            discount_cents,
+            total_cents,
+
+            payment_method
+          `)
           .eq("customer_id", customerData.id)
-          .eq("payment_status", "paid")
-          .eq("status", "paid")
-          .order("created_at", { ascending: false });
+          .neq("status", "draft")
+          .order("created_at", {
+            ascending: false,
+          });
 
         if (ordersError) throw ordersError;
 
-        const nextOrders = (ordersData as Order[]) || [];
+        const nextOrders =
+          (ordersData || []) as Order[];
 
-        if (mounted) setOrders(nextOrders);
+        if (mounted) {
+          setOrders(nextOrders);
+        }
 
-        const orderIds = nextOrders.map((order) => order.id);
+        /* -----------------------------------------------
+           ITENS
+        ------------------------------------------------ */
+
+        const orderIds =
+          nextOrders.map((order) => order.id);
 
         if (orderIds.length > 0) {
-          const { data: itemsData, error: itemsError } = await supabase
+          const {
+            data: itemsData,
+            error: itemsError,
+          } = await supabase
             .from("order_items")
             .select(`
+              id,
+              order_id,
+              sku_id,
+              unit_price_cents,
+              quantity,
+              line_total_cents,
+
+              skus:sku_id (
                 id,
-                order_id,
-                sku_id,
-                unit_price_cents,
-                quantity,
-                line_total_cents,
-                skus:sku_id (
+                variant_name,
+                title,
+                plating_type,
+
+                products:product_id (
                   id,
-                  variant_name,
-                  title,
-                  plating_type,
-                  products:product_id (
-                    id,
-                    name,
-                    slug
-                  ),
-                  sku_images (
-                    id,
-                    path,
-                    alt,
-                    is_primary,
-                    sort_order
-                  )
+                  name,
+                  slug
+                ),
+
+                sku_images (
+                  id,
+                  path,
+                  alt,
+                  is_primary,
+                  sort_order
                 )
-              `)
+              )
+            `)
             .in("order_id", orderIds);
 
-          if (!itemsError && mounted) {
-            const normalizedItems = ((itemsData || []) as unknown as OrderItem[]);
-
-            const grouped = normalizedItems.reduce(
-              (acc, item) => {
-                if (!acc[item.order_id]) acc[item.order_id] = [];
-                acc[item.order_id].push(item);
-                return acc;
-              },
-              {} as Record<string, OrderItem[]>
+          if (itemsError) {
+            console.error(
+              "Erro ao carregar itens:",
+              itemsError
             );
+          } else if (mounted) {
+            const normalized =
+              (itemsData || []) as unknown as OrderItem[];
+
+            const grouped =
+              normalized.reduce(
+                (acc, item) => {
+                  if (!acc[item.order_id]) {
+                    acc[item.order_id] = [];
+                  }
+
+                  acc[item.order_id].push(item);
+
+                  return acc;
+                },
+                {} as Record<
+                  string,
+                  OrderItem[]
+                >
+              );
 
             setOrderItems(grouped);
           }
@@ -263,25 +370,63 @@ export default function ContaPage() {
           setOrderItems({});
         }
 
-        const { data: addressData, error: addressError } = await supabase
+        /* -----------------------------------------------
+           ENDEREÇOS
+        ------------------------------------------------ */
+
+        const {
+          data: addressData,
+          error: addressError,
+        } = await supabase
           .from("addresses")
-          .select(
-            "id, recipient_name, street, number, complement, neighborhood, city, state, cep, is_default"
+          .select(`
+            id,
+            recipient_name,
+            street,
+            number,
+            complement,
+            neighborhood,
+            city,
+            state,
+            cep,
+            is_default
+          `)
+          .eq(
+            "customer_id",
+            customerData.id
           )
-          .eq("customer_id", customerData.id)
-          .order("is_default", { ascending: false });
+          .order("is_default", {
+            ascending: false,
+          });
 
-        if (addressError) throw addressError;
-
-        if (mounted) setAddresses((addressData as Address[]) || []);
-      } catch (err: any) {
-        console.error("Erro ao carregar página da conta:", err);
+        if (addressError) {
+          throw addressError;
+        }
 
         if (mounted) {
-          setError(err?.message || "Não foi possível carregar sua conta.");
+          const normalizedAddresses =
+            (addressData || []) as Address[];
+
+          setAddresses(
+            removeDuplicateAddresses(normalizedAddresses)
+          );
+        }
+      } catch (err: any) {
+        console.error(
+          "Erro ao carregar conta:",
+          err
+        );
+
+        if (mounted) {
+          setError(
+            err?.message ||
+            "Não foi possível carregar sua conta."
+          );
         }
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
@@ -292,68 +437,63 @@ export default function ContaPage() {
     };
   }, []);
 
-  const loyalty = useMemo<LoyaltySummary>(() => {
-    const paidOrders = orders.filter((order) =>
-      ["paid", "processing", "shipped", "delivered"].includes(
-        String(order.status || "").toLowerCase()
-      )
-    );
+  /* =======================================================
+     PERFIL
+  ======================================================= */
 
-    return {
-      totalOrders: paidOrders.length,
-      totalSpentCents: paidOrders.reduce(
-        (sum, order) => sum + (order.total_cents || 0),
-        0
-      ),
-      lastOrderDate: paidOrders[0]?.created_at || null,
-    };
-  }, [orders]);
-
-  const filteredOrders = useMemo(() => {
-    return orders;
-  }, [orders]);
-
-
-
-  const menuItems: Array<{
-    key: TabKey;
-    label: string;
-    icon: React.ElementType;
-  }> = [
-      { key: "pedidos", label: "Pedidos", icon: Package },
-      { key: "perfil", label: "Dados do perfil", icon: User },
-      { key: "enderecos", label: "Endereços", icon: MapPin },
-      { key: "trocas", label: "Notificações", icon: ShieldCheck },
-      { key: "fidelidade", label: "Indicações", icon: Heart },
-    ];
-
-  function updateProfileField(field: keyof ProfileFormState, value: string) {
-    setProfileForm((prev) => ({ ...prev, [field]: value }));
+  function updateProfileField(
+    field: keyof ProfileFormState,
+    value: string
+  ) {
+    setProfileForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
   }
 
-  function handleStartProfileEdit() {
+  function startProfileEdit() {
     setProfileForm({
-      full_name: profile?.full_name || "",
-      email: profile?.email || authUser?.email || "",
-      phone: profile?.phone || authUser?.phone || "",
-      document: profile?.document || "",
-      birth_date: profile?.birth_date || "",
+      full_name:
+        profile?.full_name || "",
+      email:
+        profile?.email ||
+        authUser?.email ||
+        "",
+      phone:
+        profile?.phone ||
+        authUser?.phone ||
+        "",
+      document:
+        profile?.document || "",
+      birth_date:
+        profile?.birth_date || "",
     });
+
     setEditingProfile(true);
   }
 
-  function handleCancelProfileEdit() {
+  function cancelProfileEdit() {
     setProfileForm({
-      full_name: profile?.full_name || "",
-      email: profile?.email || authUser?.email || "",
-      phone: profile?.phone || "",
-      document: profile?.document || "",
-      birth_date: profile?.birth_date || "",
+      full_name:
+        profile?.full_name || "",
+      email:
+        profile?.email ||
+        authUser?.email ||
+        "",
+      phone:
+        profile?.phone ||
+        authUser?.phone ||
+        "",
+      document:
+        profile?.document || "",
+      birth_date:
+        profile?.birth_date || "",
     });
+
     setEditingProfile(false);
   }
 
-  async function handleSaveProfile() {
+  async function saveProfile() {
     if (!profile?.id) return;
 
     try {
@@ -361,396 +501,430 @@ export default function ContaPage() {
       setError(null);
 
       const payload = {
-        full_name: profileForm.full_name.trim() || null,
-        email: profileForm.email.trim().toLowerCase() || null,
-        phone: cleanPhone(profileForm.phone) || null,
-        document: cleanDigits(profileForm.document) || null,
-        birth_date: profileForm.birth_date || null,
-        updated_at: new Date().toISOString(),
+        full_name:
+          profileForm.full_name.trim() ||
+          null,
+
+        email:
+          profileForm.email
+            .trim()
+            .toLowerCase() || null,
+
+        phone:
+          cleanPhone(profileForm.phone) ||
+          null,
+
+        document:
+          cleanDigits(
+            profileForm.document
+          ) || null,
+
+        birth_date:
+          profileForm.birth_date ||
+          null,
+
+        updated_at:
+          new Date().toISOString(),
       };
 
-      const { data, error: updateError } = await supabase
+      const {
+        data,
+        error: updateError,
+      } = await supabase
         .from("customers")
         .update(payload)
         .eq("id", profile.id)
-        .select("id, user_id, full_name, email, phone, document, birth_date")
+        .select(`
+          id,
+          user_id,
+          full_name,
+          email,
+          phone,
+          document,
+          birth_date
+        `)
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        throw updateError;
+      }
 
-      const nextProfile = data as CustomerProfile;
+      setProfile(
+        data as CustomerProfile
+      );
 
-      setProfile(nextProfile);
-      setProfileForm({
-        full_name: nextProfile.full_name || "",
-        email: nextProfile.email || "",
-        phone: nextProfile.phone || "",
-        document: nextProfile.document || "",
-        birth_date: nextProfile.birth_date || "",
-      });
       setEditingProfile(false);
     } catch (err: any) {
-      setError(err?.message || "Não foi possível salvar seus dados.");
+      setError(
+        err?.message ||
+        "Não foi possível salvar seus dados."
+      );
     } finally {
       setSavingProfile(false);
     }
   }
-  async function getOrLinkCustomer(user: any) {
-    const userEmail = String(user.email || "").trim().toLowerCase();
 
-    if (!userEmail) return null;
+  /* =======================================================
+     CLIENTE
+  ======================================================= */
 
-    // 1. Primeiro tenta achar pelo usuário logado
-    const { data: byUserId, error: byUserError } = await supabase
+  async function getOrLinkCustomer(
+    user: any
+  ) {
+    const email = String(
+      user.email || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!email) return null;
+
+    const {
+      data: byUser,
+      error: byUserError,
+    } = await supabase
       .from("customers")
-      .select("id, user_id, full_name, email, phone, document, birth_date")
+      .select(`
+        id,
+        user_id,
+        full_name,
+        email,
+        phone,
+        document,
+        birth_date
+      `)
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (byUserError) throw byUserError;
+    if (byUserError) {
+      throw byUserError;
+    }
 
-    if (byUserId) return byUserId;
+    if (byUser) {
+      return byUser;
+    }
 
-    // 2. Se não achou, tenta achar pelo mesmo e-mail usado na compra
-    const { data: byEmail, error: byEmailError } = await supabase
+    const {
+      data: byEmail,
+      error: byEmailError,
+    } = await supabase
       .from("customers")
-      .select("id, user_id, full_name, email, phone, document, birth_date")
-      .ilike("email", userEmail)
+      .select(`
+        id,
+        user_id,
+        full_name,
+        email,
+        phone,
+        document,
+        birth_date
+      `)
+      .ilike("email", email)
       .maybeSingle();
 
-    if (byEmailError) throw byEmailError;
+    if (byEmailError) {
+      throw byEmailError;
+    }
 
-    // 3. Se achou cliente antigo sem user_id, vincula ao login atual
-    if (byEmail?.id && !byEmail.user_id) {
-      const { data: linkedCustomer, error: linkError } = await supabase
+    if (
+      byEmail?.id &&
+      !byEmail.user_id
+    ) {
+      const {
+        data: linked,
+        error: linkError,
+      } = await supabase
         .from("customers")
         .update({
           user_id: user.id,
-          updated_at: new Date().toISOString(),
+          updated_at:
+            new Date().toISOString(),
         })
         .eq("id", byEmail.id)
         .is("user_id", null)
-        .select("id, user_id, full_name, email, phone, document, birth_date")
+        .select(`
+          id,
+          user_id,
+          full_name,
+          email,
+          phone,
+          document,
+          birth_date
+        `)
         .single();
 
-      if (linkError) throw linkError;
+      if (linkError) {
+        throw linkError;
+      }
 
-      return linkedCustomer;
+      return linked;
     }
 
-    // 4. Se achou pelo email, mas já tem user_id, retorna
-    if (byEmail?.id) return byEmail;
+    if (byEmail) {
+      return byEmail;
+    }
 
-    // 5. Se não existe customer, cria um novo
-    const { data: newCustomer, error: createError } = await supabase
+    const {
+      data: created,
+      error: createError,
+    } = await supabase
       .from("customers")
       .insert({
         user_id: user.id,
-        email: userEmail,
-        full_name: user.user_metadata?.full_name || null,
-        phone: user.phone || null,
+        email,
+        full_name:
+          user.user_metadata
+            ?.full_name || null,
+        phone:
+          user.phone || null,
       })
-      .select("id, user_id, full_name, email, phone, document, birth_date")
+      .select(`
+        id,
+        user_id,
+        full_name,
+        email,
+        phone,
+        document,
+        birth_date
+      `)
       .single();
 
-    if (createError) throw createError;
+    if (createError) {
+      throw createError;
+    }
 
-    return newCustomer;
+    return created;
   }
+
+  /* =======================================================
+     NAVEGAÇÃO
+  ======================================================= */
+
+  const menuItems: Array<{
+    key: TabKey;
+    label: string;
+    icon: React.ElementType;
+  }> = [
+      {
+        key: "pedidos",
+        label: "Pedidos",
+        icon: Package,
+      },
+      {
+        key: "perfil",
+        label: "Perfil",
+        icon: User,
+      },
+      {
+        key: "enderecos",
+        label: "Endereços",
+        icon: MapPin,
+      },
+      {
+        key: "notificacoes",
+        label: "Notificações",
+        icon: Bell,
+      },
+      {
+        key: "indicacoes",
+        label: "Indicações",
+        icon: Heart,
+      },
+    ];
+
+  const latestOrder = orders[0];
+
+  /* =======================================================
+     UI
+  ======================================================= */
+
   return (
-    <div className="min-h-screen" style={{ background: CALEA.bg }}>
+    <div className="min-h-screen bg-[#FCFAF6]">
       <Header />
 
-      <main className="mx-auto w-full max-w-[1560px] px-3 pb-16 pt-[120px] sm:px-4 sm:pt-[150px] md:px-8 md:pt-[220px]">
-        <div className="mb-4 overflow-hidden rounded-[22px] border bg-white shadow-sm sm:rounded-[28px] md:mb-8">
-          <div
-            className="grid gap-4 p-4 sm:p-6 md:grid-cols-[1.2fr_0.8fr] md:p-8"
-            style={{ borderColor: CALEA.line }}
-          >
-            <div>
-              <p
-                className="mb-3 text-xs font-semibold uppercase tracking-[0.22em]"
-                style={{ color: CALEA.accent }}
-              >
-                Área do cliente
+      <main className="mx-auto w-full max-w-[1380px] px-4 pb-24 pt-[118px] sm:px-6 md:px-8 md:pt-[150px] lg:px-10">
+        {loading ? (
+          <LoadingState />
+        ) : !authUser ? (
+          <LoginRequired />
+        ) : error ? (
+          <ErrorState error={error} />
+        ) : (
+          <>
+            {/* ============================================
+                INTRO
+            ============================================ */}
+
+            <section className="border-b border-[#2b554e]/10 pb-8 md:pb-10">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#b08d57]">
+                Minha Caléa
               </p>
 
-              <h1
-                className="mt-3 max-w-2xl text-base md:text-lg"
-                style={{ color: CALEA.primary }}
-              >
-                Olá, {getFirstName(profile?.full_name) || "cliente"}.
+              <h1 className="mt-3 font-serif text-[38px] font-normal leading-[0.98] tracking-[-0.035em] text-[#2b554e] sm:text-[46px] md:text-[54px]">
+                Olá,{" "}
+                {getFirstName(
+                  profile?.full_name
+                ) || "cliente"}.
               </h1>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 sm:text-base md:text-lg" style={{ color: CALEA.textSoft }}>
-                Acompanhe seus pedidos, dados cadastrais, endereços e histórico de compras.
+              <p className="mt-4 max-w-[560px] text-sm leading-6 text-[#6f6558] sm:text-base">
+                Acompanhe seus pedidos e
+                cuide dos seus dados em
+                um só lugar.
               </p>
-            </div>
+            </section>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-              <SummaryCard label="Pedidos pagos" value={String(orders.length)} />
-              <SummaryCard label="Status" value="Pagos" />
-              <SummaryCard label="Total" value={formatBRL(loyalty.totalSpentCents)} />
-            </div>
-          </div>
-        </div>
+            {/* ============================================
+                PEDIDO MAIS RECENTE
+            ============================================ */}
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="xl:sticky xl:top-24 xl:h-fit">
-            <div
-              className="flex gap-2 overflow-x-auto rounded-[20px] border p-2 xl:block xl:overflow-hidden xl:rounded-[24px] xl:p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              style={{
-                borderColor: CALEA.line,
-                background: CALEA.soft,
-              }}
-            >
-              {menuItems.map((item, index) => {
-                const active = activeTab === item.key;
-                const Icon = item.icon;
+            {latestOrder && (
+              <LatestOrder
+                order={latestOrder}
+                items={
+                  orderItems[
+                  latestOrder.id
+                  ] || []
+                }
+                onOpen={() =>
+                  navigate(
+                    `/minha-conta/pedidos/${latestOrder.id}`
+                  )
+                }
+              />
+            )}
 
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setActiveTab(item.key)}
-                    className={[
-                      "flex shrink-0 items-center gap-2 rounded-[16px] px-4 py-3 text-left text-xs transition sm:text-sm xl:w-full xl:rounded-none xl:px-6 xl:py-5 xl:text-base",
-                      active ? "bg-white shadow-sm" : "bg-transparent hover:bg-white/70",
-                      index !== 0 ? "xl:border-t" : "",
-                    ].join(" ")}
-                    style={{
-                      borderColor: index !== 0 ? CALEA.line : undefined,
-                      color: CALEA.primary,
-                    }}
-                  >
-                    <Icon size={20} strokeWidth={1.8} />
-                    <span className="whitespace-nowrap">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
+            {/* ============================================
+                NAVEGAÇÃO
+            ============================================ */}
 
-          <section>
-            {loading ? (
-              <LoadingBox />
-            ) : !authUser ? (
-              <LoginRequired />
-            ) : error ? (
-              <ErrorBox error={error} />
-            ) : (
-              <>
-                {activeTab === "pedidos" && (
-                  <div>
-                    <SectionHeader
-                      title="Meus pedidos"
-                      description="Veja os pedidos realizados e acompanhe o andamento da compra."
-                    />
+            <nav className="border-b border-[#2b554e]/10">
+              <div className="flex gap-6 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {menuItems.map(
+                  (item) => {
+                    const Icon =
+                      item.icon;
 
+                    const active =
+                      activeTab ===
+                      item.key;
 
-                    <div className="mt-6 space-y-4">
-                      {filteredOrders.length === 0 ? (
-                        <EmptyOrders />
-                      ) : (
-                        filteredOrders.map((order) => (
-                          <OrderCard
-                            key={order.id}
-                            order={order}
-                            items={orderItems[order.id] || []}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === "perfil" && (
-                  <div
-                    className="rounded-[28px] border bg-white p-6 shadow-sm md:p-8"
-                    style={{ borderColor: CALEA.line }}
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <SectionTitle title="Dados do perfil" />
-
-                      {!editingProfile ? (
-                        <button
-                          type="button"
-                          onClick={handleStartProfileEdit}
-                          className="inline-flex items-center justify-center gap-2 rounded-full border bg-white px-5 py-3 text-sm transition hover:bg-[#fcfaf6]"
-                          style={{
-                            borderColor: CALEA.accent,
-                            color: CALEA.primary,
-                          }}
-                        >
-                          <Pencil size={16} />
-                          Editar informações
-                        </button>
-                      ) : (
-                        <div className="flex flex-wrap gap-3">
-                          <button
-                            type="button"
-                            onClick={handleCancelProfileEdit}
-                            className="inline-flex rounded-full border bg-white px-5 py-3 text-sm transition hover:bg-[#fafafa]"
-                            style={{
-                              borderColor: CALEA.line,
-                              color: CALEA.primary,
-                            }}
-                          >
-                            Cancelar
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleSaveProfile}
-                            disabled={savingProfile}
-                            className="inline-flex rounded-full px-5 py-3 text-sm text-white transition disabled:opacity-60"
-                            style={{ background: CALEA.primary }}
-                          >
-                            {savingProfile ? "Salvando..." : "Salvar alterações"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <ProfileField
-                        label="Nome completo"
-                        value={profile?.full_name || "—"}
-                        editing={editingProfile}
-                        inputValue={profileForm.full_name}
-                        onChange={(value) => updateProfileField("full_name", value)}
-                        placeholder="Seu nome completo"
-                      />
-
-                      <ProfileField
-                        label="E-mail"
-                        value={profile?.email || authUser.email || "—"}
-                        editing={editingProfile}
-                        inputValue={profileForm.email}
-                        onChange={(value) => updateProfileField("email", value)}
-                        placeholder="voce@exemplo.com"
-                        inputMode="email"
-                      />
-
-                      <ProfileField
-                        label="Telefone"
-                        value={maskPhone(profile?.phone || authUser.phone)}
-                        editing={editingProfile}
-                        inputValue={profileForm.phone}
-                        onChange={(value) =>
-                          updateProfileField("phone", formatPhoneInput(value))
+                    return (
+                      <button
+                        key={
+                          item.key
                         }
-                        placeholder="(11) 99999-9999"
-                        inputMode="tel"
-                      />
-
-                      <ProfileField
-                        label="CPF"
-                        value={maskDocument(profile?.document)}
-                        editing={editingProfile}
-                        inputValue={profileForm.document}
-                        onChange={(value) =>
-                          updateProfileField("document", formatCpf(value))
+                        type="button"
+                        onClick={() =>
+                          setActiveTab(
+                            item.key
+                          )
                         }
-                        placeholder="000.000.000-00"
-                        inputMode="numeric"
-                      />
-
-                      <ProfileField
-                        label="Data de nascimento"
-                        value={formatDate(profile?.birth_date)}
-                        editing={editingProfile}
-                        inputValue={profileForm.birth_date}
-                        onChange={(value) => updateProfileField("birth_date", value)}
-                        type="date"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === "enderecos" && (
-                  <div
-                    className="rounded-[28px] border bg-white p-6 shadow-sm md:p-8"
-                    style={{ borderColor: CALEA.line }}
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <SectionTitle title="Endereços" />
-
-                      <a
-                        href="/checkout-identificacao"
-                        className="inline-flex items-center justify-center rounded-full border bg-white px-5 py-3 text-sm"
-                        style={{
-                          borderColor: CALEA.accent,
-                          color: CALEA.primary,
-                        }}
+                        className={[
+                          "relative flex shrink-0 items-center gap-2 py-5 text-xs transition sm:text-sm",
+                          active
+                            ? "text-[#2b554e]"
+                            : "text-[#6f6558] hover:text-[#2b554e]",
+                        ].join(
+                          " "
+                        )}
                       >
-                        Adicionar endereço
-                      </a>
-                    </div>
+                        <Icon
+                          size={17}
+                          strokeWidth={
+                            1.7
+                          }
+                        />
 
-                    {addresses.length === 0 ? (
-                      <p className="mt-8 text-base" style={{ color: CALEA.textSoft }}>
-                        Nenhum endereço cadastrado.
-                      </p>
-                    ) : (
-                      <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-                        {addresses.map((address) => {
-                          const lines = joinAddress(address);
+                        {
+                          item.label
+                        }
 
-                          return (
-                            <div
-                              key={address.id}
-                              className="rounded-[22px] border p-5"
-                              style={{
-                                borderColor: CALEA.line,
-                                background: CALEA.bg,
-                              }}
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <h3 className="text-lg" style={{ color: CALEA.primary }}>
-                                  {address.recipient_name || "Endereço cadastrado"}
-                                </h3>
-
-                                {address.is_default ? (
-                                  <span
-                                    className="rounded-full px-3 py-1 text-xs text-white"
-                                    style={{ background: CALEA.primary }}
-                                  >
-                                    Principal
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              <div
-                                className="mt-4 space-y-1 text-sm md:text-base"
-                                style={{ color: CALEA.textSoft }}
-                              >
-                                {lines.map((line, idx) => (
-                                  <p key={idx}>{line}</p>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                        {active && (
+                          <span className="absolute inset-x-0 bottom-0 h-px bg-[#2b554e]" />
+                        )}
+                      </button>
+                    );
+                  }
                 )}
+              </div>
+            </nav>
 
-                {activeTab === "trocas" && (
-                  <InfoPanel
-                    title="Notificações"
-                    description="Área reservada para avisos da conta, trocas, entregas e atualizações importantes."
+            {/* ============================================
+                CONTEÚDO
+            ============================================ */}
+
+            <section className="pt-8 md:pt-10">
+              {activeTab ===
+                "pedidos" && (
+                  <OrdersSection
+                    orders={orders}
+                    orderItems={
+                      orderItems
+                    }
                   />
                 )}
 
-                {activeTab === "fidelidade" && (
-                  <ReferralPanel profile={profile} authUser={authUser} />
+              {activeTab ===
+                "perfil" && (
+                  <ProfileSection
+                    profile={
+                      profile
+                    }
+                    authUser={
+                      authUser
+                    }
+                    editing={
+                      editingProfile
+                    }
+                    saving={
+                      savingProfile
+                    }
+                    form={
+                      profileForm
+                    }
+                    onEdit={
+                      startProfileEdit
+                    }
+                    onCancel={
+                      cancelProfileEdit
+                    }
+                    onSave={
+                      saveProfile
+                    }
+                    onChange={
+                      updateProfileField
+                    }
+                  />
                 )}
-              </>
-            )}
-          </section>
-        </div>
+
+              {activeTab ===
+                "enderecos" && (
+                  <AddressesSection
+                    addresses={
+                      addresses
+                    }
+                  />
+                )}
+
+              {activeTab ===
+                "notificacoes" && (
+                  <NotificationsSection />
+                )}
+
+              {activeTab ===
+                "indicacoes" && (
+                  <ReferralPanel
+                    profile={
+                      profile
+                    }
+                    authUser={
+                      authUser
+                    }
+                  />
+                )}
+            </section>
+          </>
+        )}
       </main>
 
       <Footer />
@@ -758,286 +932,426 @@ export default function ContaPage() {
   );
 }
 
-function LoadingBox() {
-  return (
-    <div className="flex min-h-[360px] items-center justify-center rounded-[28px] border bg-white">
-      <div className="flex items-center gap-3 text-[#2b554e]">
-        <Loader2 className="animate-spin" size={22} />
-        <span>Carregando sua conta...</span>
-      </div>
-    </div>
-  );
-}
+/* =========================================================
+   PEDIDO MAIS RECENTE
+========================================================= */
 
-function LoginRequired() {
-  return (
-    <div className="rounded-[28px] border bg-white p-8 shadow-sm">
-      <h2 className="text-[32px] font-normal text-[#2b554e]">Faça login</h2>
-
-      <p className="mt-3 text-base text-[#6f6558]">
-        Você precisa estar autenticada para acessar seus pedidos e dados da conta.
-      </p>
-
-      <a
-        href="/login"
-        className="mt-6 inline-flex rounded-full px-6 py-3 text-sm text-white"
-        style={{ background: CALEA.primary }}
-      >
-        Ir para login
-      </a>
-    </div>
-  );
-}
-
-function ErrorBox({ error }: { error: string }) {
-  return (
-    <div className="rounded-[28px] border bg-white p-8 shadow-sm">
-      <h2 className="text-[32px] font-normal text-[#2b554e]">Erro ao carregar</h2>
-
-      <p className="mt-3 text-base text-[#7b4545]">{error}</p>
-    </div>
-  );
-}
-
-function SectionHeader({
-  title,
-  description,
+function LatestOrder({
+  order,
+  items,
+  onOpen,
 }: {
-  title: string;
-  description: string;
+  order: Order;
+  items: OrderItem[];
+  onOpen: () => void;
+}) {
+  const firstItem = items[0];
+
+  const image = firstItem
+    ? getItemImage(firstItem)
+    : "";
+
+  return (
+    <section className="border-b border-[#2b554e]/10 py-8 md:py-10">
+      <div className="grid gap-6 sm:grid-cols-[92px_minmax(0,1fr)] md:grid-cols-[110px_minmax(0,1fr)_auto] md:items-center">
+        <div className="aspect-[3/4] w-[88px] overflow-hidden bg-[#f1ede6] sm:w-[92px] md:w-[110px]">
+          {image ? (
+            <img
+              src={image}
+              alt={
+                firstItem
+                  ? getItemName(
+                    firstItem
+                  )
+                  : "Pedido"
+              }
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[#b08d57]">
+              <Package
+                size={23}
+                strokeWidth={1.5}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.19em] text-[#b08d57]">
+            Pedido mais recente
+          </p>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h2 className="font-serif text-[26px] font-normal text-[#2b554e] md:text-[30px]">
+              {order.order_number ||
+                `Pedido #${order.id
+                  .slice(0, 8)
+                  .toUpperCase()}`}
+            </h2>
+
+            <OrderState
+              order={order}
+            />
+          </div>
+
+          <p className="mt-2 text-xs text-[#6f6558]">
+            {formatDateLong(
+              order.created_at
+            )}
+          </p>
+
+          {firstItem && (
+            <p className="mt-4 text-sm text-[#2b554e]">
+              {getItemName(
+                firstItem
+              )}
+
+              {items.length > 1 &&
+                ` + ${items.length -
+                1
+                } ${items.length -
+                  1 ===
+                  1
+                  ? "item"
+                  : "itens"
+                }`}
+            </p>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={onOpen}
+          className="col-span-full inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[#2b554e] px-6 text-[10px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#214b44] md:col-span-1"
+        >
+          Ver pedido
+          <ChevronRight
+            size={14}
+          />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/* =========================================================
+   PEDIDOS
+========================================================= */
+
+function OrdersSection({
+  orders,
+  orderItems,
+}: {
+  orders: Order[];
+  orderItems: Record<
+    string,
+    OrderItem[]
+  >;
 }) {
   return (
     <div>
-      <h2 className="text-[26px] font-normal leading-tight text-[#2b554e] sm:text-[34px] md:text-[44px]">
-        {title}
-      </h2>
+      <SectionHeader
+        eyebrow="Seus pedidos"
+        title="Histórico de compras"
+        description="Veja seus pedidos e acompanhe cada etapa da entrega."
+      />
 
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6f6558] sm:text-base">
-        {description}
-      </p>
-    </div>
-  );
-}
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <h2 className="text-[26px] font-normal leading-tight text-[#2b554e] sm:text-[32px] md:text-[42px]">
-      {title}
-    </h2>
-  );
-}
-
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div
-      className="rounded-[16px] border bg-[#FCFAF6] p-3 sm:rounded-[20px] sm:p-4"
-      style={{ borderColor: CALEA.line }}
-    >
-      <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#b08d57] sm:text-xs">
-        {label}
-      </p>
-
-      <p className="mt-1 truncate text-base font-medium text-[#2b554e] sm:mt-2 md:text-xl">
-        {value}
-      </p>
+      {orders.length === 0 ? (
+        <EmptyOrders />
+      ) : (
+        <div className="mt-7">
+          {orders.map(
+            (order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                items={
+                  orderItems[
+                  order.id
+                  ] || []
+                }
+              />
+            )
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function OrderCard({ order, items }: { order: Order; items: OrderItem[] }) {
+function OrderCard({
+  order,
+  items,
+}: {
+  order: Order;
+  items: OrderItem[];
+}) {
   const navigate = useNavigate();
 
-  const visibleItems = items.slice(0, 2);
-  const moreItems = Math.max(items.length - visibleItems.length, 0);
+  const firstItem = items[0];
+
+  const image = firstItem
+    ? getItemImage(firstItem)
+    : "";
 
   return (
-    <article
-      className="overflow-hidden rounded-[26px] border bg-white shadow-[0_14px_38px_rgba(43,85,78,0.05)]"
-      style={{ borderColor: CALEA.line }}
-    >
-      <div className="p-4 sm:p-5 md:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusPill status={order.status} />
-
-              <span className="text-xs font-medium text-[#6f6558] sm:text-sm">
-                {order.order_number || `Pedido #${order.id.slice(0, 8).toUpperCase()}`}
-              </span>
+    <article className="border-b border-[#2b554e]/10 py-6 first:pt-0 md:py-7">
+      <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-4 sm:grid-cols-[92px_minmax(0,1fr)_auto] sm:items-center sm:gap-6">
+        <div className="aspect-[3/4] overflow-hidden bg-[#f1ede6]">
+          {image ? (
+            <img
+              src={image}
+              alt={
+                firstItem
+                  ? getItemName(
+                    firstItem
+                  )
+                  : "Pedido"
+              }
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[#b08d57]">
+              <Package
+                size={20}
+              />
             </div>
-
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-[#b08d57]">
-                  Total do pedido
-                </p>
-
-                <h3 className="mt-1 text-[28px] font-normal tracking-[-0.03em] text-[#2b554e] sm:text-[34px]">
-                  {formatBRL(order.total_cents)}
-                </h3>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => navigate(`/minha-conta/pedidos/${order.id}`)}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:brightness-95 sm:w-auto"
-              >
-                Ver detalhes
-                <ChevronRight size={15} />
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-2 rounded-[20px] bg-[#fcfaf6] p-4 text-sm text-[#6f6558] sm:grid-cols-3">
-              <span className="inline-flex items-center gap-2">
-                <ShoppingBag size={15} />
-                {formatDateLong(order.created_at)}
-              </span>
-
-              <span className="inline-flex items-center gap-2">
-                <CreditCard size={15} />
-                {translatePaymentMethod(order.payment_method)}
-              </span>
-
-              <span className="inline-flex items-center gap-2">
-                <Truck size={15} />
-                Frete {formatBRL(order.shipping_cents)}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
-      </div>
 
-      <div className="border-t bg-[#fffdf9] px-4 py-4 sm:px-5 md:px-6" style={{ borderColor: CALEA.line }}>
-        {items.length === 0 ? (
-          <p className="text-sm text-[#6f6558]">
-            Pedido encontrado, mas os itens não foram carregados.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {visibleItems.map((item, index) => (
-              <OrderItemRow key={item.id || `${item.order_id}-${index}`} item={item} />
-            ))}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <OrderState
+              order={order}
+            />
 
-            {moreItems > 0 && (
-              <button
-                type="button"
-                onClick={() => navigate(`/minha-conta/pedidos/${order.id}`)}
-                className="text-sm font-medium text-[#b08d57] transition hover:text-[#2b554e]"
-              >
-                Ver mais {moreItems} item(ns)
-              </button>
-            )}
+            <span className="text-[11px] text-[#6f6558]">
+              {order.order_number ||
+                `Pedido #${order.id
+                  .slice(0, 8)
+                  .toUpperCase()}`}
+            </span>
           </div>
-        )}
+
+          <p className="mt-2 text-xs text-[#6f6558]">
+            {formatDateLong(
+              order.created_at
+            )}
+          </p>
+
+          {firstItem && (
+            <p className="mt-3 truncate text-sm font-medium text-[#2b554e]">
+              {getItemName(
+                firstItem
+              )}
+
+              {items.length > 1 &&
+                ` + ${items.length -
+                1
+                }`}
+            </p>
+          )}
+
+          <p className="mt-2 font-serif text-[21px] text-[#2b554e]">
+            {formatBRL(
+              order.total_cents
+            )}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() =>
+            navigate(
+              `/minha-conta/pedidos/${order.id}`
+            )
+          }
+          className="col-span-2 flex items-center justify-between border-t border-[#2b554e]/10 pt-4 text-[9px] font-semibold uppercase tracking-[0.15em] text-[#2b554e] sm:col-span-1 sm:border-0 sm:pt-0"
+        >
+          Ver pedido
+          <ChevronRight
+            size={14}
+          />
+        </button>
       </div>
     </article>
   );
 }
 
-function OrderItemRow({ item }: { item: OrderItem }) {
-  const image = getItemImage(item);
-  const name = getItemName(item);
-  const variant = getItemVariant(item);
-  const qty = item.quantity || 1;
-  const total = item.line_total_cents ?? item.unit_price_cents * qty;
+/* =========================================================
+   PERFIL
+========================================================= */
 
+function ProfileSection({
+  profile,
+  authUser,
+  editing,
+  saving,
+  form,
+  onEdit,
+  onCancel,
+  onSave,
+  onChange,
+}: {
+  profile: CustomerProfile | null;
+  authUser: AuthUser;
+  editing: boolean;
+  saving: boolean;
+  form: ProfileFormState;
+
+  onEdit: () => void;
+  onCancel: () => void;
+  onSave: () => void;
+
+  onChange: (
+    field: keyof ProfileFormState,
+    value: string
+  ) => void;
+}) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[16px] border border-[#e9e2d6] bg-[#f6f3ee]">
-        {image ? (
-          <img src={image} alt={name} className="h-full w-full object-cover" />
+    <div>
+      <div className="flex flex-col gap-5 border-b border-[#2b554e]/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <SectionHeader
+          eyebrow="Sua conta"
+          title="Dados pessoais"
+          description="Mantenha suas informações atualizadas para facilitar suas próximas compras."
+        />
+
+        {!editing ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-[#2b554e]/15 px-5 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#2b554e]"
+          >
+            <Pencil
+              size={14}
+            />
+            Editar
+          </button>
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-[#b08d57]">
-            <Package size={20} />
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-full px-5 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#6f6558]"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#2b554e] px-5 text-[10px] font-semibold uppercase tracking-[0.13em] text-white disabled:opacity-50"
+            >
+              {saving
+                ? "Salvando"
+                : "Salvar"}
+            </button>
           </div>
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-[#2b554e] sm:text-base">
-          {name}
-        </p>
+      <div className="grid md:grid-cols-2 md:gap-x-12">
+        <ProfileField
+          label="Nome completo"
+          value={
+            profile?.full_name ||
+            "Não informado"
+          }
+          editing={editing}
+          inputValue={
+            form.full_name
+          }
+          onChange={(value) =>
+            onChange(
+              "full_name",
+              value
+            )
+          }
+        />
 
-        <p className="mt-1 text-xs text-[#6f6558] sm:text-sm">
-          {variant ? `${variant} • ` : ""}
-          Qtd. {qty}
-        </p>
-      </div>
+        <ProfileField
+          label="E-mail"
+          value={
+            profile?.email ||
+            authUser.email ||
+            "Não informado"
+          }
+          editing={editing}
+          inputValue={
+            form.email
+          }
+          onChange={(value) =>
+            onChange(
+              "email",
+              value
+            )
+          }
+          inputMode="email"
+        />
 
-      <div className="shrink-0 text-right text-sm font-semibold text-[#2b554e]">
-        {formatBRL(total)}
+        <ProfileField
+          label="Telefone"
+          value={maskPhone(
+            profile?.phone ||
+            authUser.phone
+          )}
+          editing={editing}
+          inputValue={
+            form.phone
+          }
+          onChange={(value) =>
+            onChange(
+              "phone",
+              formatPhoneInput(
+                value
+              )
+            )
+          }
+          inputMode="tel"
+        />
+
+        <ProfileField
+          label="CPF"
+          value={maskDocument(
+            profile?.document
+          )}
+          editing={editing}
+          inputValue={
+            form.document
+          }
+          onChange={(value) =>
+            onChange(
+              "document",
+              formatCpf(value)
+            )
+          }
+          inputMode="numeric"
+        />
+
+        <ProfileField
+          label="Data de nascimento"
+          value={formatDate(
+            profile?.birth_date
+          )}
+          editing={editing}
+          inputValue={
+            form.birth_date
+          }
+          onChange={(value) =>
+            onChange(
+              "birth_date",
+              value
+            )
+          }
+          type="date"
+        />
       </div>
     </div>
   );
 }
-
-function EmptyOrders() {
-  return (
-    <div
-      className="rounded-[28px] border bg-white px-6 py-12 text-center shadow-sm"
-      style={{ borderColor: CALEA.line }}
-    >
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#f6f3ee] text-[#2b554e]">
-        <Package size={26} />
-      </div>
-
-      <h3 className="mt-5 text-[24px] font-normal text-[#2b554e]">
-        Nenhum pedido encontrado
-      </h3>
-
-      <p className="mx-auto mt-2 max-w-md text-base text-[#6f6558]">
-        Quando a cliente finalizar uma compra, o pedido aparecerá aqui automaticamente.
-      </p>
-
-      <a
-        href="/produtos"
-        className="mt-6 inline-flex rounded-full px-6 py-3 text-sm text-white"
-        style={{ background: CALEA.primary }}
-      >
-        Ver produtos
-      </a>
-    </div>
-  );
-}
-
-function InfoPanel({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div
-      className="rounded-[28px] border bg-white p-6 shadow-sm md:p-8"
-      style={{ borderColor: CALEA.line }}
-    >
-      <SectionTitle title={title} />
-
-      <p className="mt-4 text-base text-[#6f6558]">{description}</p>
-    </div>
-  );
-}
-
-function StatusPill({ status }: { status?: string | null }) {
-  const key = String(status || "").toLowerCase();
-
-  const isDone = ["paid", "delivered"].includes(key);
-  const isOpen = ["draft", "pending_payment", "processing", "shipped"].includes(key);
-  const isCancelled = ["canceled", "cancelled", "refunded"].includes(key);
-
-  let classes = "bg-[#f6f3ee] text-[#6f6558]";
-
-  if (isDone) classes = "bg-[#e7f1ed] text-[#2b554e]";
-  if (isOpen) classes = "bg-[#f8eddc] text-[#8b6a3e]";
-  if (isCancelled) classes = "bg-[#f8e5e5] text-[#a35a5a]";
-
-  return (
-    <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-medium ${classes}`}>
-      {translateOrderStatus(status)}
-    </span>
-  );
-}
-
 
 function ProfileField({
   label,
@@ -1045,207 +1359,189 @@ function ProfileField({
   editing,
   inputValue,
   onChange,
-  placeholder,
   inputMode,
   type = "text",
 }: {
   label: string;
   value: string;
+
   editing?: boolean;
   inputValue?: string;
-  onChange?: (value: string) => void;
-  placeholder?: string;
+
+  onChange?: (
+    value: string
+  ) => void;
+
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+
   type?: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-[#e9e2d6] bg-[#fcfaf6] p-5">
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#b08d57]">
+    <div className="border-b border-[#2b554e]/10 py-6">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#b08d57]">
         {label}
       </p>
 
       {editing ? (
         <input
           type={type}
-          value={inputValue ?? ""}
-          onChange={(e) => onChange?.(e.target.value)}
-          placeholder={placeholder}
-          inputMode={inputMode}
-          className="mt-3 h-12 w-full rounded-xl border border-[#e9e2d6] bg-white px-4 text-base text-[#2b554e] outline-none transition focus:border-[#b08d57] focus:ring-2 focus:ring-[#b08d57]/15"
+          value={
+            inputValue ?? ""
+          }
+          onChange={(event) =>
+            onChange?.(
+              event.target
+                .value
+            )
+          }
+          inputMode={
+            inputMode
+          }
+          className="mt-3 h-11 w-full border-b border-[#2b554e]/25 bg-transparent text-[15px] text-[#2b554e] outline-none transition focus:border-[#b08d57]"
         />
       ) : (
-        <p className="mt-2 text-lg text-[#2b554e]">{value}</p>
+        <p className="mt-2 text-[15px] text-[#2b554e] sm:text-base">
+          {value}
+        </p>
       )}
     </div>
   );
 }
 
-function getItemName(item: OrderItem) {
-  return item.skus?.products?.name || item.skus?.title || "Produto";
+/* =========================================================
+   ENDEREÇOS
+========================================================= */
+
+function AddressesSection({
+  addresses,
+}: {
+  addresses: Address[];
+}) {
+  return (
+    <div>
+      <div className="flex flex-col gap-5 border-b border-[#2b554e]/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <SectionHeader
+          eyebrow="Entrega"
+          title="Seus endereços"
+          description="Endereços utilizados nas suas compras."
+        />
+
+        <a
+          href="/checkout-identificacao"
+          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-[#2b554e]/15 px-5 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#2b554e]"
+        >
+          Adicionar
+          <ArrowRight
+            size={14}
+          />
+        </a>
+      </div>
+
+      {addresses.length ===
+        0 ? (
+        <div className="py-12">
+          <p className="font-serif text-[24px] text-[#2b554e]">
+            Nenhum endereço
+            cadastrado.
+          </p>
+
+          <p className="mt-2 text-sm text-[#6f6558]">
+            Adicione um endereço
+            quando quiser.
+          </p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 md:gap-x-12">
+          {addresses.map(
+            (address) => (
+              <AddressRow
+                key={
+                  address.id
+                }
+                address={
+                  address
+                }
+              />
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function getItemVariant(item: OrderItem) {
-  return item.skus?.variant_name || item.skus?.plating_type || "";
+function AddressRow({
+  address,
+}: {
+  address: Address;
+}) {
+  const lines =
+    joinAddress(address);
+
+  return (
+    <div className="border-b border-[#2b554e]/10 py-6">
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="font-serif text-[21px] text-[#2b554e]">
+          {address.recipient_name ||
+            "Endereço"}
+        </h3>
+
+        {address.is_default && (
+          <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-[#b08d57]">
+            Principal
+          </span>
+        )}
+      </div>
+
+      <div className="mt-3 space-y-1 text-sm leading-5 text-[#6f6558]">
+        {lines.map(
+          (line, index) => (
+            <p key={index}>
+              {line}
+            </p>
+          )
+        )}
+      </div>
+    </div>
+  );
 }
 
-function getItemImage(item: OrderItem) {
-  const images = item.skus?.sku_images || [];
+/* =========================================================
+   NOTIFICAÇÕES
+========================================================= */
 
-  const primary =
-    images.find((img) => img.is_primary) ||
-    [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
+function NotificationsSection() {
+  return (
+    <div>
+      <SectionHeader
+        eyebrow="Atualizações"
+        title="Notificações"
+        description="Avisos importantes sobre seus pedidos e sua conta."
+      />
 
-  if (!primary?.path) return "";
+      <div className="mt-8 border-y border-[#2b554e]/10 py-10">
+        <Bell
+          size={20}
+          className="text-[#b08d57]"
+        />
 
-  const { data } = supabase.storage
-    .from("product-images")
-    .getPublicUrl(primary.path);
+        <p className="mt-4 font-serif text-[24px] text-[#2b554e]">
+          Tudo certo por aqui.
+        </p>
 
-  return data.publicUrl;
+        <p className="mt-2 max-w-md text-sm leading-6 text-[#6f6558]">
+          Quando houver uma
+          atualização importante,
+          ela aparecerá aqui.
+        </p>
+      </div>
+    </div>
+  );
 }
 
-function getFirstName(value?: string | null) {
-  if (!value) return "";
-  return value.trim().split(" ")[0];
-}
-
-function formatDateLong(value?: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatBRL(value?: number | null) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format((value ?? 0) / 100);
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function cleanDigits(value?: string | null) {
-  return String(value || "").replace(/\D/g, "");
-}
-
-function cleanPhone(value?: string | null) {
-  return String(value || "").replace(/\D/g, "").slice(0, 11);
-}
-
-function formatPhoneInput(value?: string | null) {
-  const digits = cleanPhone(value);
-
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-
-  if (digits.length <= 10) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-  }
-
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-}
-
-function formatCpf(value?: string | null) {
-  const digits = cleanDigits(value).slice(0, 11);
-
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-
-  if (digits.length <= 9) {
-    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  }
-
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(
-    6,
-    9
-  )}-${digits.slice(9)}`;
-}
-
-function maskDocument(doc?: string | null) {
-  if (!doc) return "—";
-
-  const digits = doc.replace(/\D/g, "");
-
-  if (digits.length !== 11) return doc;
-
-  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-}
-
-function maskPhone(phone?: string | null) {
-  if (!phone) return "—";
-
-  const digits = phone.replace(/\D/g, "");
-
-  if (digits.length === 11) {
-    return digits.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-  }
-
-  if (digits.length === 10) {
-    return digits.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
-  }
-
-  return phone;
-}
-
-function translateOrderStatus(status?: string | null) {
-  const map: Record<string, string> = {
-    draft: "Aberto",
-    pending_payment: "Aguardando pagamento",
-    processing: "Em separação",
-    shipped: "Enviado",
-    paid: "Pago",
-    delivered: "Entregue",
-    canceled: "Cancelado",
-    cancelled: "Cancelado",
-    refunded: "Reembolsado",
-  };
-
-  return map[(status || "").toLowerCase()] || (status ? status : "—");
-}
-
-function translatePaymentMethod(method?: string | null) {
-  const map: Record<string, string> = {
-    pix: "Pix",
-    boleto: "Boleto",
-    card: "Cartão",
-    credit_card: "Cartão",
-    debit_card: "Débito",
-  };
-
-  return map[(method || "").toLowerCase()] || method || "Pagamento";
-}
-
-function joinAddress(address: Address) {
-  const line1 = [address.street, address.number].filter(Boolean).join(", ");
-
-  const line2 = [address.neighborhood, address.city, address.state]
-    .filter(Boolean)
-    .join(" • ");
-
-  const zip = address.cep ? `CEP ${address.cep}` : "";
-
-  return [line1, address.complement, line2, zip].filter(Boolean);
-}
+/* =========================================================
+   INDICAÇÕES
+========================================================= */
 
 function ReferralPanel({
   profile,
@@ -1255,68 +1551,76 @@ function ReferralPanel({
   authUser: AuthUser | null;
 }) {
   const [copied, setCopied] = useState(false);
-
-  const firstName =
-    getFirstName(profile?.full_name) ||
-    getFirstName(authUser?.email?.split("@")[0]) ||
-    "CLIENTE";
-
-  const couponCode = `CALEA${normalizeCouponName(firstName)}`;
-
-  const [savingCoupon, setSavingCoupon] = useState(false);
+  const [savingCoupon, setSavingCoupon] = useState(true);
   const [couponReady, setCouponReady] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
 
   useEffect(() => {
-    async function ensureReferralCoupon() {
-      if (!profile?.id || !couponCode) return;
+    let mounted = true;
+
+    async function loadReferralCoupon() {
+      if (!profile?.id || !authUser?.id) {
+        if (mounted) {
+          setSavingCoupon(false);
+        }
+
+        return;
+      }
 
       try {
         setSavingCoupon(true);
+        setCouponReady(false);
 
-        const { data: existingCoupon, error: findError } = await supabase
-          .from("coupons")
-          .select("id, code")
-          .eq("code", couponCode)
-          .maybeSingle();
+        const { data, error } = await supabase.rpc(
+          "ensure_referral_coupon"
+        );
 
-        if (findError) throw findError;
-
-        if (existingCoupon?.id) {
-          setCouponReady(true);
-          return;
+        if (error) {
+          throw error;
         }
 
-        const { error: insertError } = await supabase.from("coupons").insert({
-          code: couponCode,
-          active: true,
-          discount_type: "percent",
-          percent: 10,
-          amount_cents: null,
-          max_discount_cents: 3000,
-          min_subtotal_cents: 10000,
-          starts_at: new Date().toISOString(),
-          ends_at: null,
-          first_purchase_only: true,
-          referral_customer_id: profile.id,
-          referral_code: true,
-        });
+        const result = Array.isArray(data)
+          ? data[0]
+          : data;
 
-        if (insertError) throw insertError;
+        if (!mounted) return;
 
-        setCouponReady(true);
+        if (result?.code) {
+          setCouponCode(result.code);
+          setCouponReady(true);
+        } else {
+          setCouponCode("");
+          setCouponReady(false);
+        }
       } catch (error) {
-        console.error("Erro ao criar cupom de indicação:", error);
-        setCouponReady(false);
+        console.error(
+          "Erro ao carregar cupom de indicação:",
+          error
+        );
+
+        if (mounted) {
+          setCouponCode("");
+          setCouponReady(false);
+        }
       } finally {
-        setSavingCoupon(false);
+        if (mounted) {
+          setSavingCoupon(false);
+        }
       }
     }
 
-    ensureReferralCoupon();
-  }, [profile?.id, couponCode]);
+    loadReferralCoupon();
+
+    return () => {
+      mounted = false;
+    };
+  }, [profile?.id, authUser?.id]);
 
   async function copyCoupon() {
+    if (!couponCode) return;
+
     await navigator.clipboard.writeText(couponCode);
+
     setCopied(true);
 
     window.setTimeout(() => {
@@ -1325,84 +1629,67 @@ function ReferralPanel({
   }
 
   return (
-    <div
-      className="overflow-hidden rounded-[28px] border bg-white shadow-sm"
-      style={{ borderColor: CALEA.line }}
-    >
-      <div className="bg-[#2b554e] px-5 py-7 text-white sm:px-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d8c3a0]">
-          Indicações
-        </p>
+    <div>
+      <SectionHeader
+        eyebrow="Compartilhe"
+        title="Indique a Caléa"
+        description="Compartilhe seu código com alguém especial."
+      />
 
-        <h2 className="mt-3 text-[30px] font-normal leading-tight sm:text-[42px]">
-          Indique a Caléa
-        </h2>
-
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75 sm:text-base">
-          Compartilhe seu cupom com amigas e familiares. Quando usarem o código,
-          elas ganham um benefício especial na compra.
-        </p>
-      </div>
-
-      <div className="grid gap-5 p-5 sm:p-8 lg:grid-cols-[1fr_340px]">
-        <div
-          className="rounded-[24px] border bg-[#fcfaf6] p-5 sm:p-6"
-          style={{ borderColor: CALEA.line }}
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b08d57]">
-            Seu cupom de indicação
+      <div className="mt-8 grid gap-10 border-t border-[#2b554e]/10 pt-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-[0.17em] text-[#b08d57]">
+            Seu código
           </p>
 
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex min-h-[58px] flex-1 items-center rounded-2xl border border-dashed border-[#b08d57] bg-white px-5">
-              <span className="text-[24px] font-semibold tracking-[0.08em] text-[#2b554e]">
-                {couponCode}
-              </span>
-            </div>
-<p className="mt-3 text-xs text-[#6f6558]">
-  {savingCoupon
-    ? "Preparando seu cupom..."
-    : couponReady
-      ? "Cupom ativo para uso no checkout."
-      : "Cupom ainda não disponível. Tente novamente em instantes."}
-</p>
+          <div className="mt-3 flex flex-col gap-4 border-b border-[#2b554e]/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
+            <span className="font-serif text-[32px] tracking-[0.04em] text-[#2b554e] sm:text-[40px]">
+              {savingCoupon
+                ? "..."
+                : couponCode || "Indisponível"}
+            </span>
+
             <button
               type="button"
               onClick={copyCoupon}
-              className="min-h-[52px] rounded-full bg-[#2b554e] px-6 text-sm font-semibold text-white transition hover:brightness-95"
+              disabled={!couponReady || savingCoupon}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#2b554e] px-6 text-[9px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#214b44] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {copied ? "Copiado!" : "Copiar cupom"}
+              {copied ? (
+                <>
+                  <Check size={13} />
+                  Copiado
+                </>
+              ) : (
+                <>
+                  <Copy size={13} />
+                  Copiar
+                </>
+              )}
             </button>
           </div>
 
-          <p className="mt-4 text-sm leading-6 text-[#6f6558]">
-            Envie esse código para quem você quer indicar. Ele pode ser usado no
-            checkout como cupom promocional.
+          <p className="mt-4 text-xs text-[#6f6558]">
+            {savingCoupon
+              ? "Preparando seu código..."
+              : couponReady
+                ? "Seu código está pronto para compartilhar."
+                : "Não foi possível carregar seu código agora."}
           </p>
         </div>
 
-        <div
-          className="rounded-[24px] border bg-white p-5 sm:p-6"
-          style={{ borderColor: CALEA.line }}
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b08d57]">
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-[0.17em] text-[#b08d57]">
             Como funciona
           </p>
 
           <div className="mt-4 space-y-4 text-sm leading-6 text-[#6f6558]">
+            <p>01. Compartilhe seu código.</p>
+            <p>02. A pessoa utiliza no checkout.</p>
             <p>
-              1. Copie seu cupom personalizado.
+              03. Na primeira compra elegível, o benefício
+              é aplicado automaticamente.
             </p>
-
-            <p>
-              2. Compartilhe com outra pessoa.
-            </p>
-
-            <p>
-              3. Ela usa o código no checkout.
-            </p>
-
-
           </div>
         </div>
       </div>
@@ -1410,11 +1697,672 @@ function ReferralPanel({
   );
 }
 
-function normalizeCouponName(value?: string | null) {
-  return String(value || "CLIENTE")
+/* =========================================================
+   STATUS
+========================================================= */
+
+function OrderState({
+  order,
+}: {
+  order: Order;
+}) {
+  const label =
+    getCustomerOrderStatus(
+      order
+    );
+
+  const shipping =
+    String(
+      order.shipping_status ||
+      ""
+    ).toLowerCase();
+
+  const isDelivered =
+    shipping === "delivered" ||
+    order.status ===
+    "delivered";
+
+  const isTransit = [
+    "posted",
+    "in_transit",
+  ].includes(shipping);
+
+  return (
+    <span
+      className={[
+        "inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
+        isDelivered ||
+          isTransit
+          ? "text-[#2b554e]"
+          : "text-[#b08d57]",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "h-1.5 w-1.5 rounded-full",
+          isDelivered ||
+            isTransit
+            ? "bg-[#2b554e]"
+            : "bg-[#b08d57]",
+        ].join(" ")}
+      />
+
+      {label}
+    </span>
+  );
+}
+
+function getCustomerOrderStatus(
+  order: Order
+) {
+  const shipping =
+    String(
+      order.shipping_status ||
+      ""
+    ).toLowerCase();
+
+  const fulfillment =
+    String(
+      order.fulfillment_status ||
+      ""
+    ).toLowerCase();
+
+  const payment =
+    String(
+      order.payment_status ||
+      ""
+    ).toLowerCase();
+
+  if (
+    shipping ===
+    "delivered"
+  ) {
+    return "Entregue";
+  }
+
+  if (
+    shipping ===
+    "in_transit"
+  ) {
+    return "A caminho";
+  }
+
+  if (
+    shipping === "posted"
+  ) {
+    return "Postado";
+  }
+
+  if (
+    shipping ===
+    "awaiting_post"
+  ) {
+    return "Pronto para envio";
+  }
+
+  if (
+    [
+      "picking",
+      "packed",
+      "ready_to_ship",
+    ].includes(fulfillment)
+  ) {
+    return "Preparando";
+  }
+
+  if (
+    payment === "paid"
+  ) {
+    return "Confirmado";
+  }
+
+  return translateOrderStatus(
+    order.status
+  );
+}
+
+/* =========================================================
+   ESTADOS DA PÁGINA
+========================================================= */
+
+function LoadingState() {
+  return (
+    <div className="flex min-h-[420px] items-center justify-center">
+      <div className="flex items-center gap-3 text-[#2b554e]">
+        <Loader2
+          className="animate-spin"
+          size={20}
+        />
+
+        <span className="text-sm">
+          Carregando sua
+          conta...
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function LoginRequired() {
+  return (
+    <div className="border-y border-[#2b554e]/10 py-16 text-center">
+      <User
+        size={24}
+        className="mx-auto text-[#b08d57]"
+      />
+
+      <h2 className="mt-5 font-serif text-[30px] text-[#2b554e]">
+        Acesse sua conta
+      </h2>
+
+      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#6f6558]">
+        Entre para acompanhar
+        seus pedidos e seus
+        dados.
+      </p>
+
+      <a
+        href="/login"
+        className="mt-7 inline-flex rounded-full bg-[#2b554e] px-7 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white"
+      >
+        Entrar
+      </a>
+    </div>
+  );
+}
+
+function ErrorState({
+  error,
+}: {
+  error: string;
+}) {
+  return (
+    <div className="border-y border-[#2b554e]/10 py-16 text-center">
+      <X
+        size={24}
+        className="mx-auto text-[#9c5555]"
+      />
+
+      <h2 className="mt-5 font-serif text-[30px] text-[#2b554e]">
+        Não conseguimos
+        carregar sua conta
+      </h2>
+
+      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#6f6558]">
+        {error}
+      </p>
+    </div>
+  );
+}
+
+function EmptyOrders() {
+  return (
+    <div className="border-y border-[#2b554e]/10 py-12">
+      <Package
+        size={22}
+        className="text-[#b08d57]"
+      />
+
+      <h3 className="mt-4 font-serif text-[26px] text-[#2b554e]">
+        Nenhum pedido por
+        aqui ainda.
+      </h3>
+
+      <p className="mt-2 max-w-md text-sm leading-6 text-[#6f6558]">
+        Quando você fizer uma
+        compra, ela aparecerá
+        aqui.
+      </p>
+
+      <a
+        href="/joias"
+        className="mt-6 inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.15em] text-[#2b554e]"
+      >
+        Ver semijoias
+
+        <ArrowRight
+          size={14}
+        />
+      </a>
+    </div>
+  );
+}
+
+/* =========================================================
+   TÍTULOS
+========================================================= */
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#b08d57]">
+        {eyebrow}
+      </p>
+
+      <h2 className="mt-2 font-serif text-[30px] font-normal leading-tight tracking-[-0.025em] text-[#2b554e] sm:text-[36px] md:text-[42px]">
+        {title}
+      </h2>
+
+      <p className="mt-3 max-w-[620px] text-sm leading-6 text-[#6f6558]">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+/* =========================================================
+   PRODUTOS
+========================================================= */
+
+function getItemName(
+  item: OrderItem
+) {
+  return (
+    item.skus?.products
+      ?.name ||
+    item.skus?.title ||
+    "Produto"
+  );
+}
+
+function getItemImage(
+  item: OrderItem
+) {
+  const images =
+    item.skus?.sku_images ||
+    [];
+
+  const primary =
+    images.find(
+      (image) =>
+        image.is_primary
+    ) ||
+    [...images].sort(
+      (a, b) =>
+        Number(
+          a.sort_order ?? 0
+        ) -
+        Number(
+          b.sort_order ?? 0
+        )
+    )[0];
+
+  if (!primary?.path) {
+    return "";
+  }
+
+  const { data } =
+    supabase.storage
+      .from(
+        "product-images"
+      )
+      .getPublicUrl(
+        primary.path
+      );
+
+  return data.publicUrl;
+}
+
+/* =========================================================
+   FORMATADORES
+========================================================= */
+
+function formatBRL(
+  value?: number | null
+) {
+  return new Intl.NumberFormat(
+    "pt-BR",
+    {
+      style: "currency",
+      currency: "BRL",
+    }
+  ).format(
+    (value ?? 0) / 100
+  );
+}
+
+function formatDateLong(
+  value?: string | null
+) {
+  if (!value) return "—";
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat(
+    "pt-BR",
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }
+  ).format(date);
+}
+
+function formatDate(
+  value?: string | null
+) {
+  if (!value) {
+    return "Não informado";
+  }
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "Não informado";
+  }
+
+  return date.toLocaleDateString(
+    "pt-BR",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }
+  );
+}
+
+function getFirstName(
+  value?: string | null
+) {
+  if (!value) return "";
+
+  return value
+    .trim()
+    .split(" ")[0];
+}
+
+/* =========================================================
+   CPF / TELEFONE
+========================================================= */
+
+function cleanDigits(
+  value?: string | null
+) {
+  return String(
+    value || ""
+  ).replace(/\D/g, "");
+}
+
+function cleanPhone(
+  value?: string | null
+) {
+  return cleanDigits(
+    value
+  ).slice(0, 11);
+}
+
+function formatPhoneInput(
+  value?: string | null
+) {
+  const digits =
+    cleanPhone(value);
+
+  if (
+    digits.length <= 2
+  ) {
+    return digits;
+  }
+
+  if (
+    digits.length <= 6
+  ) {
+    return `(${digits.slice(
+      0,
+      2
+    )}) ${digits.slice(2)}`;
+  }
+
+  if (
+    digits.length <= 10
+  ) {
+    return `(${digits.slice(
+      0,
+      2
+    )}) ${digits.slice(
+      2,
+      6
+    )}-${digits.slice(6)}`;
+  }
+
+  return `(${digits.slice(
+    0,
+    2
+  )}) ${digits.slice(
+    2,
+    7
+  )}-${digits.slice(7)}`;
+}
+
+function formatCpf(
+  value?: string | null
+) {
+  const digits =
+    cleanDigits(
+      value
+    ).slice(0, 11);
+
+  if (
+    digits.length <= 3
+  ) {
+    return digits;
+  }
+
+  if (
+    digits.length <= 6
+  ) {
+    return `${digits.slice(
+      0,
+      3
+    )}.${digits.slice(3)}`;
+  }
+
+  if (
+    digits.length <= 9
+  ) {
+    return `${digits.slice(
+      0,
+      3
+    )}.${digits.slice(
+      3,
+      6
+    )}.${digits.slice(6)}`;
+  }
+
+  return `${digits.slice(
+    0,
+    3
+  )}.${digits.slice(
+    3,
+    6
+  )}.${digits.slice(
+    6,
+    9
+  )}-${digits.slice(9)}`;
+}
+
+function maskDocument(
+  value?: string | null
+) {
+  if (!value) {
+    return "Não informado";
+  }
+
+  return formatCpf(value);
+}
+
+function maskPhone(
+  value?: string | null
+) {
+  if (!value) {
+    return "Não informado";
+  }
+
+  return formatPhoneInput(
+    value
+  );
+}
+
+/* =========================================================
+   STATUS
+========================================================= */
+
+function translateOrderStatus(
+  status?: string | null
+) {
+  const map: Record<
+    string,
+    string
+  > = {
+    pending_payment:
+      "Aguardando pagamento",
+
+    paid: "Confirmado",
+
+    processing:
+      "Preparando",
+
+    shipped: "Enviado",
+
+    delivered:
+      "Entregue",
+
+    canceled:
+      "Cancelado",
+
+    cancelled:
+      "Cancelado",
+
+    refunded:
+      "Reembolsado",
+  };
+
+  return (
+    map[
+    String(
+      status || ""
+    ).toLowerCase()
+    ] ||
+    status ||
+    "—"
+  );
+}
+
+/* =========================================================
+   ENDEREÇO
+========================================================= */
+
+function normalizeAddressPart(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function getAddressKey(address: Address) {
+  return [
+    normalizeAddressPart(address.cep).replace(/\D/g, ""),
+    normalizeAddressPart(address.street),
+    normalizeAddressPart(address.number),
+    normalizeAddressPart(address.complement),
+    normalizeAddressPart(address.neighborhood),
+    normalizeAddressPart(address.city),
+    normalizeAddressPart(address.state),
+  ].join("|");
+}
+
+function removeDuplicateAddresses(addresses: Address[]) {
+  const map = new Map<string, Address>();
+
+  addresses.forEach((address) => {
+    const key = getAddressKey(address);
+
+    const existing = map.get(key);
+
+    // Se existir duplicado, prioriza o marcado como principal
+    if (!existing || address.is_default) {
+      map.set(key, address);
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+function joinAddress(
+  address: Address
+) {
+  const line1 = [
+    address.street,
+    address.number,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const line2 = [
+    address.neighborhood,
+    address.city,
+    address.state,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  const zip =
+    address.cep
+      ? `CEP ${address.cep}`
+      : "";
+
+  return [
+    line1,
+    address.complement,
+    line2,
+    zip,
+  ].filter(Boolean);
+}
+
+
+
+/* =========================================================
+   CUPOM
+========================================================= */
+
+function normalizeCouponName(
+  value?: string | null
+) {
+  return String(
+    value || "CLIENTE"
+  )
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .replace(
+      /[^a-zA-Z0-9]/g,
+      ""
+    )
     .toUpperCase()
     .slice(0, 12);
 }
