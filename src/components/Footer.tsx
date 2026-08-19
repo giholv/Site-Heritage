@@ -289,7 +289,7 @@ const Footer: React.FC = () => {
             </p>
 
             <a
-              href="https://www.instagram.com/calea.blanc/"
+              href="https://www.instagram.com/calea.blanc?igsh=MWVnd3ExdWg5MmRx&utm_source=qr"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-4 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:text-[#d2b078]"

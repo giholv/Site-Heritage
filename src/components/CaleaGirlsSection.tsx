@@ -7,7 +7,7 @@ const images = [
 
 export default function CaleaGirlsSection() {
   return (
-    <section className="bg-[#FCFAF6] py-16 md:py-24">
+    <section className="bg-[#FCFAF6] py-12 md:py-24">
       <div className="mx-auto w-full max-w-[1540px] px-4 sm:px-6 md:px-8 lg:px-10">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
@@ -18,7 +18,7 @@ export default function CaleaGirlsSection() {
             <h2 className="mt-3 font-serif text-[34px] font-normal leading-[1.03] tracking-[-0.03em] text-[#2b554e] sm:text-[40px] md:text-[50px]">
               Nosso universo.
               <span className="ml-2 italic text-[#8a7660]">
-                A vida real.
+              Seu jeito de brilhar.
               </span>
             </h2>
           </div>

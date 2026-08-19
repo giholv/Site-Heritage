@@ -42,6 +42,7 @@ const AdminCupons = lazy(() => import("./pages/admin/AdminCupons"));
 const AdminParcerias = lazy(() => import("./pages/admin/AdminParcerias"));
 import AdminCustosPage from "./pages/admin/AdminCustosPage";
 import FAQPage from "./pages/FAQPage";
+import MysteryBoxPage from "./pages/MysteryBoxPage";
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -99,6 +100,7 @@ export default function App() {
           <Route path="/produto/:slug" element={<ProductPage />} />
           <Route path="/faq" element={<FAQPage />} />
           <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />
+          <Route  path="/box-misteriosa" element={<MysteryBoxPage />}/>
 
           <Route path="/admin" element={<AdminGuard />}>
             <Route element={<AdminLayout />}>
