@@ -6,14 +6,19 @@ import {
   CreditCard,
   Landmark,
   ShieldCheck,
+  ArrowLeft,
+  LockKeyhole,
+  ChevronRight,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Copy,
+  PackageCheck,
   ShoppingBag,
   User,
-  CheckCircle,
-  ArrowLeft,
+  XCircle,
 } from "lucide-react";
 
-import Header from "../components/Header";
-import Footer from "../components/Footer";
 import { supabase } from "../lib/supabase";
 
 const CALEA = {
@@ -441,64 +446,6 @@ async function createPagarmeCardToken(card: CardForm) {
   return data.id as string;
 }
 
-function Step({
-  label,
-  active,
-  done,
-  Icon,
-  onClick,
-}: {
-  label: string;
-  active?: boolean;
-  done?: boolean;
-  Icon: React.ElementType;
-  onClick?: () => void;
-}) {
-  const content = (
-    <>
-      <span
-        className={[
-          "inline-flex h-10 w-10 items-center justify-center rounded-full border transition",
-          active
-            ? "border-[#2b554e] bg-[#2b554e] text-white shadow-[0_10px_22px_rgba(43,85,78,0.18)]"
-            : done
-              ? "border-[#b08d57] bg-[#fff8ed] text-[#b08d57]"
-              : "border-[#ddd5ca] bg-white text-[#aaa197]",
-        ].join(" ")}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-
-      <span
-        className={[
-          "whitespace-nowrap text-[11px] sm:text-xs",
-          active ? "font-semibold text-[#2b554e]" : "text-[#9a9187]",
-        ].join(" ")}
-      >
-        {label}
-      </span>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex min-w-[82px] flex-col items-center gap-2"
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div className="flex min-w-[82px] flex-col items-center gap-2">
-      {content}
-    </div>
-  );
-}
-
 function buildPagarmeItemsWithDiscount(params: {
   items: any[];
   discountCents: number;
@@ -572,6 +519,134 @@ function buildPagarmeItemsWithDiscount(params: {
   });
 }
 
+
+type CheckoutView = "payment" | "confirmation";
+
+function getPagarmeOrder(paymentResponse: any) {
+  return paymentResponse?.order || paymentResponse?.data || paymentResponse || null;
+}
+
+function getPagarmeCharge(order: any) {
+  return order?.charges?.[0] || null;
+}
+
+function getPagarmeTransaction(charge: any) {
+  return charge?.last_transaction || charge?.transactions?.[0] || null;
+}
+
+function normalizePaymentStatus(status?: string | null) {
+  const value = String(status || "").toLowerCase();
+
+  if (["paid", "approved", "captured"].includes(value)) return "paid";
+  if (["failed", "refused", "denied", "not_authorized"].includes(value)) return "failed";
+  if (["canceled", "cancelled"].includes(value)) return "canceled";
+  if (["processing", "authorized"].includes(value)) return "processing";
+
+  return "pending";
+}
+
+function getConfirmationStatusLabel(status?: string | null) {
+  switch (normalizePaymentStatus(status)) {
+    case "paid":
+      return "Pagamento aprovado";
+    case "failed":
+      return "Pagamento recusado";
+    case "canceled":
+      return "Pedido cancelado";
+    case "processing":
+      return "Pagamento em análise";
+    default:
+      return "Aguardando pagamento";
+  }
+}
+
+function getConfirmationTitle(status?: string | null) {
+  switch (normalizePaymentStatus(status)) {
+    case "paid":
+      return "Pedido confirmado";
+    case "failed":
+      return "Pagamento recusado";
+    case "canceled":
+      return "Pedido cancelado";
+    case "processing":
+      return "Pagamento em análise";
+    default:
+      return "Pedido recebido";
+  }
+}
+
+function getConfirmationMessage(status?: string | null) {
+  switch (normalizePaymentStatus(status)) {
+    case "paid":
+      return "Seu pagamento foi aprovado. Agora vamos preparar seu pedido com todo cuidado.";
+    case "failed":
+      return "Não conseguimos aprovar o pagamento. Você pode tentar novamente.";
+    case "canceled":
+      return "Este pedido foi cancelado.";
+    case "processing":
+      return "Seu pagamento está em análise. A atualização acontecerá automaticamente.";
+    default:
+      return "Recebemos seu pedido. Aguardando a confirmação oficial do pagamento.";
+  }
+}
+
+function getConfirmationStatusIcon(status?: string | null) {
+  switch (normalizePaymentStatus(status)) {
+    case "paid":
+      return <CheckCircle size={30} />;
+    case "failed":
+      return <XCircle size={30} />;
+    case "canceled":
+      return <AlertCircle size={30} />;
+    case "processing":
+      return <Clock size={30} />;
+    default:
+      return <Clock size={30} />;
+  }
+}
+
+function getConfirmationStatusColors(status?: string | null) {
+  switch (normalizePaymentStatus(status)) {
+    case "paid":
+      return { bg: "#edf5f2", color: "#2b554e", border: "#cfe3dc" };
+    case "failed":
+      return { bg: "#fff1f2", color: "#b42318", border: "#fecdd3" };
+    case "canceled":
+      return { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" };
+    case "processing":
+      return { bg: "#fffbeb", color: "#a16207", border: "#fde68a" };
+    default:
+      return { bg: "#edf5f2", color: "#2b554e", border: "#cfe3dc" };
+  }
+}
+
+function getPaymentMethodLabel(method?: string | null) {
+  switch (method) {
+    case "pix":
+      return "Pix";
+    case "boleto":
+      return "Boleto";
+    case "credit_card":
+      return "Cartão de crédito";
+    case "debit_card":
+      return "Cartão de débito";
+    default:
+      return "Pagamento";
+  }
+}
+
+function isUuid(value?: string | null) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(value || "")
+  );
+}
+
+async function copyToClipboard(value?: string | null, onCopied?: () => void) {
+  if (!value) return;
+  await navigator.clipboard.writeText(value);
+  onCopied?.();
+}
+
 export default function CheckoutPagamento() {
   const navigate = useNavigate();
 
@@ -582,6 +657,8 @@ export default function CheckoutPagamento() {
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkoutView, setCheckoutView] = useState<CheckoutView>("payment");
+  const [paymentResponse, setPaymentResponse] = useState<any>(null);
 
   const checkoutDraft = useMemo(() => {
     const raw = sessionStorage.getItem("calea_checkout");
@@ -964,7 +1041,9 @@ export default function CheckoutPagamento() {
       }
 
       sessionStorage.setItem("calea_payment_response", JSON.stringify(data));
-      navigate("/checkout/confirmacao");
+      setPaymentResponse(data);
+      setCheckoutView("confirmation");
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
     } catch (e: any) {
       setError(getFriendlyError(e?.message || ""));
     } finally {
@@ -972,70 +1051,50 @@ export default function CheckoutPagamento() {
     }
   }
 
+  const displayTotal =
+    paymentMethod === "credit_card" && selectedInstallment
+      ? selectedInstallment.totalAmountCents / 100
+      : Number(checkoutDraft?.total || 0);
+
+  if (checkoutView === "confirmation" && paymentResponse) {
+    return (
+      <CheckoutConfirmationView
+        paymentResponse={paymentResponse}
+        checkoutDraft={checkoutDraft}
+        identification={identification}
+        selectedPaymentMethod={paymentMethod}
+        fallbackTotal={displayTotal}
+        onTryAgain={() => {
+          setError(null);
+          setCheckoutView("payment");
+          window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
-      <Header />
+    <div className="min-h-screen bg-[#fcfaf6] text-[#2b554e]">
+      <CheckoutHeader onBack={() => navigate("/checkout/identificacao")} />
 
-      <main className="pt-[128px] md:pt-[156px]">
-        <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
-          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-            <button
-              type="button"
-              onClick={() => navigate("/checkout/identificacao")}
-              className="mb-5 inline-flex items-center gap-2 text-sm text-[#756d63] transition hover:text-[#2b554e]"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar para identificação
-            </button>
-
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-[#b08d57]">
-                Checkout
-              </p>
-
-              <h1 className="mt-2 text-[30px] font-light leading-tight tracking-[-0.04em] text-[#2b554e] sm:text-[40px]">
-                Pagamento
-              </h1>
-
-              <p className="mt-2 max-w-xl text-sm leading-6 text-[#7a746c]">
-                Escolha a forma de pagamento para finalizar sua compra.
-              </p>
-            </div>
-
-            <div className="mt-8 overflow-x-auto pb-2">
-              <div className="flex min-w-max items-center gap-4 sm:min-w-0 sm:justify-between">
-                <Step
-                  label="Sacola"
-                  done
-                  Icon={ShoppingBag}
-                  onClick={() => navigate("/checkout")}
-                />
-
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-
-                <Step
-                  label="Identificação"
-                  done
-                  Icon={User}
-                  onClick={() => navigate("/checkout/identificacao")}
-                />
-
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-
-                <Step label="Pagamento" active Icon={CreditCard} />
-
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-
-                <Step label="Confirmação" Icon={CheckCircle} />
-              </div>
-            </div>
-          </div>
+      <main className="pb-28 lg:pb-16">
+        <section className="mx-auto max-w-6xl px-4 pb-5 pt-7 sm:px-6 sm:pb-7 sm:pt-9">
+          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#b08d57]">
+            Último passo
+          </p>
+          <h1 className="mt-2 font-serif text-[34px] font-normal leading-none tracking-[-0.03em] text-[#2b554e] sm:text-[42px]">
+            Como deseja pagar?
+          </h1>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-[#2b554e]/55">
+            Escolha a forma de pagamento e finalize sua compra com segurança.
+          </p>
+          <CheckoutProgress />
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_390px] lg:gap-7">
             <div className="space-y-6">
-              <section className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">                <div className="mb-6 flex items-center justify-between gap-4">
+              <section className="border-y border-[#e8dfd3] bg-white p-4 sm:rounded-[24px] sm:border sm:p-6">                <div className="mb-6 flex items-center justify-between gap-4">
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-full bg-[#fcfaf6] px-3 py-1 text-xs font-semibold text-[#2b554e] ring-1 ring-[#e9e2d6]">
                     <CreditCard className="h-3.5 w-3.5" />
@@ -1078,6 +1137,8 @@ export default function CheckoutPagamento() {
                 <div className="space-y-3">
                   {paymentSettings.pix_enabled && (
                     <label className="flex cursor-pointer items-center gap-3 rounded-[22px] border border-[#e7dccb] bg-[#fffdf9] p-4 transition hover:border-[#b08d57] hover:bg-[#fcfaf6]">                      <input
+                      id="payment-pix"
+                      name="paymentMethod"
                       type="radio"
                       checked={paymentMethod === "pix"}
                       onChange={() => setPaymentMethod("pix")}
@@ -1091,6 +1152,8 @@ export default function CheckoutPagamento() {
                   {paymentSettings.boleto_enabled && (
                     <label className="flex cursor-pointer items-center gap-3 rounded-[22px] border border-[#e7dccb] bg-[#fffdf9] p-4 transition hover:border-[#b08d57] hover:bg-[#fcfaf6]">
                       <input
+                        id="payment-boleto"
+                        name="paymentMethod"
                         type="radio"
                         checked={paymentMethod === "boleto"}
                         onChange={() => setPaymentMethod("boleto")}
@@ -1104,6 +1167,8 @@ export default function CheckoutPagamento() {
                   {paymentSettings.credit_card_enabled && (
                     <label className="flex cursor-pointer items-center gap-3 rounded-[22px] border border-[#e7dccb] bg-[#fffdf9] p-4 transition hover:border-[#b08d57] hover:bg-[#fcfaf6]">
                       <input
+                        id="payment-credit-card"
+                        name="paymentMethod"
                         type="radio"
                         checked={paymentMethod === "credit_card"}
                         onChange={() => setPaymentMethod("credit_card")}
@@ -1165,7 +1230,7 @@ export default function CheckoutPagamento() {
                     <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div className="md:col-span-2">
                         <div className="flex items-center justify-between">
-                          <label className="text-sm font-medium text-gray-700">
+                          <label htmlFor="card-number" className="text-sm font-medium text-gray-700">
                             Número do cartão
                           </label>
 
@@ -1177,6 +1242,9 @@ export default function CheckoutPagamento() {
                         </div>
 
                         <input
+                          id="card-number"
+                          name="cardNumber"
+                          autoComplete="cc-number"
                           value={cardForm.number}
                           onChange={(e) =>
                             updateCardField(
@@ -1197,10 +1265,13 @@ export default function CheckoutPagamento() {
                       </div>
 
                       <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-gray-700">
+                        <label htmlFor="card-holder-name" className="text-sm font-medium text-gray-700">
                           Nome impresso no cartão
                         </label>
                         <input
+                          id="card-holder-name"
+                          name="cardHolderName"
+                          autoComplete="cc-name"
                           value={cardForm.holderName}
                           onChange={(e) =>
                             updateCardField("holderName", e.target.value)
@@ -1211,10 +1282,13 @@ export default function CheckoutPagamento() {
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-gray-700">
+                        <label htmlFor="card-expiry" className="text-sm font-medium text-gray-700">
                           Validade
                         </label>
                         <input
+                          id="card-expiry"
+                          name="cardExpiry"
+                          autoComplete="cc-exp"
                           value={cardForm.expiry}
                           onChange={(e) =>
                             updateCardField(
@@ -1230,10 +1304,13 @@ export default function CheckoutPagamento() {
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-gray-700">
+                        <label htmlFor="card-cvv" className="text-sm font-medium text-gray-700">
                           CVV
                         </label>
                         <input
+                          id="card-cvv"
+                          name="cardCvv"
+                          autoComplete="cc-csc"
                           value={cardForm.cvv}
                           onChange={(e) =>
                             updateCardField(
@@ -1250,10 +1327,12 @@ export default function CheckoutPagamento() {
 
                       {paymentMethod === "credit_card" && (
                         <div className="md:col-span-2">
-                          <label className="text-sm font-medium text-gray-700">
+                          <label htmlFor="card-installments" className="text-sm font-medium text-gray-700">
                             Parcelas
                           </label>
                           <select
+                            id="card-installments"
+                            name="cardInstallments"
                             value={cardForm.installments}
                             onChange={(e) =>
                               updateCardField("installments", e.target.value)
@@ -1296,7 +1375,7 @@ export default function CheckoutPagamento() {
                   type="button"
                   onClick={handleCreateOrder}
                   disabled={loading}
-                  className="mt-6 w-full rounded-full py-4 text-sm font-semibold tracking-[0.08em] text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-6 hidden w-full py-4 text-sm font-semibold tracking-[0.08em] text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 lg:block"
                   style={{ backgroundColor: CALEA.primary }}
                 >
                   {loading ? "Processando..." : "Finalizar pagamento"}
@@ -1316,8 +1395,8 @@ export default function CheckoutPagamento() {
               </section>
             </div>
 
-            <aside className="h-fit space-y-6 lg:sticky lg:top-24">
-              <div className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+            <aside className="hidden h-fit space-y-6 lg:sticky lg:top-24 lg:block">
+              <div className="border-y border-[#e8dfd3] bg-white p-4 sm:rounded-[24px] sm:border sm:p-6">
                 <p className="text-[11px] uppercase tracking-[0.24em] text-[#b08d57]">
                   Resumo
                 </p>
@@ -1372,7 +1451,7 @@ export default function CheckoutPagamento() {
                     </span>
                   </div>
 
-                  {!!checkoutDraft?.giftWrapPrice && (
+                  {Boolean(checkoutDraft?.giftWrap) && Number(checkoutDraft?.giftWrapPrice || 0) > 0 && (
                     <div className="flex items-center justify-between">
                       <span className="text-gray-600">Presente</span>
                       <span className="font-semibold">
@@ -1422,7 +1501,759 @@ export default function CheckoutPagamento() {
         </section>
       </main>
 
-      <Footer />
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e5ddd2] bg-[#fcfaf6]/96 px-4 py-3 shadow-[0_-12px_35px_rgba(43,85,78,0.06)] backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <div className="min-w-[112px]">
+            <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#2b554e]/40">
+              Total
+            </p>
+            <p className="font-serif text-xl text-[#2b554e]">
+              {moneyBRL(displayTotal)}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCreateOrder}
+            disabled={loading}
+            className="flex h-12 flex-1 items-center justify-center gap-2 bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:bg-[#23463f] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {loading ? "Processando..." : "Finalizar pagamento"}
+            {!loading && <ChevronRight className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CheckoutHeader({
+  onBack,
+  backLabel = "Voltar para seus dados",
+}: {
+  onBack: () => void;
+  backLabel?: string;
+}) {
+  return (
+    <header className="sticky top-0 z-50 border-b border-[#e8dfd3] bg-[#fcfaf6]/95 backdrop-blur">
+      <div className="mx-auto grid h-[68px] max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 sm:h-[76px] sm:px-6">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 justify-self-start text-xs font-medium text-[#2b554e]/55 transition hover:text-[#2b554e]"
+          aria-label={backLabel}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">{backLabel}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => (window.location.href = "/")}
+          className="justify-self-center text-center"
+          aria-label="Ir para a loja Caléa"
+        >
+          <span className="block font-serif text-[20px] tracking-[0.11em] text-[#2b554e] sm:text-[22px]">
+            CALÉA
+          </span>
+          <span className="mt-[-2px] block text-[7px] font-medium uppercase tracking-[0.38em] text-[#b08d57]">
+            Blanc
+          </span>
+        </button>
+
+        <div className="inline-flex items-center gap-2 justify-self-end text-[10px] font-medium uppercase tracking-[0.12em] text-[#2b554e]/45">
+          <LockKeyhole className="h-3.5 w-3.5 text-[#2b554e]" />
+          <span className="hidden sm:inline">Compra segura</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function CheckoutProgress() {
+  return (
+    <div className="mt-7">
+      <div className="flex items-center justify-between text-[11px] font-medium">
+        <span className="text-[#2b554e]">
+          Pagamento
+        </span>
+
+        <span className="text-[#2b554e]/35">
+          3 de 4
+        </span>
+      </div>
+
+      <div className="mt-2 grid grid-cols-4 gap-1">
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#e4dbcf]" />
+      </div>
+    </div>
+  );
+}
+
+function CheckoutConfirmationView({
+  paymentResponse,
+  checkoutDraft,
+  identification,
+  selectedPaymentMethod,
+  fallbackTotal,
+  onTryAgain,
+}: {
+  paymentResponse: any;
+  checkoutDraft: any;
+  identification: any;
+  selectedPaymentMethod: PaymentMethod;
+  fallbackTotal: number;
+  onTryAgain: () => void;
+}) {
+  const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
+  const [dbOrderStatus, setDbOrderStatus] = useState<string | null>(null);
+  const [dbPaymentStatus, setDbPaymentStatus] = useState<string | null>(null);
+
+  const order = getPagarmeOrder(paymentResponse);
+  const charge = getPagarmeCharge(order);
+  const transaction = getPagarmeTransaction(charge);
+
+  const confirmationPaymentMethod =
+    charge?.payment_method ||
+    transaction?.payment_method ||
+    order?.payments?.[0]?.payment_method ||
+    paymentResponse?.paymentMethod ||
+    selectedPaymentMethod;
+
+  const rawStatus =
+    dbPaymentStatus ||
+    dbOrderStatus ||
+    charge?.status ||
+    transaction?.status ||
+    order?.status ||
+    paymentResponse?.status ||
+    "pending";
+
+  const status = normalizePaymentStatus(rawStatus);
+  const statusColors = getConfirmationStatusColors(status);
+
+  const initialOrderNumber =
+    paymentResponse?.local_order_number ||
+    paymentResponse?.order_number ||
+    paymentResponse?.orderNumber ||
+    identification?.order_number ||
+    identification?.orderNumber ||
+    sessionStorage.getItem("calea_order_number") ||
+    order?.metadata?.order_number ||
+    order?.metadata?.local_order_number ||
+    null;
+
+  const orderNumber =
+    initialOrderNumber && !isUuid(initialOrderNumber)
+      ? initialOrderNumber
+      : "Pedido em processamento";
+
+  const internalOrderId =
+    paymentResponse?.local_order_id ||
+    paymentResponse?.metadata?.local_order_id ||
+    paymentResponse?.order?.metadata?.local_order_id ||
+    order?.metadata?.local_order_id ||
+    sessionStorage.getItem("calea_order_id") ||
+    null;
+
+  useEffect(() => {
+    let mounted = true;
+    let intervalId: number | null = null;
+
+    async function loadOrderStatus() {
+      if (!internalOrderId || !isUuid(internalOrderId)) return;
+
+      const email = String(identification?.email || "").trim().toLowerCase();
+      if (!email) return;
+
+      try {
+        const response = await fetch("/.netlify/functions/get-order-status", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: internalOrderId,
+            email,
+          }),
+        });
+
+        const result = await response.json().catch(() => null);
+        if (!mounted) return;
+
+        if (!response.ok || !result?.ok) {
+          console.error(
+            "Erro ao buscar status do pedido:",
+            result?.error || `HTTP ${response.status}`
+          );
+          return;
+        }
+
+        const nextOrderStatus = result.order?.status || null;
+        const nextPaymentStatus = result.order?.paymentStatus || null;
+
+        setDbOrderStatus(nextOrderStatus);
+        setDbPaymentStatus(nextPaymentStatus);
+
+        const normalizedOrderStatus = normalizePaymentStatus(nextOrderStatus);
+        const normalizedPaymentStatus = normalizePaymentStatus(nextPaymentStatus);
+
+        if (
+          normalizedOrderStatus === "paid" ||
+          normalizedOrderStatus === "failed" ||
+          normalizedOrderStatus === "canceled" ||
+          normalizedPaymentStatus === "paid" ||
+          normalizedPaymentStatus === "failed" ||
+          normalizedPaymentStatus === "canceled"
+        ) {
+          if (intervalId !== null) {
+            window.clearInterval(intervalId);
+            intervalId = null;
+          }
+        }
+      } catch (pollError) {
+        if (!mounted) return;
+        console.error("Erro ao consultar status do pedido:", pollError);
+      }
+    }
+
+    loadOrderStatus();
+    intervalId = window.setInterval(loadOrderStatus, 5000);
+
+    return () => {
+      mounted = false;
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [internalOrderId, identification?.email]);
+
+  const pixQrCode =
+    transaction?.qr_code ||
+    transaction?.qrCode ||
+    transaction?.pix_qr_code ||
+    transaction?.payload ||
+    transaction?.emv;
+
+  const pixQrCodeUrl =
+    transaction?.qr_code_url ||
+    transaction?.qrCodeUrl ||
+    transaction?.pix_qr_code_url;
+
+  const boletoUrl =
+    transaction?.url ||
+    transaction?.pdf ||
+    transaction?.boleto_url ||
+    transaction?.document_url;
+
+  const boletoBarcode =
+    transaction?.barcode ||
+    transaction?.line ||
+    transaction?.digitable_line ||
+    transaction?.nosso_numero;
+
+  const providerTotal =
+    Number(order?.amount || charge?.amount || 0) > 0
+      ? Number(order?.amount || charge?.amount || 0) / 100
+      : 0;
+
+  const total = providerTotal || fallbackTotal || Number(checkoutDraft?.total || 0);
+  const couponCode = getCheckoutCouponCode(checkoutDraft);
+  const discountCents = getCheckoutDiscountCents(checkoutDraft);
+  const discountValue = discountCents / 100;
+
+  const isPix = confirmationPaymentMethod === "pix";
+  const isBoleto = confirmationPaymentMethod === "boleto";
+  const isCard =
+    confirmationPaymentMethod === "credit_card" ||
+    confirmationPaymentMethod === "debit_card";
+
+  return (
+    <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6] text-[#2b554e]">
+      <CheckoutHeader
+        onBack={() => navigate("/")}
+        backLabel="Voltar para a loja"
+      />
+
+      <main className="pb-16">
+        <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[#b08d57]">
+                  Checkout
+                </p>
+
+                <h1 className="mt-2 font-serif text-[34px] font-normal leading-none tracking-[-0.03em] text-[#2b554e] sm:text-[42px]">
+                  Confirmação do pedido
+                </h1>
+
+                <p className="mt-3 max-w-xl text-sm leading-6 text-[#2b554e]/55">
+                  Acompanhe o status do pagamento e os detalhes da sua compra.
+                </p>
+              </div>
+
+              <div className="rounded-full border border-[#e5dbce] bg-white px-4 py-2 text-sm text-[#2b554e] shadow-sm">
+                {getConfirmationStatusLabel(status)}
+              </div>
+            </div>
+
+            <ConfirmationProgress />
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_390px] lg:items-start lg:gap-7">
+            <div className="space-y-5">
+              <section className="border-y border-[#e8dfd3] bg-white p-5 sm:rounded-[24px] sm:border sm:p-7">
+                <div className="flex items-start gap-4">
+                  <div
+                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border"
+                    style={{
+                      backgroundColor: statusColors.bg,
+                      color: statusColors.color,
+                      borderColor: statusColors.border,
+                    }}
+                  >
+                    {getConfirmationStatusIcon(status)}
+                  </div>
+
+                  <div>
+                    <h2
+                      className="font-serif text-[30px] font-normal leading-tight tracking-[-0.03em] sm:text-[36px]"
+                      style={{ color: statusColors.color }}
+                    >
+                      {getConfirmationTitle(status)}
+                    </h2>
+
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-[#6f675e]">
+                      {getConfirmationMessage(status)}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="mt-7 rounded-[24px] border bg-[#fcfaf6] p-5"
+                  style={{ borderColor: statusColors.border }}
+                >
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#9a9187]">
+                    Número do pedido
+                  </p>
+
+                  <p className="mt-2 break-all text-2xl font-semibold tracking-[-0.03em] text-[#2b554e]">
+                    {orderNumber}
+                  </p>
+
+                  <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <ConfirmationInfoBox
+                      label="Status"
+                      value={getConfirmationStatusLabel(status)}
+                      color={statusColors.color}
+                    />
+                    <ConfirmationInfoBox
+                      label="Pagamento"
+                      value={getPaymentMethodLabel(confirmationPaymentMethod)}
+                    />
+                    <ConfirmationInfoBox label="Total" value={moneyBRL(total)} />
+                  </div>
+                </div>
+
+                {isPix && status !== "failed" && (
+                  <ConfirmationPaymentBox
+                    icon={<QrCode />}
+                    title="Pagamento via Pix"
+                    description="Escaneie o QR Code ou copie o código Pix abaixo."
+                  >
+                    {pixQrCodeUrl && (
+                      <div className="mt-5 flex justify-center">
+                        <img
+                          src={pixQrCodeUrl}
+                          alt="QR Code Pix"
+                          className="h-56 w-56 rounded-3xl border border-[#e9e2d6] bg-white p-3"
+                        />
+                      </div>
+                    )}
+
+                    {pixQrCode && (
+                      <div className="mt-5">
+                        <label
+                          htmlFor="pix-copy-paste"
+                          className="text-sm font-medium text-[#5f5850]"
+                        >
+                          Pix copia e cola
+                        </label>
+
+                        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_130px]">
+                          <textarea
+                            id="pix-copy-paste"
+                            name="pix-copy-paste"
+                            readOnly
+                            value={pixQrCode}
+                            className="h-24 resize-none rounded-2xl border border-[#e9e2d6] bg-[#fcfaf6] p-3 text-xs text-[#5f5850] outline-none"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyToClipboard(pixQrCode, () => {
+                                setCopied(true);
+                                window.setTimeout(() => setCopied(false), 1800);
+                              })
+                            }
+                            className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#2b554e] px-4 text-sm font-semibold text-white"
+                          >
+                            <Copy size={17} />
+                            {copied ? "Copiado" : "Copiar"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </ConfirmationPaymentBox>
+                )}
+
+                {isBoleto && status !== "failed" && (
+                  <ConfirmationPaymentBox
+                    icon={<Landmark />}
+                    title="Pagamento via boleto"
+                    description="Use a linha digitável ou abra o boleto para pagamento."
+                  >
+                    {boletoBarcode && (
+                      <div className="mt-5">
+                        <label
+                          htmlFor="boleto-barcode"
+                          className="text-sm font-medium text-[#5f5850]"
+                        >
+                          Linha digitável
+                        </label>
+
+                        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_130px]">
+                          <input
+                            id="boleto-barcode"
+                            name="boleto-barcode"
+                            readOnly
+                            value={boletoBarcode}
+                            className="h-12 rounded-full border border-[#e9e2d6] bg-[#fcfaf6] px-4 text-sm text-[#5f5850] outline-none"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyToClipboard(boletoBarcode, () => {
+                                setCopied(true);
+                                window.setTimeout(() => setCopied(false), 1800);
+                              })
+                            }
+                            className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#2b554e] px-4 text-sm font-semibold text-white"
+                          >
+                            <Copy size={17} />
+                            {copied ? "Copiado" : "Copiar"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {boletoUrl && (
+                      <a
+                        href={boletoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-5 inline-flex rounded-full bg-[#b08d57] px-6 py-3 text-sm font-semibold text-white"
+                      >
+                        Abrir boleto
+                      </a>
+                    )}
+                  </ConfirmationPaymentBox>
+                )}
+
+                {isCard && (
+                  <ConfirmationPaymentBox
+                    icon={<CreditCard />}
+                    title="Pagamento com cartão"
+                    description={
+                      status === "failed"
+                        ? "O pagamento foi recusado. Confira os dados do cartão ou tente outra forma de pagamento."
+                        : status === "paid"
+                          ? "Pagamento aprovado com sucesso."
+                          : "Seu pagamento foi enviado para processamento."
+                    }
+                  />
+                )}
+
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  {status === "failed" && (
+                    <button
+                      type="button"
+                      onClick={onTryAgain}
+                      className="rounded-full bg-[#b08d57] px-6 py-3 text-center text-sm font-semibold text-white"
+                    >
+                      Tentar novamente
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => navigate("/")}
+                    className="rounded-full border border-[#e9e2d6] px-6 py-3 text-center text-sm font-semibold text-[#2b554e]"
+                  >
+                    Voltar para início
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate("/joias")}
+                    className="rounded-full bg-[#2b554e] px-6 py-3 text-center text-sm font-semibold text-white"
+                  >
+                    Continuar comprando
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <aside className="h-fit space-y-5 lg:sticky lg:top-24">
+              <div className="border-y border-[#e8dfd3] bg-white p-5 sm:rounded-[24px] sm:border sm:p-6">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-[#b08d57]">
+                  Resumo
+                </p>
+                <h2 className="mt-2 text-lg font-semibold text-[#2b554e]">
+                  Seu pedido
+                </h2>
+
+                <div className="mt-5 space-y-5 text-sm">
+                  <ConfirmationSummaryBlock title="Cliente">
+                    <p className="font-medium text-[#2b554e]">
+                      {identification?.name || "-"}
+                    </p>
+                    <p className="text-[#7a746c]">
+                      {identification?.email || "-"}
+                    </p>
+                  </ConfirmationSummaryBlock>
+
+                  <ConfirmationSummaryBlock title="Entrega">
+                    <p className="text-[#5f5850]">
+                      {identification?.street || "-"}, {identification?.number || "-"}
+                    </p>
+                    <p className="text-[#7a746c]">
+                      {identification?.neighborhood || "-"} - {identification?.city || "-"}/
+                      {identification?.state || "-"}
+                    </p>
+                    <p className="text-[#7a746c]">
+                      CEP: {identification?.zipCode || identification?.cep || "-"}
+                    </p>
+                  </ConfirmationSummaryBlock>
+
+                  <ConfirmationSummaryBlock title="Itens">
+                    <div className="space-y-3">
+                      {checkoutDraft?.items?.length ? (
+                        checkoutDraft.items.map((item: any) => (
+                          <div
+                            key={item.id || item.sku_id || item.name}
+                            className="flex justify-between gap-3"
+                          >
+                            <div>
+                              <p className="font-medium text-[#2b554e]">
+                                {item.name}
+                              </p>
+                              <p className="text-xs text-[#8a8175]">
+                                Qtd: {item.qty || item.quantity || 1}
+                              </p>
+                            </div>
+
+                            <p className="font-medium text-[#2b554e]">
+                              {moneyBRL(Number(item.price || 0))}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[#7a746c]">Nenhum item encontrado.</p>
+                      )}
+                    </div>
+                  </ConfirmationSummaryBlock>
+
+                  <div className="space-y-3">
+                    <ConfirmationSummaryLine
+                      label="Subtotal"
+                      value={moneyBRL(checkoutDraft?.subtotal || 0)}
+                    />
+
+                    {discountCents > 0 && (
+                      <ConfirmationSummaryLine
+                        label={`Desconto${couponCode ? ` (${couponCode})` : ""}`}
+                        value={`- ${moneyBRL(discountValue)}`}
+                        success
+                      />
+                    )}
+
+                    <ConfirmationSummaryLine
+                      label="Frete"
+                      value={
+                        Boolean(checkoutDraft?.shipping) &&
+                        (
+                          checkoutDraft?.free_shipping_applied ||
+                          checkoutDraft?.coupon?.discount_type === "free_shipping" ||
+                          Number(checkoutDraft?.shippingPrice || 0) === 0
+                        )
+                          ? "Grátis"
+                          : moneyBRL(checkoutDraft?.shippingPrice || 0)
+                      }
+                      success={
+                        Boolean(checkoutDraft?.shipping) &&
+                        (
+                          checkoutDraft?.free_shipping_applied ||
+                          checkoutDraft?.coupon?.discount_type === "free_shipping" ||
+                          Number(checkoutDraft?.shippingPrice || 0) === 0
+                        )
+                      }
+                    />
+
+                    {!!checkoutDraft?.giftWrapPrice && (
+                      <ConfirmationSummaryLine
+                        label="Presente"
+                        value={moneyBRL(checkoutDraft.giftWrapPrice)}
+                      />
+                    )}
+                  </div>
+
+                  <div className="h-px bg-[#eee5d8]" />
+
+                  <div className="rounded-3xl bg-[#2b554e] p-5 text-white">
+                    <div className="flex items-end justify-between gap-4">
+                      <div>
+                        <p className="text-sm text-white/70">Total</p>
+                        <p className="text-xs text-white/50">Pedido finalizado</p>
+                      </div>
+
+                      <span className="text-[26px] font-semibold tracking-[-0.04em]">
+                        {moneyBRL(total)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-2xl bg-[#fcfaf6] p-4">
+                  <div className="flex items-start gap-3">
+                    <PackageCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#2b554e]" />
+                    <p className="text-xs leading-5 text-[#7a746c]">
+                      Você receberá atualizações pelo e-mail informado na compra.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function ConfirmationProgress() {
+  return (
+    <div className="mt-7">
+      <div className="flex items-center justify-between text-[11px] font-medium">
+        <span className="text-[#2b554e]">
+          Confirmação
+        </span>
+
+        <span className="text-[#2b554e]/35">
+          4 de 4
+        </span>
+      </div>
+
+      <div className="mt-2 grid grid-cols-4 gap-1">
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#2b554e]" />
+      </div>
+    </div>
+  );
+}
+
+function ConfirmationInfoBox({
+  label,
+  value,
+  color = "#2b554e",
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-white p-4">
+      <p className="text-xs text-[#9a9187]">{label}</p>
+      <p className="mt-1 font-semibold" style={{ color }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function ConfirmationPaymentBox({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="mt-6 rounded-[24px] border border-[#e9e2d6] bg-white p-5">
+      <div className="flex items-center gap-3 text-[#2b554e]">
+        {icon}
+        <h3 className="text-lg font-semibold">{title}</h3>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#7a746c]">{description}</p>
+      {children}
+    </div>
+  );
+}
+
+function ConfirmationSummaryBlock({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs uppercase tracking-[0.16em] text-[#9a9187]">
+        {title}
+      </p>
+      {children}
+      <div className="mt-5 h-px bg-[#eee5d8]" />
+    </div>
+  );
+}
+
+function ConfirmationSummaryLine({
+  label,
+  value,
+  success,
+}: {
+  label: string;
+  value: string;
+  success?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-[#6f675e]">{label}</span>
+      <span
+        className={
+          success
+            ? "font-semibold text-emerald-700"
+            : "font-semibold text-[#2b554e]"
+        }
+      >
+        {value}
+      </span>
     </div>
   );
 }

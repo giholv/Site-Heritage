@@ -48,7 +48,23 @@ const Header: React.FC<HeaderProps> = ({
 
   const q = searchValue ?? qLocal;
   const navigate = useNavigate();
-  const location = useLocation();
+
+  const handleLogoClick = () => {
+    setIsOpen(false);
+    setSearchOpen(false);
+    setAccountMenuOpen(false);
+
+    if (location.pathname !== "/") {
+      navigate("/");
+    }
+
+    window.setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    }, 50);
+  };
 
   const isHomePage = location.pathname === "/";
   const isProductPage = location.pathname.startsWith("/produto/");
@@ -63,12 +79,13 @@ const Header: React.FC<HeaderProps> = ({
 
   const showHeaderSound = !isAdminPage && !showFloatingSound;
 
-const menuItems: MenuItem[] = [
-  { label: "SHOP", type: "route", to: "/joias" },
-  { label: "BEST SELLERS", type: "route", to: "/?tab=best-sellers#semijoias" },
-  { label: "FAQ", type: "section", id: "faq" },
-  { label: "SEU MATCH CALÉA", type: "section", id: "style-quiz" },
-];
+  const menuItems: MenuItem[] = [
+    { label: "SHOP", type: "route", to: "/joias" },
+
+    { label: "BEST SELLERS", type: "route", to: "/?tab=best-sellers#semijoias" },
+    { label: "FAQ", type: "section", id: "faq" },
+    { label: "SEU MATCH CALÉA", type: "section", id: "style-quiz" },
+  ];
 
   const setQ = (v: string) => {
     onSearchChange?.(v);
@@ -303,14 +320,31 @@ const menuItems: MenuItem[] = [
               {/* LOGO CENTRAL ABSOLUTA */}
               <button
                 type="button"
-                onClick={() => navigate("/")}
+                onClick={handleLogoClick}
                 aria-label="Ir para Home"
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                className="
+    absolute
+    left-1/2
+    top-1/2
+    z-30
+    -translate-x-1/2
+    -translate-y-1/2
+    cursor-pointer
+    pointer-events-auto
+  "
               >
                 <img
                   src="/logo_fundo_escuro_mobile.png"
                   alt="Caléa Blanc"
-                  className="w-[142px] h-auto object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.08)] md:w-[156px] lg:w-[168px] xl:w-[178px]"
+                  className="
+      h-auto
+      w-[142px]
+      object-contain
+      drop-shadow-[0_2px_10px_rgba(0,0,0,0.08)]
+      md:w-[156px]
+      lg:w-[168px]
+      xl:w-[178px]
+    "
                 />
               </button>
 

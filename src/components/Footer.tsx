@@ -1,101 +1,330 @@
-import React from "react";
-import { Instagram, Mail, Phone, MapPin } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Link } from "./ui/Link";
+
+import {
+  Instagram,
+  Mail,
+  Phone,
+  MapPin,
+  ArrowUpRight,
+} from "lucide-react";
+import {
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
+import React, { useState } from "react";
+import { supabase } from "../lib/supabase";
+
+
 
 const Footer: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [newsletterMessage, setNewsletterMessage] = useState("");
+  const [newsletterSuccess, setNewsletterSuccess] = useState(false);
 
   const navItems = [
-    { label: "Início", id: "home" },
-    { label: "Encontre Sua Joia", id: "categorias" },
-    { label: "Lançamentos", id: "semijoias" },
-    { label: "Sobre Nós", id: "about" },
-    { label: "Contato", id: "contact" },
+    {
+      label: "Início",
+      type: "section",
+      id: "home",
+    },
+    {
+      label: "Encontre Sua Joia",
+      type: "section",
+      id: "categorias",
+    },
+    {
+      label: "Lançamentos",
+      type: "section",
+      id: "semijoias",
+    },
+    {
+      label: "Quem Somos",
+      type: "route",
+      path: "/faq#quem-somos",
+    },
+    {
+      label: "FAQ",
+      type: "route",
+      path: "/faq#perguntas",
+    },
   ];
 
-  const scrollToId = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    else window.location.hash = id;
-  };
+  function scrollToId(id: string) {
+    const element = document.getElementById(id);
 
-  const goSection = (id: string) => {
-    // já na home → só scroll
+    if (element) {
+      element.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      return;
+    }
+
+    window.location.hash = id;
+  }
+
+
+  function goSection(id: string) {
     if (location.pathname === "/") {
       scrollToId(id);
       return;
     }
 
-    // outra rota → vai pra home e espera renderizar
-    navigate("/", { replace: false });
+    navigate("/");
 
     let tries = 0;
-    const t = setInterval(() => {
+
+    const timer = window.setInterval(() => {
       tries += 1;
-      const el = document.getElementById(id);
-      if (el) {
-        clearInterval(t);
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else if (tries >= 40) {
-        clearInterval(t);
-        window.location.hash = id;
+
+      const element =
+        document.getElementById(id);
+
+      if (element) {
+        window.clearInterval(timer);
+
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+
+      if (tries >= 40) {
+        window.clearInterval(timer);
       }
     }, 50);
-  };
+  }
+  async function handleNewsletterSubmit(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
 
+    const email = newsletterEmail
+      .trim()
+      .toLowerCase();
+
+    setNewsletterMessage("");
+    setNewsletterSuccess(false);
+
+    if (!email) {
+      setNewsletterMessage("Digite seu e-mail.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setNewsletterMessage("Digite um e-mail válido.");
+      return;
+    }
+
+    try {
+      setNewsletterLoading(true);
+
+      const { error } = await supabase
+        .from("newsletter_subscribers")
+        .insert({
+          email,
+          source: "footer",
+        });
+
+      if (error) {
+        if (error.code === "23505") {
+          setNewsletterSuccess(true);
+          setNewsletterMessage(
+            "Você já faz parte do universo Caléa ✦"
+          );
+          return;
+        }
+
+        throw error;
+      }
+
+      setNewsletterSuccess(true);
+      setNewsletterMessage(
+        "Bem-vinda ao universo Caléa ✦"
+      );
+
+      setNewsletterEmail("");
+    } catch (error) {
+      console.error(
+        "Erro ao cadastrar newsletter:",
+        error
+      );
+
+      setNewsletterMessage(
+        "Não foi possível cadastrar agora. Tente novamente."
+      );
+    } finally {
+      setNewsletterLoading(false);
+    }
+  }
   return (
-    <footer className="bg-[#2b554e] text-[#FCFAF6] pt-14 pb-8">
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-          {/* Marca */}
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <button
-                type="button"
-                onClick={() => navigate("/")}
-                className="inline-flex items-center"
-                aria-label="Ir para Home"
-              >
-                <img
-                  src="/logo_fundo_escuro.svg"
-                  alt="Caléa Logo"
-                  className="h-[95px] w-auto object-contain"
-                />
-              </button>
-            </div>
+    <footer className="bg-[#173a35] text-[#FCFAF6]">
 
-            <p className="text-[#FCFAF6]/75 text-sm leading-relaxed">
-              Semijoias com estética clean, brilho elegante e acabamento premium — feitas pra acompanhar sua fase.
+      {/* NEWSLETTER */}
+      <section className="border-b border-white/10">
+        <div className="mx-auto grid w-full max-w-[1540px] gap-8 px-5 py-10 sm:px-6 md:px-8 lg:grid-cols-[1fr_1fr] lg:items-end lg:px-10 lg:py-14">
+
+          <div>
+
+            <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#d2b078]">
+              Assine e entre para o universo Caléa
             </p>
 
-            <div className="mt-5 flex items-center gap-4">
-              <a
-                href="https://www.instagram.com/calea.blanc/?utm_source=ig_web_button_share_sheet"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="text-[#FCFAF6]/80 hover:text-[#b08d57] transition-colors"
-              >
-                <Instagram className="h-5 w-5" />
-              </a>
-            </div>
+            <h2 className="mt-3 max-w-[520px] font-serif text-[30px] font-normal leading-[1.05] tracking-[-0.03em] text-[#FCFAF6] md:text-[40px]">
+              Novidades que chegam
+              <span className="ml-2 italic text-[#d2b078]">
+                primeiro a você.
+              </span>
+            </h2>
+
+            <p className="mt-5 max-w-[460px] text-sm leading-6 text-white/60">
+              Receba lançamentos, curadorias e novidades da Caléa.
+            </p>
           </div>
 
-          {/* Links rápidos */}
           <div>
-            <h3 className="text-sm font-semibold tracking-wide text-[#FCFAF6] mb-4">
-              Navegação
-            </h3>
+            <form
+              onSubmit={handleNewsletterSubmit}
+              className="flex border-b border-white/30"
+            >
+              <input
+                type="email"
+                value={newsletterEmail}
+                onChange={(event) =>
+                  setNewsletterEmail(event.target.value)
+                }
+                placeholder="Seu melhor e-mail"
+                autoComplete="email"
+                className="
+      h-14
+      min-w-0
+      flex-1
+      bg-transparent
+      px-0
+      text-sm
+      text-white
+      outline-none
+      placeholder:text-white/45
+    "
+              />
 
-            <ul className="space-y-2 text-sm">
+              <button
+                type="submit"
+                disabled={newsletterLoading}
+                className="
+      px-4
+      text-[9px]
+      font-semibold
+      uppercase
+      tracking-[0.16em]
+      text-[#d2b078]
+      transition
+      hover:text-white
+      disabled:cursor-not-allowed
+      disabled:opacity-50
+    "
+              >
+                {newsletterLoading
+                  ? "Enviando..."
+                  : "Quero receber"}
+              </button>
+            </form>
+
+
+            {newsletterMessage && (
+              <p
+                className={[
+                  "mt-3 text-[10px] leading-4",
+                  newsletterSuccess
+                    ? "text-[#d2b078]"
+                    : "text-red-300",
+                ].join(" ")}
+              >
+                {newsletterMessage}
+              </p>
+            )}
+            <p className="mt-3 max-w-[270px] text-[9px] leading-4 text-white/35 md:max-w-none md:text-[10px] md:leading-5">
+              Ao se cadastrar, você concorda com nossa Política de Privacidade.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* CONTEÚDO PRINCIPAL */}
+      <div className="mx-auto w-full max-w-[1540px] px-5 py-12 sm:px-6 md:px-8 lg:px-10 lg:py-16">
+
+        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-[1.25fr_0.8fr_0.9fr_1fr]">
+
+          {/* MARCA */}
+          {/* MARCA */}
+          <div>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              aria-label="Ir para Home"
+              className="inline-flex items-center"
+            >
+              <div className="flex h-[46px] w-[120px] items-center justify-start overflow-hidden">
+                <img
+                  src="/Logo (3).png"
+                  alt="Caléa"
+                  className="
+          h-full
+          w-full
+          scale-[1.15]
+          object-contain
+          object-left
+        "
+                />
+              </div>
+            </button>
+
+            <p className="mt-2 max-w-[310px] text-sm leading-7 text-white/60">
+              Semijoias pensadas para realçar,
+              acompanhar e fazer parte das suas
+              diferentes versões.
+            </p>
+
+            <a
+              href="https://www.instagram.com/calea.blanc/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:text-[#d2b078]"
+            >
+              <Instagram size={16} />
+              @calea.blanc
+              <ArrowUpRight size={13} />
+            </a>
+          </div>
+
+          {/* NAVEGAÇÃO */}
+          <div>
+            <p className="mb-5 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#d2b078]">
+              Navegue
+            </p>
+
+            <ul className="space-y-3">
               {navItems.map((item) => (
-                <li key={item.id}>
+                <li key={item.label}>
                   <button
                     type="button"
-                    onClick={() => goSection(item.id)}
-                    className="text-[#FCFAF6]/75 hover:text-[#b08d57] transition-colors"
+                    onClick={() => {
+                      if (
+                        item.type === "route" &&
+                        item.path
+                      ) {
+                        navigate(item.path);
+                        return;
+                      }
+
+                      if (item.id) {
+                        goSection(item.id);
+                      }
+                    }}
+                    className="text-sm text-white/65 transition hover:text-white"
                   >
                     {item.label}
                   </button>
@@ -104,94 +333,127 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Confiança / políticas */}
+          {/* AJUDA */}
           <div>
-            <h3 className="text-sm font-semibold tracking-wide text-[#FCFAF6] mb-4">
-              Compra segura
-            </h3>
+            <p className="mb-5 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#d2b078]">
+              Ajuda
+            </p>
 
-            <ul className="space-y-2 text-sm text-[#FCFAF6]/75">
-              <li>• 5% OFF na primeira compra: <strong>BOASVINDAS</strong></li>
-              <li>• Troca fácil</li>
-              <li>• Atendimento pelo WhatsApp</li>
-            </ul>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate("/faq#perguntas")
+                }
+                className="block text-sm text-white/65 transition hover:text-white"
+              >
+                Perguntas frequentes
+              </button>
 
-            <div className="mt-5 rounded-2xl border border-[#FCFAF6]/15 bg-[#FCFAF6]/10 p-3">
-        
-              <img
-                src="/Bandeiras-horizontal-grande.svg"
-                alt="Pix, Visa, Mastercard, American Express, Elo e Hipercard"
-                className="h-auto max-h-12 w-auto object-contain opacity-90"
-              />
-            </div>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate("/faq#perguntas")
+                }
+                className="block text-sm text-white/65 transition hover:text-white"
+              >
+                Trocas e devoluções
+              </button>
 
-            <div className="mt-4">
-              <span className="inline-flex items-center rounded-full border border-[#b08d57]/40 bg-[#FCFAF6]/10 px-3 py-1 text-xs text-[#FCFAF6]">
-                ✦ Acabamento premium • Brilho elegante
-              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate("/politica-de-privacidade")
+                }
+                className="block text-sm text-white/65 transition hover:text-white"
+              >
+                Política de Privacidade
+              </button>
+
+              <p className="text-sm text-white/65">
+                Envio para todo o Brasil
+              </p>
             </div>
           </div>
 
-          {/* Contato */}
-          <div>
-            <h3 className="text-sm font-semibold tracking-wide text-[#FCFAF6] mb-4">
+          {/* CONTATO */}
+          <div id="contact">
+            <p className="mb-5 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#d2b078]">
               Fale com a gente
-            </h3>
+            </p>
 
-            <div className="space-y-3 text-sm">
-              <div className="flex items-start gap-3 text-[#FCFAF6]/75">
-                <Mail className="h-4 w-4 mt-0.5 text-[#b08d57]" />
-                <a
-                  href="mailto:contato@calea.com.br"
-                  className="hover:text-[#b08d57] transition-colors"
-                >
-                  contato@calea.com.br
-                </a>
-              </div>
+            <div className="space-y-4">
 
-              <div className="flex items-start gap-3 text-[#FCFAF6]/75">
-                <Phone className="h-4 w-4 mt-0.5 text-[#b08d57]" />
-                <a
-                  href="tel:+5511997946257"
-                  className="hover:text-[#b08d57] transition-colors"
-                >
-                  +55 (11) 99794-6257
-                </a>
-              </div>
+              <a
+                href="mailto:contato@calea.com.br"
+                className="flex items-start gap-3 text-sm text-white/65 transition hover:text-white"
+              >
+                <Mail
+                  size={15}
+                  className="mt-0.5 text-[#d2b078]"
+                />
 
-              <div className="flex items-start gap-3 text-[#FCFAF6]/75">
-                <MapPin className="h-4 w-4 mt-0.5 text-[#b08d57]" />
+                contato@calea.com.br
+              </a>
+
+              <a
+                href="https://wa.me/5511997946257"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-3 text-sm text-white/65 transition hover:text-white"
+              >
+                <Phone
+                  size={15}
+                  className="mt-0.5 text-[#d2b078]"
+                />
+
+                +55 (11) 99794-6257
+              </a>
+
+              <div className="flex items-start gap-3 text-sm text-white/65">
+                <MapPin
+                  size={15}
+                  className="mt-0.5 text-[#d2b078]"
+                />
+
                 <p>
-                  Sorocaba • SP <br />
-                  Envio para todo o Brasil
+                  Sorocaba • SP
+                  <br />
+                  Brasil
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Barra final */}
-        <div className="mt-10 pt-6 border-t border-[#FCFAF6]/15">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-[#FCFAF6]/65">
-              Copyright © {new Date().getFullYear()} Caléa. Todos os direitos reservados. CNPJ: 64.568.833/0001-36
+        {/* PAGAMENTOS */}
+        <div className="mt-14 flex flex-col gap-6 border-t border-white/10 pt-8 md:flex-row md:items-center md:justify-between">
+
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/40">
+              Pagamento seguro
             </p>
 
-            <div className="flex items-center gap-6 text-xs">
-              <Link href="#" className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors">
-                Política de Privacidade
-              </Link>
-              <Link href="#" className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors">
-                Trocas e Devoluções
-              </Link>
-              <Link href="#" className="text-[#FCFAF6]/65 hover:text-[#b08d57] transition-colors">
-                Termos
-              </Link>
-            </div>
+            <img
+              src="/Bandeiras-horizontal-grande.svg"
+              alt="Formas de pagamento"
+              className="mt-3 max-h-9 w-auto opacity-80"
+            />
+          </div>
+
+          <div className="text-left md:text-right">
+            <p className="text-xs leading-6 text-white/45">
+              © {new Date().getFullYear()} Caléa Blanc.
+              Todos os direitos reservados.
+            </p>
+
+            <p className="text-[10px] text-white/35">
+              CNPJ 64.568.833/0001-36
+            </p>
           </div>
         </div>
-      </div>
-    </footer>
+      </div >
+    </footer >
   );
 };
 

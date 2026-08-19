@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { Link } from "react-router-dom";
 
 type Banner = {
   src: string;
   mobileSrc?: string;
   alt: string;
+  href?: string;
 };
 
 const BUCKET = "product-images";
@@ -21,26 +23,15 @@ function getPublicUrl(path: string) {
   return data.publicUrl;
 }
 
-const FALLBACK: Banner[] = [
-  {
-    src: "/Banner4.jpg",
-    mobileSrc: "/Banner4.jpg",
-    alt: "Banner semijoias 1",
-  },
-  {
-    src: "/Banner6.jpg",
-    mobileSrc: "/Banner6.jpg",
-    alt: "Banner semijoias 2",
-  },
-  {
-    src: "/Banner7.jpg",
-    mobileSrc: "/Banner7.jpg",
-    alt: "Banner semijoias 3",
-  },
-];
+const FIRST_BANNER: Banner = {
+  src: "/banner-local-1.png",
+  mobileSrc: "/14.webp",
+  alt: "Banner semijoias 1",
+  href: "/joias?colecao=calea-nouveau",
+};
 
-const Hero: React.FC = () => {
-  const [banners, setBanners] = useState<Banner[]>(FALLBACK);
+export default function Hero() {
+  const [banners, setBanners] = useState<Banner[]>([FIRST_BANNER]);
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
@@ -49,35 +40,43 @@ const Hero: React.FC = () => {
     async function loadBanners() {
       const { data, error } = await supabase
         .from("hero_banners")
-        .select("image_path, mobile_image_path, alt")
+        .select("image_path, mobile_image_path, alt, link_url")
         .eq("active", true)
         .order("position", { ascending: true });
+
+      if (!active) return;
 
       if (error) {
         console.error("Erro ao carregar banners:", error.message);
         return;
       }
 
-      if (!data?.length || !active) return;
+      if (!data?.length) return;
 
       const mapped: Banner[] = data
         .filter((banner) => banner.image_path)
         .map((banner) => {
-          const desktopSrc = getPublicUrl(banner.image_path);
+          const src = getPublicUrl(banner.image_path);
 
           return {
-            src: desktopSrc,
-
+            src,
             mobileSrc: banner.mobile_image_path
               ? getPublicUrl(banner.mobile_image_path)
-              : desktopSrc,
-
+              : src,
             alt: banner.alt || "Banner Caléa Blanc",
+            href: banner.link_url || undefined,
           };
         });
 
       if (mapped.length && active) {
-        setBanners(mapped);
+        const others = mapped.filter(
+          (banner) => banner.src !== FIRST_BANNER.src
+        );
+
+        setBanners([
+          FIRST_BANNER,
+          ...others,
+        ]);
       }
     }
 
@@ -87,12 +86,6 @@ const Hero: React.FC = () => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (idx >= banners.length) {
-      setIdx(0);
-    }
-  }, [banners.length, idx]);
 
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -112,94 +105,87 @@ const Hero: React.FC = () => {
     return banners[(idx + 1) % banners.length];
   }, [banners, idx]);
 
-  /*
-    Pré-carrega desktop + mobile do próximo banner.
-  */
   useEffect(() => {
     if (!nextBanner) return;
 
     const desktop = new Image();
     desktop.src = nextBanner.src;
 
-    if (nextBanner.mobileSrc) {
+    if (
+      nextBanner.mobileSrc &&
+      nextBanner.mobileSrc !== nextBanner.src
+    ) {
       const mobile = new Image();
       mobile.src = nextBanner.mobileSrc;
     }
   }, [nextBanner]);
 
-  const prev = () => {
+  function prev() {
     setIdx(
       (value) =>
         (value - 1 + banners.length) % banners.length
     );
-  };
+  }
 
-  const next = () => {
+  function next() {
     setIdx(
       (value) =>
         (value + 1) % banners.length
     );
-  };
+  }
 
   return (
     <section
       id="home"
-      className="relative bg-[#FCFAF6]"
+      className="relative overflow-hidden bg-[#FCFAF6]"
     >
-      <div className="relative w-full overflow-hidden">
-
-        {/* BANNER */}
-        <div
-          className="
+      <div
+        className="
     relative
     w-full
+    overflow-hidden
+
+    aspect-[16/9]
+
+    md:aspect-auto
     md:h-[620px]
     lg:h-[720px]
     xl:h-[760px]
   "
-        >
-          <picture key={`${currentBanner.src}-${idx}`}>
+      >
+        <picture>
+          <source
+            media="(max-width: 767px)"
+            srcSet={
+              currentBanner.mobileSrc ??
+              currentBanner.src
+            }
+          />
 
-            {/* MOBILE */}
-            <source
-              media="(max-width: 767px)"
-              srcSet={
-                currentBanner.mobileSrc ??
-                currentBanner.src
-              }
-            />
+          <img
+            src={currentBanner.src}
+            alt={currentBanner.alt}
+            width={1600}
+            height={900}
+            loading="eager"
+            {...({ fetchpriority: "high" } as any)}
+            decoding="async"
+            className="block h-full w-full object-cover"
+            style={{
+              objectPosition: "center center",
+            }}
+          />
+        </picture>
 
-            {/* DESKTOP */}
-            <img
-              src={currentBanner.src}
-              alt={currentBanner.alt}
-              className="
-  block
-  h-auto
-  w-full
-  object-contain
-  md:h-full
-  md:object-cover
-"
-              style={{
-                objectPosition: "center center",
-              }}
-              loading={idx === 0 ? "eager" : "lazy"}
-              {...(
-                idx === 0
-                  ? { fetchpriority: "high" }
-                  : {}
-              ) as any}
-              decoding="async"
-              width={1600}
-              height={900}
-            />
-          </picture>
-        </div>
-
+        {currentBanner.href && (
+          <Link
+            to={currentBanner.href}
+            aria-label={currentBanner.alt}
+            className="absolute inset-0 z-[5]"
+          />
+        )}
         {banners.length > 1 && (
           <>
-            {/* SETA ESQUERDA */}
             <button
               type="button"
               aria-label="Banner anterior"
@@ -233,7 +219,6 @@ const Hero: React.FC = () => {
               ‹
             </button>
 
-            {/* SETA DIREITA */}
             <button
               type="button"
               aria-label="Próximo banner"
@@ -267,7 +252,6 @@ const Hero: React.FC = () => {
               ›
             </button>
 
-            {/* INDICADORES */}
             <div
               className="
                 absolute
@@ -302,6 +286,4 @@ const Hero: React.FC = () => {
       </div>
     </section>
   );
-};
-
-export default Hero;
+}

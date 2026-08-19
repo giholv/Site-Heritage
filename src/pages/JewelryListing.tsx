@@ -125,6 +125,11 @@ export default function JewelryListing() {
   const { categorySlug, collectionSlug } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const collectionFromQuery = searchParams.get("colecao");
+
+  const activeCollectionSlug =
+    collectionSlug || collectionFromQuery;
+
 
   const selectedMaterial = useMemo(
     () => getMulti(searchParams, "material"),
@@ -168,9 +173,12 @@ export default function JewelryListing() {
 
   const pageTitle = useMemo(() => {
     if (categorySlug) return titleizeSlug(categorySlug);
-    if (collectionSlug) return titleizeSlug(collectionSlug);
+    if (activeCollectionSlug) {
+      return titleizeSlug(activeCollectionSlug);
+    }
+
     return "Catálogo";
-  }, [categorySlug, collectionSlug]);
+  }, [categorySlug, activeCollectionSlug]);
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [categoryIds, setCategoryIds] = useState<string[] | null>(null);
@@ -273,8 +281,11 @@ export default function JewelryListing() {
         query = query.in("primary_category_id", categoryIds);
       }
 
-      if (collectionSlug) {
-        query = query.contains("collection_slugs", [collectionSlug]);
+      if (activeCollectionSlug) {
+        query = query.contains(
+          "collection_slugs",
+          [activeCollectionSlug]
+        );
       }
 
       return query;
@@ -356,7 +367,7 @@ export default function JewelryListing() {
     return () => {
       alive = false;
     };
-  }, [categorySlug, collectionSlug, categoryIds]);
+  }, [categorySlug, activeCollectionSlug, categoryIds]);
 
   const effMin = useMemo(() => {
     if (minFromUrl !== null) return Math.max(0, minFromUrl);
@@ -402,8 +413,11 @@ export default function JewelryListing() {
         query = query.in("primary_category_id", categoryIds);
       }
 
-      if (collectionSlug) {
-        query = query.contains("collection_slugs", [collectionSlug]);
+      if (activeCollectionSlug) {
+        query = query.contains(
+          "collection_slugs",
+          [activeCollectionSlug]
+        );
       }
 
       if (qText) {
@@ -477,7 +491,7 @@ export default function JewelryListing() {
           }))
         );
       }
-      
+
       setProducts(normalizedRows);
       setLoading(false);
     }
@@ -489,7 +503,7 @@ export default function JewelryListing() {
     };
   }, [
     categorySlug,
-    collectionSlug,
+    activeCollectionSlug,
     categoryIds,
     priceBounds,
     userSetPrice,
@@ -939,11 +953,17 @@ export default function JewelryListing() {
                     const isAvailable = availableQty > 0;
 
                     return (
-                      <button
+                      <article
                         key={product.id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => navigate(`/produto/${product.slug}`)}
-                        className="group min-w-0 text-left"
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            navigate(`/produto/${product.slug}`);
+                          }
+                        }}
+                        className="group min-w-0 cursor-pointer text-left"
                       >
                         <div className="relative">
                           {!isAvailable && (
@@ -1022,7 +1042,7 @@ export default function JewelryListing() {
 
                           <div className="mt-2 text-[16px] font-semibold leading-none text-[#173a35] md:text-[17px]">
                             {product.min_price_cents !== null &&
-                            product.min_price_cents !== undefined
+                              product.min_price_cents !== undefined
                               ? centsToBRL(product.min_price_cents)
                               : centsToBRL(product.min_price_cents)}
                           </div>
@@ -1040,7 +1060,7 @@ export default function JewelryListing() {
                             </div>
                           )}
                         </div>
-                      </button>
+                      </article>
                     );
                   })}
                 </div>

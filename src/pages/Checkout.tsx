@@ -1,10 +1,7 @@
 // src/pages/Checkout.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ShoppingBag,
-  User,
-  CreditCard,
-  CheckCircle,
   Trash2,
   Gift,
   MapPin,
@@ -15,13 +12,12 @@ import {
   Minus,
   Plus,
   Truck,
+  LockKeyhole,
+  ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import Header from "../components/Header";
-import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
-import CombineWith from "../components/CombineWith";
 import { supabase } from "../lib/supabase";
 
 const CALEA = {
@@ -128,44 +124,6 @@ function calculateCouponDiscountCents(params: {
   return Math.min(
     discount,
     subtotalCents + shippingCents
-  );
-}
-
-function Step({
-  label,
-  active,
-  done,
-  Icon,
-}: {
-  label: string;
-  active?: boolean;
-  done?: boolean;
-  Icon: React.ElementType;
-}) {
-  return (
-    <div className="flex min-w-[78px] flex-col items-center gap-2">
-      <span
-        className={[
-          "inline-flex h-10 w-10 items-center justify-center rounded-full border transition-all",
-          active
-            ? "border-[#2b554e] bg-[#2b554e] text-white shadow-[0_10px_22px_rgba(43,85,78,0.18)]"
-            : done
-              ? "border-[#b08d57] bg-[#fff8ed] text-[#b08d57]"
-              : "border-[#ddd5ca] bg-white text-[#aaa197]",
-        ].join(" ")}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-
-      <span
-        className={[
-          "whitespace-nowrap text-[11px] sm:text-xs",
-          active ? "font-semibold text-[#2b554e]" : "text-[#9a9187]",
-        ].join(" ")}
-      >
-        {label}
-      </span>
-    </div>
   );
 }
 
@@ -660,155 +618,147 @@ export default function Checkout() {
     }
   }
 
- async function handleContinue() {
-  if (!canContinue || stockLoading || authLoading) return;
+  async function handleContinue() {
+    if (!canContinue || stockLoading || authLoading) return;
 
-  const stockOk = await checkCartStock();
+    const stockOk = await checkCartStock();
 
-  if (!stockOk) return;
+    if (!stockOk) return;
 
-  // Preserva frete, cupom, presente e totais.
-  saveCheckoutDraft();
+    // Preserva frete, cupom, presente e totais.
+    saveCheckoutDraft();
 
-  // Não sai do checkout.
-  if (!currentUser) {
-    setShowAuthGate(true);
-    return;
+    // Não sai do checkout.
+    if (!currentUser) {
+      setShowAuthGate(true);
+      return;
+    }
+
+    navigate("/checkout/identificacao");
   }
 
-  navigate("/checkout/identificacao");
-}
-
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6]">
-      <Header />
+    <div className="min-h-screen overflow-x-hidden bg-[#fcfaf6] text-[#2b554e]">
+      <CheckoutHeader onBack={() => navigate("/")} />
 
-      <main className="pb-32 pt-[112px] md:pb-16 md:pt-[145px]">
-        <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
-          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="mb-5 inline-flex items-center gap-2 text-sm text-[#756d63] transition hover:text-[#2b554e]"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Continuar comprando
-            </button>
+      <main className="pb-24 lg:pb-16">
+        <section className="mx-auto max-w-6xl px-4 pb-4 pt-7 sm:px-6 sm:pb-6 sm:pt-9">
+          <div className="flex items-end justify-between gap-5">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#b08d57]">
+                Checkout Caléa
+              </p>
 
-            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-[#b08d57]">
-                  Sua seleção
-                </p>
-
-                <h1 className="mt-2 text-[30px] font-light leading-tight tracking-[-0.04em] text-[#2b554e] sm:text-[40px]">
+              <div className="mt-2 flex items-baseline gap-3">
+                <h1 className="font-serif text-[34px] font-normal leading-none tracking-[-0.03em] text-[#2b554e] sm:text-[42px]">
                   Sua sacola
                 </h1>
 
-                <p className="mt-2 max-w-xl text-sm leading-6 text-[#7a746c]">
-                  Confira suas escolhas, calcule a entrega e veja o valor final antes de continuar.
-                </p>
+                {items.length > 0 && (
+                  <span className="text-sm text-[#2b554e]/45">
+                    {itemCountLabel(count)}
+                  </span>
+                )}
               </div>
-
-
             </div>
 
-            <div className="mt-8 overflow-x-auto pb-2">
-              <div className="flex min-w-max items-center gap-4 sm:min-w-0 sm:justify-between">
-                <Step label="Sacola" active Icon={ShoppingBag} />
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-                <Step label="Dados" Icon={User} />
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-                <Step label="Pagamento" Icon={CreditCard} />
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-                <Step label="Confirmação" Icon={CheckCircle} />
-              </div>
+            <div className="hidden text-right sm:block">
+              <p className="font-serif text-lg italic text-[#b08d57]">
+                Quase sua.
+              </p>
+              <p className="mt-1 text-xs text-[#2b554e]/45">
+                Revise e siga para finalizar.
+              </p>
             </div>
           </div>
+
+          <CheckoutProgress />
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_390px] lg:items-start">
-            <div className="space-y-5">
-              <div className="rounded-[22px] border border-[#eee5d8] bg-white p-4 shadow-[0_14px_40px_rgba(43,85,78,0.05)] sm:p-6">
-                <div className="mb-5 flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-[#2b554e]">
-                      Produtos
-                    </h2>
-
-                    <p className="mt-1 text-sm text-[#7a746c]">
-                      Ajuste quantidades ou remova itens da sua sacola.
-                    </p>
-                  </div>
-
-                  {items.length > 0 && (
-                    <span className="rounded-full bg-[#f7f1e7] px-3 py-1 text-xs font-medium text-[#8a6a38]">
-                      {itemCountLabel(count)}
-                    </span>
-                  )}
-                </div>
-
+        <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_390px] lg:items-start lg:gap-7">
+            <div className="space-y-4">
+              <div className="border-y border-[#e8dfd3] bg-white pb-3 sm:rounded-[24px] sm:border sm:pb-0">
                 {items.length === 0 ? (
                   <EmptyCart onContinue={() => navigate("/")} />
                 ) : (
-                  <div className="divide-y divide-[#efe8dc]">
-                    {items.map((item) => (
-                      <CartItemRow
-                        key={item.id}
-                        item={item}
-                        availableQty={
-                          getCartSkuId(item) ? stockBySku[getCartSkuId(item) as string] : undefined
-                        }
-                        onRemove={() => remove(item.id)}
-                        onDecrease={() =>
-                          setQty(item.id, Math.max(1, (item.qty ?? 1) - 1))
-                        }
-                        onIncrease={async () => {
-                          const skuId = getCartSkuId(item);
+                  <div className="px-4 sm:px-6">
+                    <div className="flex items-center justify-between border-b border-[#eee7dc] py-4">
+                      <div>
+                        <h2 className="text-base font-semibold text-[#2b554e]">
+                          Suas escolhas
+                        </h2>
+                        <p className="mt-0.5 text-xs text-[#2b554e]/45">
+                          Ajuste a quantidade se precisar.
+                        </p>
+                      </div>
 
-                          if (!skuId) {
-                            setStockError("Não foi possível validar o estoque deste item.");
-                            return;
+                      <ShoppingBag className="h-5 w-5 text-[#b08d57]" />
+                    </div>
+
+                    <div className="divide-y divide-[#eee7dc]">
+                      {items.map((item) => (
+                        <CartItemRow
+                          key={item.id}
+                          item={item}
+                          availableQty={
+                            getCartSkuId(item)
+                              ? stockBySku[getCartSkuId(item) as string]
+                              : undefined
                           }
-
-                          const { data, error } = await supabase
-                            .from("sku_availability")
-                            .select("available_qty")
-                            .eq("sku_id", skuId)
-                            .maybeSingle();
-
-                          if (error) {
-                            console.error("Erro ao verificar estoque:", error);
-                            setStockError("Erro ao verificar estoque.");
-                            return;
+                          onRemove={() => remove(item.id)}
+                          onDecrease={() =>
+                            setQty(item.id, Math.max(1, (item.qty ?? 1) - 1))
                           }
+                          onIncrease={async () => {
+                            const skuId = getCartSkuId(item);
 
-                          const availableQty = Number(data?.available_qty || 0);
-                          const nextQty = (item.qty ?? 1) + 1;
+                            if (!skuId) {
+                              setStockError(
+                                "Não foi possível validar o estoque deste item."
+                              );
+                              return;
+                            }
 
-                          setStockBySku((prev) => ({
-                            ...prev,
-                            [skuId]: availableQty,
-                          }));
+                            const { data, error } = await supabase
+                              .from("sku_availability")
+                              .select("available_qty")
+                              .eq("sku_id", skuId)
+                              .maybeSingle();
 
-                          if (nextQty > availableQty) {
-                            setStockError(`Estoque insuficiente. Disponível: ${availableQty}.`);
-                            return;
-                          }
+                            if (error) {
+                              console.error("Erro ao verificar estoque:", error);
+                              setStockError("Erro ao verificar estoque.");
+                              return;
+                            }
 
-                          setQty(item.id, nextQty);
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
+                            const availableQty = Number(data?.available_qty || 0);
+                            const nextQty = (item.qty ?? 1) + 1;
 
-                {items.length > 0 && <CuradoriaCalea items={items} />}
+                            setStockBySku((prev) => ({
+                              ...prev,
+                              [skuId]: availableQty,
+                            }));
 
-                {stockError && (
-                  <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">
-                    {stockError}
+                            if (nextQty > availableQty) {
+                              setStockError(
+                                `Estoque insuficiente. Disponível: ${availableQty}.`
+                              );
+                              return;
+                            }
+
+                            setStockError(null);
+                            setQty(item.id, nextQty);
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {stockError && (
+                      <div className="mb-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+                        {stockError}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -822,7 +772,7 @@ export default function Checkout() {
               )}
             </div>
 
-            <aside className="space-y-5 lg:sticky lg:top-[120px]">
+            <aside className="lg:sticky lg:top-24">
               <CheckoutPanel
                 cep={cep}
                 setCep={setCep}
@@ -864,10 +814,10 @@ export default function Checkout() {
       </main>
 
       {items.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e9e2d6] bg-[#fcfaf6]/95 p-3 backdrop-blur lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e5ddd2] bg-[#fcfaf6]/96 px-4 py-3 shadow-[0_-12px_35px_rgba(43,85,78,0.06)] backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-lg items-center gap-3">
             <div className="min-w-[112px]">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-[#8a8175]">
+              <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#2b554e]/40">
                 Total
               </p>
               <p className="font-serif text-xl text-[#2b554e]">
@@ -881,32 +831,93 @@ export default function Checkout() {
               disabled={
                 !canContinue || stockLoading || authLoading || Boolean(stockError)
               }
-              className="flex-1 rounded-full bg-[#2b554e] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(43,85,78,0.18)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-12 flex-1 items-center justify-center gap-2 bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:bg-[#23463f] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {authLoading
                 ? "Só um instante..."
                 : stockLoading
                   ? "Verificando..."
-                  : "Continuar"}
+                  : "Finalizar"}
+              {!authLoading && !stockLoading && (
+                <ChevronRight className="h-4 w-4" />
+              )}
             </button>
           </div>
         </div>
       )}
-      
-      {showAuthGate && (
-  <CheckoutAuthGate
-    onClose={() => setShowAuthGate(false)}
-    onAuthenticated={() => {
-      setShowAuthGate(false);
-      navigate("/checkout/identificacao");
-    }}
-  />
-)}
 
-      <Footer />
+      {showAuthGate && (
+        <CheckoutAuthGate
+          onClose={() => setShowAuthGate(false)}
+          onAuthenticated={() => {
+            setShowAuthGate(false);
+            navigate("/checkout/identificacao");
+          }}
+        />
+      )}
     </div>
   );
 }
+
+function CheckoutHeader({ onBack }: { onBack: () => void }) {
+  return (
+    <header className="sticky top-0 z-50 border-b border-[#e8dfd3] bg-[#fcfaf6]/95 backdrop-blur">
+      <div className="mx-auto grid h-[68px] max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 sm:h-[76px] sm:px-6">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 justify-self-start text-xs font-medium text-[#2b554e]/55 transition hover:text-[#2b554e]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Voltar à loja</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => (window.location.href = "/")}
+          className="justify-self-center text-center"
+          aria-label="Ir para a loja Caléa"
+        >
+          <span className="block font-serif text-[20px] tracking-[0.11em] text-[#2b554e] sm:text-[22px]">
+            CALÉA
+          </span>
+          <span className="mt-[-2px] block text-[7px] font-medium uppercase tracking-[0.38em] text-[#b08d57]">
+            Blanc
+          </span>
+        </button>
+
+        <div className="inline-flex items-center gap-2 justify-self-end text-[10px] font-medium uppercase tracking-[0.12em] text-[#2b554e]/45">
+          <LockKeyhole className="h-3.5 w-3.5 text-[#2b554e]" />
+          <span className="hidden sm:inline">Compra segura</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function CheckoutProgress() {
+  return (
+    <div className="mt-7">
+      <div className="flex items-center justify-between text-[11px] font-medium">
+        <span className="text-[#2b554e]">
+          Carrinho
+        </span>
+
+        <span className="text-[#2b554e]/35">
+          1 de 4
+        </span>
+      </div>
+
+      <div className="mt-2 grid grid-cols-4 gap-1">
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#e4dbcf]" />
+        <div className="h-[3px] bg-[#e4dbcf]" />
+        <div className="h-[3px] bg-[#e4dbcf]" />
+      </div>
+    </div>
+  );
+}
+
 function CheckoutAuthGate({
   onClose,
   onAuthenticated,
@@ -1057,11 +1068,11 @@ function CheckoutAuthGate({
             </p>
 
             <h2 className="mt-3 font-serif text-[30px] font-normal leading-none text-[#2b554e]">
-              Continue sua compra
+              Entre para finalizar
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-[#2b554e]/60">
-              Entre na sua conta ou crie uma agora. Sua sacola continua salva.
+              Para seguir com entrega e pagamento, entre na sua conta ou crie uma agora. Sua sacola continua salva.
             </p>
           </div>
 
@@ -1116,11 +1127,16 @@ function CheckoutAuthGate({
           className="mt-6 space-y-4"
         >
           <div>
-            <label className="text-xs font-medium text-[#2b554e]/70">
+            <label
+              htmlFor="checkout-auth-email"
+              className="text-xs font-medium text-[#2b554e]/70"
+            >
               E-mail
             </label>
 
             <input
+              id="checkout-auth-email"
+              name="email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -1131,11 +1147,16 @@ function CheckoutAuthGate({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-[#2b554e]/70">
+            <label
+              htmlFor="checkout-auth-password"
+              className="text-xs font-medium text-[#2b554e]/70"
+            >
               Senha
             </label>
 
             <input
+              id="checkout-auth-password"
+              name="password"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -1151,11 +1172,16 @@ function CheckoutAuthGate({
 
           {mode === "register" && (
             <div>
-              <label className="text-xs font-medium text-[#2b554e]/70">
+              <label
+                htmlFor="checkout-auth-confirm-password"
+                className="text-xs font-medium text-[#2b554e]/70"
+              >
                 Confirme sua senha
               </label>
 
               <input
+                id="checkout-auth-confirm-password"
+                name="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
@@ -1219,77 +1245,6 @@ function CheckoutAuthGate({
     </div>
   );
 }
-
-function CuradoriaCalea({ items }: { items: any[] }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
-    if (reducedMotion) return;
-
-    const timer = window.setInterval(() => {
-      if (!el || el.scrollWidth <= el.clientWidth) return;
-
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      const isAtEnd = el.scrollLeft >= maxScroll - 16;
-
-      if (isAtEnd) {
-        el.scrollTo({ left: 0, behavior: "smooth" });
-      } else {
-        el.scrollBy({ left: 280, behavior: "smooth" });
-      }
-    }, 3800);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="mt-7 rounded-[26px] border border-[#eadfce] bg-[#fcfaf6] p-4 sm:p-5">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#b08d57]">
-            Curadoria Caléa
-          </p>
-
-          <h3 className="mt-1 text-base font-semibold text-[#2b554e]">
-            Combine com sua escolha
-          </h3>
-
-          <p className="mt-1 text-xs leading-5 text-[#7a746c]">
-            Arraste para o lado e veja mais peças selecionadas.
-          </p>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1 rounded-full border border-[#e1d6c7] bg-white px-3 py-1.5 text-xs font-medium text-[#2b554e] shadow-sm">
-          ver mais
-          <span className="text-base leading-none">›</span>
-        </div>
-      </div>
-
-      <div
-        ref={scrollRef}
-        className="-mx-4 overflow-x-auto px-4 pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        <div className="min-w-max">
-          <CombineWith items={items} />
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-center gap-1.5 sm:hidden">
-        <span className="h-1.5 w-5 rounded-full bg-[#2b554e]" />
-        <span className="h-1.5 w-1.5 rounded-full bg-[#d8c9b4]" />
-        <span className="h-1.5 w-1.5 rounded-full bg-[#d8c9b4]" />
-      </div>
-    </div>
-  );
-}
-
 
 function EmptyCart({ onContinue }: { onContinue: () => void }) {
   return (
@@ -1422,57 +1377,64 @@ function GiftWrapCard({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <div className="rounded-[22px] border border-[#eadfce] bg-white p-4 shadow-[0_14px_40px_rgba(43,85,78,0.04)] sm:p-5">
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#efe6d7] text-[#b08d57]">
-          <Gift className="h-5 w-5" />
-        </div>
+    <label className="flex cursor-pointer items-center gap-4 border-y border-[#e8dfd3] bg-white px-4 py-4 transition hover:bg-[#fffdf9] sm:rounded-[20px] sm:border sm:px-5">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[#f4eee4] text-[#b08d57]">
+        <Gift className="h-4.5 w-4.5" />
+      </div>
 
-        <div className="flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[#2b554e] sm:text-base">
-                Embalagem para presente
-              </p>
-
-              <p className="mt-1 text-sm leading-5 text-[#7a746c]">
-                Caixinha para sua Jóia + finalização especial.
-              </p>
-            </div>
-
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-4">
+          <div>
             <p className="text-sm font-semibold text-[#2b554e]">
-              {moneyBRL(price)}
+              É para presente?
+            </p>
+            <p className="mt-0.5 text-xs text-[#2b554e]/45">
+              Adicione nossa embalagem especial.
             </p>
           </div>
 
-          <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-2xl border border-[#e7dccb] bg-[#fcfaf6] p-3">
+          <div className="shrink-0 text-right">
+            <p className="text-xs font-semibold text-[#b08d57]">
+              + {moneyBRL(price)}
+            </p>
+
             <input
+              id="checkout-gift-wrap"
+              name="giftWrap"
               type="checkbox"
               checked={checked}
               onChange={(event) => onChange(event.target.checked)}
-              className="h-5 w-5 shrink-0"
+              className="mt-2 h-4 w-4"
               style={{ accentColor: CALEA.primary }}
+              aria-label="Adicionar embalagem para presente"
             />
-
-            <span className="text-sm font-medium text-[#5f5850]">
-              Adicionar embalagem ao pedido
-            </span>
-          </label>
+          </div>
         </div>
       </div>
-    </div>
+    </label>
   );
 }
 
 function CheckoutPanel(props: any) {
   return (
-    <div className="rounded-[22px] border border-[#eee5d8] bg-white p-4 shadow-[0_18px_50px_rgba(43,85,78,0.07)] sm:p-6">
-      <DeliverySection {...props} />
-      <Divider />
-      <CouponSection {...props} />
-      <Divider />
-      <OrderSummary {...props} />
+    <div className="border-y border-[#e8dfd3] bg-white sm:rounded-[24px] sm:border">
+      <div className="px-4 pb-1 pt-5 sm:px-6 sm:pt-6">
+        <p className="font-serif text-[26px] italic leading-none text-[#2b554e]">
+          Quase sua.
+        </p>
+        <p className="mt-2 text-xs leading-5 text-[#2b554e]/45">
+          Escolha a entrega e confira o total antes de seguir.
+        </p>
+      </div>
 
+      <div className="px-4 sm:px-6">
+        <Divider />
+        <DeliverySection {...props} />
+        <Divider />
+        <CouponSection {...props} />
+        <Divider />
+        <OrderSummary {...props} />
+      </div>
     </div>
   );
 }
@@ -1505,6 +1467,8 @@ function DeliverySection({
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_120px]">
         <input
+          id="checkout-cep"
+          name="postalCode"
           value={cep}
           onChange={(event) => setCep(formatCEP(event.target.value))}
           placeholder="Digite seu CEP *"
@@ -1551,21 +1515,23 @@ function DeliverySection({
               <label
                 key={option.id}
                 className={[
-                  "block cursor-pointer rounded-[22px] border p-4 transition",
+                  "block cursor-pointer border px-3.5 py-3 transition",
                   checked
-                    ? "border-[#2b554e] bg-[#f7f3ec]"
+                    ? "border-[#2b554e] bg-[#f8f5ef]"
                     : "border-[#e5ddd1] bg-white hover:border-[#b08d57]",
                 ].join(" ")}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <input
+                      id={`shipping-${option.id}`}
                       type="radio"
                       name="shipping"
                       checked={checked}
                       onChange={() => setSelectedShipping(option)}
                       className="mt-1 h-4 w-4 shrink-0"
                       style={{ accentColor: CALEA.primary }}
+                      aria-label={`Selecionar frete ${option.name}`}
                     />
 
                     <div>
@@ -1652,6 +1618,8 @@ function CouponSection({
         <div className="mt-4">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_104px]">
             <input
+              id="checkout-coupon"
+              name="coupon"
               value={couponCode}
               onChange={(event) =>
                 setCouponCode(event.target.value.toUpperCase())
@@ -1755,9 +1723,9 @@ function OrderSummary({
         )}
       </div>
 
-      <div className="my-6 h-px bg-[#eee5d8]" />
+      <div className="mb-2 mt-4 h-px bg-[#eee5d8] lg:my-6" />
 
-      <div className="flex items-end justify-between gap-4">
+      <div className="hidden items-end justify-between gap-4 lg:flex">
         <div>
           <p className="text-sm text-[#8a8175]">Total</p>
           <p className="text-xs text-[#9a9187]">Impostos inclusos</p>
@@ -1769,7 +1737,7 @@ function OrderSummary({
       </div>
 
       <button
-        className="mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] py-4 text-sm font-semibold tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-6 hidden w-full items-center justify-center gap-3 rounded-full bg-[#2b554e] py-4 text-sm font-semibold tracking-[0.12em] text-white shadow-[0_12px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 lg:flex"
         onClick={handleContinue}
         type="button"
         disabled={
@@ -1780,33 +1748,32 @@ function OrderSummary({
           ? "Verificando acesso..."
           : stockLoading
             ? "Verificando estoque..."
-            : "Continuar compra"}
+            : "Continuar para finalizar"}
       </button>
 
       {!isAuthenticated && !authLoading && (
-        <p className="mt-3 text-center text-[11px] leading-4 text-[#8a8175]">
-          Na próxima etapa você entra ou cria sua conta sem perder a sacola.
+        <p className="mt-3 hidden text-center text-[11px] leading-4 text-[#8a8175] lg:block">
+          Para finalizar, é necessário entrar ou criar sua conta.
         </p>
       )}
 
       {stockError && (
-        <p className="mt-3 text-center text-xs text-red-600">
+        <p className="mt-3 hidden text-center text-xs text-red-600 lg:block">
           Ajuste os itens sem estoque para continuar.
         </p>
       )}
 
       {!canContinue && (
-        <p className="mt-3 text-center text-xs text-[#8a8175]">
+        <p className="mt-3 hidden text-center text-xs text-[#8a8175] lg:block">
           Selecione uma opção de entrega para continuar.
         </p >
       )}
 
-      <div className="mt-4 rounded-2xl bg-[#fcfaf6] p-4">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#2b554e]" />
-
-          <p className="text-xs leading-5 text-[#7a746c]">
-            Ambiente seguro. Seus dados são protegidos durante toda a compra.
+      <div className="py-3">
+        <div className="flex items-center justify-center gap-2">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#2b554e]" />
+          <p className="text-[10px] leading-none text-[#2b554e]/45">
+            Pagamento seguro · seus dados protegidos
           </p>
         </div>
       </div>

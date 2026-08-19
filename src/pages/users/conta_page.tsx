@@ -131,6 +131,7 @@ type ProfileFormState = {
 
 export default function ContaPage() {
   const navigate = useNavigate();
+  const [showAddressForm, setShowAddressForm] = useState(false);
 
   const [activeTab, setActiveTab] =
     useState<TabKey>("pedidos");
@@ -900,26 +901,28 @@ export default function ContaPage() {
               {activeTab ===
                 "enderecos" && (
                   <AddressesSection
-                    addresses={
-                      addresses
-                    }
+                    addresses={addresses}
+                    onAdd={() => setShowAddressForm(true)}
+                    showForm={showAddressForm}
+                    onCancel={() => setShowAddressForm(false)}
+                    onEdit={(address) => {
+                      console.log("Editar endereço:", address);
+                    }}
                   />
+
                 )}
 
               {activeTab ===
                 "notificacoes" && (
-                  <NotificationsSection />
+                  <NotificationsSection orders={orders} />
                 )}
 
               {activeTab ===
                 "indicacoes" && (
                   <ReferralPanel
-                    profile={
-                      profile
-                    }
-                    authUser={
-                      authUser
-                    }
+                    profile={profile}
+                    authUser={authUser}
+                    orders={orders}
                   />
                 )}
             </section>
@@ -1414,8 +1417,16 @@ function ProfileField({
 
 function AddressesSection({
   addresses,
+  onAdd,
+  showForm,
+  onCancel,
+  onEdit,
 }: {
   addresses: Address[];
+  onAdd: () => void;
+  showForm: boolean;
+  onCancel: () => void;
+  onEdit: (address: Address) => void;
 }) {
   return (
     <div>
@@ -1426,44 +1437,102 @@ function AddressesSection({
           description="Endereços utilizados nas suas compras."
         />
 
-        <a
-          href="/checkout-identificacao"
+        <button
+          type="button"
+          onClick={onAdd}
           className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-[#2b554e]/15 px-5 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#2b554e]"
         >
           Adicionar
-          <ArrowRight
-            size={14}
-          />
-        </a>
+          <ArrowRight size={14} />
+        </button>
       </div>
 
-      {addresses.length ===
-        0 ? (
+      {showForm && (
+        <div className="border-b border-[#2b554e]/10 py-8">
+          <p className="font-serif text-[28px] text-[#2b554e]">
+            Novo endereço
+          </p>
+
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            <input
+              placeholder="Nome do destinatário"
+              className="h-12 border-b border-[#2b554e]/20 bg-transparent outline-none"
+            />
+
+            <input
+              placeholder="CEP"
+              className="h-12 border-b border-[#2b554e]/20 bg-transparent outline-none"
+            />
+
+            <input
+              placeholder="Rua"
+              className="h-12 border-b border-[#2b554e]/20 bg-transparent outline-none"
+            />
+
+            <input
+              placeholder="Número"
+              className="h-12 border-b border-[#2b554e]/20 bg-transparent outline-none"
+            />
+
+            <input
+              placeholder="Complemento"
+              className="h-12 border-b border-[#2b554e]/20 bg-transparent outline-none"
+            />
+
+            <input
+              placeholder="Bairro"
+              className="h-12 border-b border-[#2b554e]/20 bg-transparent outline-none"
+            />
+
+            <input
+              placeholder="Cidade"
+              className="h-12 border-b border-[#2b554e]/20 bg-transparent outline-none"
+            />
+
+            <input
+              placeholder="Estado"
+              className="h-12 border-b border-[#2b554e]/20 bg-transparent outline-none"
+            />
+          </div>
+
+          <div className="mt-7 flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-full px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#6f6558]"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className="rounded-full bg-[#2b554e] px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.13em] text-white"
+            >
+              Salvar endereço
+            </button>
+          </div>
+        </div>
+      )}
+
+      {addresses.length === 0 ? (
         <div className="py-12">
           <p className="font-serif text-[24px] text-[#2b554e]">
-            Nenhum endereço
-            cadastrado.
+            Nenhum endereço cadastrado.
           </p>
 
           <p className="mt-2 text-sm text-[#6f6558]">
-            Adicione um endereço
-            quando quiser.
+            Adicione um endereço quando quiser.
           </p>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 md:gap-x-12">
-          {addresses.map(
-            (address) => (
-              <AddressRow
-                key={
-                  address.id
-                }
-                address={
-                  address
-                }
-              />
-            )
-          )}
+          {addresses.map((address) => (
+            <AddressRow
+              key={address.id}
+              address={address}
+              onEdit={onEdit}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -1472,35 +1541,42 @@ function AddressesSection({
 
 function AddressRow({
   address,
+  onEdit,
 }: {
   address: Address;
+  onEdit: (address: Address) => void;
 }) {
-  const lines =
-    joinAddress(address);
+  const lines = joinAddress(address);
 
   return (
     <div className="border-b border-[#2b554e]/10 py-6">
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="font-serif text-[21px] text-[#2b554e]">
-          {address.recipient_name ||
-            "Endereço"}
-        </h3>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-serif text-[21px] text-[#2b554e]">
+            {address.recipient_name || "Endereço"}
+          </h3>
 
-        {address.is_default && (
-          <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-[#b08d57]">
-            Principal
-          </span>
-        )}
+          {address.is_default && (
+            <span className="mt-2 inline-block text-[8px] font-semibold uppercase tracking-[0.14em] text-[#b08d57]">
+              Principal
+            </span>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onEdit(address)}
+          className="inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#2b554e] transition hover:text-[#b08d57]"
+        >
+          <Pencil size={13} />
+          Editar
+        </button>
       </div>
 
       <div className="mt-3 space-y-1 text-sm leading-5 text-[#6f6558]">
-        {lines.map(
-          (line, index) => (
-            <p key={index}>
-              {line}
-            </p>
-          )
-        )}
+        {lines.map((line, index) => (
+          <p key={index}>{line}</p>
+        ))}
       </div>
     </div>
   );
@@ -1510,31 +1586,154 @@ function AddressRow({
    NOTIFICAÇÕES
 ========================================================= */
 
-function NotificationsSection() {
+function NotificationsSection({
+  orders,
+}: {
+  orders: Order[];
+}) {
+  const notifications = orders.flatMap((order) => {
+    const items: Array<{
+      id: string;
+      title: string;
+      description: string;
+      date: string;
+    }> = [];
+
+    const orderLabel =
+      order.order_number ||
+      `Pedido #${order.id.slice(0, 8).toUpperCase()}`;
+
+    const payment = String(
+      order.payment_status || ""
+    ).toLowerCase();
+
+    const fulfillment = String(
+      order.fulfillment_status || ""
+    ).toLowerCase();
+
+    const shipping = String(
+      order.shipping_status || ""
+    ).toLowerCase();
+
+    if (payment === "paid") {
+      items.push({
+        id: `${order.id}-paid`,
+        title: "Pagamento confirmado",
+        description: `${orderLabel} teve o pagamento aprovado.`,
+        date: order.created_at,
+      });
+    }
+
+    if (
+      ["picking", "packed", "ready_to_ship"].includes(
+        fulfillment
+      )
+    ) {
+      items.push({
+        id: `${order.id}-preparing`,
+        title: "Pedido em preparação",
+        description: `${orderLabel} está sendo preparado para envio.`,
+        date: order.created_at,
+      });
+    }
+
+    if (shipping === "awaiting_post") {
+      items.push({
+        id: `${order.id}-awaiting-post`,
+        title: "Pronto para envio",
+        description: `${orderLabel} está aguardando postagem.`,
+        date: order.created_at,
+      });
+    }
+
+    if (shipping === "posted") {
+      items.push({
+        id: `${order.id}-posted`,
+        title: "Pedido postado",
+        description: order.tracking_code
+          ? `${orderLabel} foi postado. Código: ${order.tracking_code}`
+          : `${orderLabel} foi postado.`,
+        date: order.created_at,
+      });
+    }
+
+    if (shipping === "in_transit") {
+      items.push({
+        id: `${order.id}-transit`,
+        title: "Pedido a caminho",
+        description: `${orderLabel} está em transporte.`,
+        date: order.created_at,
+      });
+    }
+
+    if (shipping === "delivered") {
+      items.push({
+        id: `${order.id}-delivered`,
+        title: "Pedido entregue",
+        description: `${orderLabel} foi entregue.`,
+        date: order.created_at,
+      });
+    }
+
+    return items;
+  });
+
   return (
     <div>
       <SectionHeader
         eyebrow="Atualizações"
         title="Notificações"
-        description="Avisos importantes sobre seus pedidos e sua conta."
+        description="Acompanhe as principais mudanças nos seus pedidos."
       />
 
-      <div className="mt-8 border-y border-[#2b554e]/10 py-10">
-        <Bell
-          size={20}
-          className="text-[#b08d57]"
-        />
+      {notifications.length === 0 ? (
+        <div className="mt-8 border-y border-[#2b554e]/10 py-10">
+          <Bell
+            size={20}
+            className="text-[#b08d57]"
+          />
 
-        <p className="mt-4 font-serif text-[24px] text-[#2b554e]">
-          Tudo certo por aqui.
-        </p>
+          <p className="mt-4 font-serif text-[24px] text-[#2b554e]">
+            Nenhuma atualização ainda.
+          </p>
 
-        <p className="mt-2 max-w-md text-sm leading-6 text-[#6f6558]">
-          Quando houver uma
-          atualização importante,
-          ela aparecerá aqui.
-        </p>
-      </div>
+          <p className="mt-2 max-w-md text-sm leading-6 text-[#6f6558]">
+            Quando seus pedidos avançarem de etapa, as atualizações aparecerão aqui.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-8">
+          {notifications.map((notification) => (
+            <div
+              key={notification.id}
+              className="border-b border-[#2b554e]/10 py-6 first:border-t"
+            >
+              <div className="flex gap-4">
+                <div className="mt-1">
+                  <Bell
+                    size={16}
+                    className="text-[#b08d57]"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-[#2b554e]">
+                    {notification.title}
+                  </h3>
+
+                  <p className="mt-1 text-sm leading-6 text-[#6f6558]">
+                    {notification.description}
+                  </p>
+
+                  <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-[#6f6558]/70">
+                    {formatDateLong(notification.date)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1546,21 +1745,30 @@ function NotificationsSection() {
 function ReferralPanel({
   profile,
   authUser,
+  orders,
 }: {
   profile: CustomerProfile | null;
   authUser: AuthUser | null;
+  orders: Order[];
 }) {
   const [copied, setCopied] = useState(false);
   const [savingCoupon, setSavingCoupon] = useState(true);
   const [couponReady, setCouponReady] = useState(false);
   const [couponCode, setCouponCode] = useState("");
 
+  const hasPurchased = orders.some(
+    (order) =>
+      String(order.payment_status || "").toLowerCase() === "paid"
+  );
+
   useEffect(() => {
     let mounted = true;
 
     async function loadReferralCoupon() {
-      if (!profile?.id || !authUser?.id) {
+      if (!profile?.id || !authUser?.id || !hasPurchased) {
         if (mounted) {
+          setCouponCode("");
+          setCouponReady(false);
           setSavingCoupon(false);
         }
 
@@ -1614,7 +1822,7 @@ function ReferralPanel({
     return () => {
       mounted = false;
     };
-  }, [profile?.id, authUser?.id]);
+  }, [profile?.id, authUser?.id, hasPurchased]);
 
   async function copyCoupon() {
     if (!couponCode) return;
@@ -1646,7 +1854,9 @@ function ReferralPanel({
             <span className="font-serif text-[32px] tracking-[0.04em] text-[#2b554e] sm:text-[40px]">
               {savingCoupon
                 ? "..."
-                : couponCode || "Indisponível"}
+                : !hasPurchased
+                  ? "Bloqueado"
+                  : couponCode || "Indisponível"}
             </span>
 
             <button
@@ -1670,11 +1880,13 @@ function ReferralPanel({
           </div>
 
           <p className="mt-4 text-xs text-[#6f6558]">
-            {savingCoupon
-              ? "Preparando seu código..."
-              : couponReady
-                ? "Seu código está pronto para compartilhar."
-                : "Não foi possível carregar seu código agora."}
+            {!hasPurchased
+              ? "Faça sua primeira compra para liberar seu código de indicação."
+              : savingCoupon
+                ? "Preparando seu código..."
+                : couponReady
+                  ? "Seu código está pronto para compartilhar."
+                  : "Não foi possível carregar seu código agora."}
           </p>
         </div>
 
@@ -2340,29 +2552,4 @@ function joinAddress(
     line2,
     zip,
   ].filter(Boolean);
-}
-
-
-
-/* =========================================================
-   CUPOM
-========================================================= */
-
-function normalizeCouponName(
-  value?: string | null
-) {
-  return String(
-    value || "CLIENTE"
-  )
-    .normalize("NFD")
-    .replace(
-      /[\u0300-\u036f]/g,
-      ""
-    )
-    .replace(
-      /[^a-zA-Z0-9]/g,
-      ""
-    )
-    .toUpperCase()
-    .slice(0, 12);
 }

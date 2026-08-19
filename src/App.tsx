@@ -20,6 +20,7 @@ const EsqueciSenhaPage = lazy(() => import("./pages/EsqueciSenhaPage"));
 const RedefinirSenhaPage = lazy(() => import("./pages/RedefinirSenhaPage"));
 const ContaPage = lazy(() => import("./pages/users/conta_page"));
 const PedidoDetalhePage = lazy(() => import("./pages/users/PedidoDetalhePage"));
+
 const MinhaContaRedirect = lazy(() => import("./pages/MinhaContaRedirect"));
 const FavoritosPages = lazy(() => import("./pages/FavoritosPages"));
 // ADMIN
@@ -40,6 +41,7 @@ const AdminEstatisticas = lazy(() => import("./pages/admin/AdminEstatisticas"));
 const AdminCupons = lazy(() => import("./pages/admin/AdminCupons"));
 const AdminParcerias = lazy(() => import("./pages/admin/AdminParcerias"));
 import AdminCustosPage from "./pages/admin/AdminCustosPage";
+import FAQPage from "./pages/FAQPage";
 
 function ScrollToHash() {
   const { hash, pathname } = useLocation();
@@ -95,6 +97,7 @@ export default function App() {
           <Route path="/joias/categoria/:categorySlug" element={<JewelryListing />} />
           <Route path="/joias/colecao/:collectionSlug" element={<JewelryListing />} />
           <Route path="/produto/:slug" element={<ProductPage />} />
+          <Route path="/faq" element={<FAQPage />} />
           <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />
 
           <Route path="/admin" element={<AdminGuard />}>

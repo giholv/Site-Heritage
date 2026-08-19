@@ -308,12 +308,16 @@ function buildCreditCardPayment(body: CreateOrderBody) {
 }
 
 
-function resolveCardSource(input: CardPaymentInput, billingAddress?: AddressInput) {
+function resolveCardSource(
+  input: CardPaymentInput,
+  billingAddress?: AddressInput
+) {
   const hasCardId = !!input.cardId;
   const hasCardToken = !!input.cardToken;
   const hasRawCard = !!input.card;
 
   const count = [hasCardId, hasCardToken, hasRawCard].filter(Boolean).length;
+
   if (count !== 1) {
     throw new Error(
       "Envie exatamente uma fonte de cartão: cardId OU cardToken OU card"
@@ -321,20 +325,21 @@ function resolveCardSource(input: CardPaymentInput, billingAddress?: AddressInpu
   }
 
   if (input.cardId) {
-    return { card_id: input.cardId };
-  }
-
-  if (!billingAddress) {
-    throw new Error("billingAddress é obrigatório para pagamento com cartão.");
+    return {
+      card_id: input.cardId,
+    };
   }
 
   if (input.cardToken) {
     return {
-      card: removeUndefined({
-        token: input.cardToken,
-        billing_address: mapAddress(billingAddress),
-      }),
+      card_token: input.cardToken,
     };
+  }
+
+  if (!billingAddress) {
+    throw new Error(
+      "billingAddress é obrigatório para pagamento com cartão."
+    );
   }
 
   return {

@@ -3,11 +3,12 @@ import Header from "../components/Header";
 import Hero from "../components/Hero";
 import Footer from "../components/Footer";
 import BenefitsBar from "../components/BenefitsBar_Calea";
+import CaleaGirlsSection from "../components/CaleaGirlsSection";
 
 const EncontreSuaJoia = lazy(() => import("../components/findyourjewelry"));
 const Semijoias = lazy(() => import("../components/Semijoias"));
 const StyleQuiz = lazy(() => import("../components/StyleQuiz_Calea"));
-const Faq = lazy(() => import("../components/FAQ"));
+const Faq = lazy(() => import("./FAQPage"));
 const Contact = lazy(() => import("../components/Contact"));
 
 function SectionLoading() {
@@ -35,7 +36,7 @@ export default function HomePage() {
           <Semijoias />
           <EncontreSuaJoia />
           <StyleQuiz />
-          <Faq />
+          <CaleaGirlsSection />
           <Contact />
         </Suspense>
       </main>

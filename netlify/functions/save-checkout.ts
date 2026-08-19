@@ -88,49 +88,79 @@ export const handler: Handler = async (event) => {
       updated_at: now,
     };
 
+    // ============================================================
+    // CUSTOMER
+    // E-mail é a identidade principal do cliente no checkout.
+    // Nunca cria outro customer se esse e-mail já existir.
+    // ============================================================
+
     if (customerId) {
-      const { error } = await supabase
+      // Confere se o ID salvo na sessão realmente pertence
+      // ao e-mail da conta que está finalizando a compra.
+      const { data: customerById, error: customerByIdError } = await supabase
+        .from("customers")
+        .select("id, email")
+        .eq("id", customerId)
+        .maybeSingle();
+
+      if (customerByIdError) {
+        throw customerByIdError;
+      }
+
+      const savedCustomerEmail = String(
+        customerById?.email || ""
+      ).trim().toLowerCase();
+
+      // Se o customerId for antigo ou pertencer a outra conta,
+      // descartamos o ID e procuramos pelo e-mail atual.
+      if (!customerById?.id || savedCustomerEmail !== cleanEmail) {
+        customerId = null;
+      }
+    }
+
+    if (!customerId) {
+      const { data: existingCustomer, error: existingCustomerError } =
+        await supabase
+          .from("customers")
+          .select("id, email")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+      if (existingCustomerError) {
+        throw existingCustomerError;
+      }
+
+      if (existingCustomer?.id) {
+        customerId = existingCustomer.id;
+      }
+    }
+
+    if (customerId) {
+      const { error: updateCustomerError } = await supabase
         .from("customers")
         .update(customerPayload)
         .eq("id", customerId);
 
-      if (error) throw error;
-    } else {
-      const { data: existingCustomer, error: existingCustomerError } =
-        await supabase
-          .from("customers")
-          .select("id")
-          .eq("email", cleanEmail)
-          .eq("document", cleanDocument)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-      if (existingCustomerError) throw existingCustomerError;
-
-      if (existingCustomer?.id) {
-        customerId = existingCustomer.id;
-
-        const { error } = await supabase
-          .from("customers")
-          .update(customerPayload)
-          .eq("id", customerId);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("customers")
-          .insert({
-            ...customerPayload,
-            created_at: now,
-          })
-          .select("id")
-          .single();
-
-        if (error) throw error;
-        customerId = data.id;
+      if (updateCustomerError) {
+        throw updateCustomerError;
       }
+    } else {
+      const { data: newCustomer, error: insertCustomerError } = await supabase
+        .from("customers")
+        .insert({
+          ...customerPayload,
+          created_at: now,
+        })
+        .select("id")
+        .single();
+
+      if (insertCustomerError) {
+        throw insertCustomerError;
+      }
+
+      customerId = newCustomer.id;
     }
+
 
     const addressPayload = {
       customer_id: customerId,
@@ -281,7 +311,17 @@ export const handler: Handler = async (event) => {
           line_total_cents: unitPriceCents * qty,
         };
       })
-      .filter(Boolean);
+      .filter(
+        (
+          item
+        ): item is {
+          order_id: any;
+          sku_id: any;
+          quantity: number;
+          unit_price_cents: number;
+          line_total_cents: number;
+        } => item !== null
+      );
 
     if (!orderItemsPayload.length) {
       throw new Error("Nenhum item válido para salvar no pedido.");

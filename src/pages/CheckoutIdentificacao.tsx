@@ -2,20 +2,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ShoppingBag,
   User,
-  CreditCard,
   CheckCircle,
   ArrowLeft,
   ShieldCheck,
   MapPin,
   AlertCircle,
   Loader2,
-  Home,
   ChevronRight,
+  LockKeyhole,
+
 } from "lucide-react";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
 import { supabase } from "../lib/supabase";
 
@@ -145,67 +142,6 @@ function isValidCPF(cpf: string) {
   return d1 === Number(c[9]) && d2 === Number(c[10]);
 }
 
-function toCents(value: number | string | null | undefined) {
-  return Math.round(Number(value ?? 0) * 100);
-}
-
-function Step({
-  label,
-  active,
-  done,
-  Icon,
-  onClick,
-}: {
-  label: string;
-  active?: boolean;
-  done?: boolean;
-  Icon: React.ElementType;
-  onClick?: () => void | Promise<void>;
-}) {
-  const content = (
-    <>
-      <span
-        className={[
-          "inline-flex h-10 w-10 items-center justify-center rounded-full border transition",
-          active
-            ? "border-[#2b554e] bg-[#2b554e] text-white shadow-[0_10px_22px_rgba(43,85,78,0.18)]"
-            : done
-              ? "border-[#b08d57] bg-[#fff8ed] text-[#b08d57]"
-              : "border-[#ddd5ca] bg-white text-[#aaa197]",
-        ].join(" ")}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-
-      <span
-        className={[
-          "whitespace-nowrap text-[11px] sm:text-xs",
-          active ? "font-semibold text-[#2b554e]" : "text-[#9a9187]",
-        ].join(" ")}
-      >
-        {label}
-      </span>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex min-w-[82px] flex-col items-center gap-2"
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div className="flex min-w-[82px] flex-col items-center gap-2">
-      {content}
-    </div>
-  );
-}
 
 function ErrorText({ children }: { children?: string }) {
   if (!children) return null;
@@ -219,6 +155,7 @@ function ErrorText({ children }: { children?: string }) {
 }
 
 function Field({
+  id,
   label,
   required,
   error,
@@ -226,6 +163,7 @@ function Field({
   hint,
   className = "",
 }: {
+  id: string;
   label: string;
   required?: boolean;
   error?: string;
@@ -235,7 +173,10 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="flex items-center gap-1 text-sm font-semibold text-[#3f3a34]">
+      <label
+        htmlFor={id}
+        className="flex items-center gap-1 text-sm font-semibold text-[#3f3a34]"
+      >
         {label}
         {required && <span className="text-red-500">*</span>}
       </label>
@@ -264,6 +205,11 @@ export default function CheckoutIdentificacao() {
 
   const items = state.items ?? [];
 
+  const [authChecking, setAuthChecking] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [customerLoaded, setCustomerLoaded] = useState(false);
+  const [hasExistingCustomer, setHasExistingCustomer] = useState(false);
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, []);
@@ -271,6 +217,178 @@ export default function CheckoutIdentificacao() {
   useEffect(() => {
     if (!items.length) navigate("/checkout", { replace: true });
   }, [items.length, navigate]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function validateCheckoutSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!active) return;
+
+
+
+        if (!session?.access_token || !session.user) {
+          navigate("/checkout", { replace: true });
+          return;
+        }
+
+        const user = session.user;
+
+        setCurrentUser(user);
+        const { data: customer, error: customerError } = await supabase
+          .from("customers")
+          .select(`
+    id,
+    full_name,
+    email,
+    phone,
+    document,
+    addresses (
+      id,
+      cep,
+      street,
+      number,
+      complement,
+      neighborhood,
+      city,
+      state,
+      is_default
+    )
+  `)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (customerError) {
+          console.error("Erro ao carregar cliente:", customerError);
+        }
+
+        if (customer) {
+          setHasExistingCustomer(true);
+
+          sessionStorage.setItem(CUSTOMER_ID_KEY, customer.id);
+
+          const addresses = Array.isArray(customer.addresses)
+            ? customer.addresses
+            : [];
+
+          const defaultAddress =
+            addresses.find((address: any) => address.is_default) ||
+            addresses[0] ||
+            null;
+
+          if (defaultAddress?.id) {
+            sessionStorage.setItem(ADDRESS_ID_KEY, defaultAddress.id);
+          } else {
+            sessionStorage.removeItem(ADDRESS_ID_KEY);
+          }
+
+          setForm((prev) => ({
+            ...prev,
+            name: customer.full_name || prev.name,
+            email: user.email || customer.email || prev.email,
+            phone: customer.phone
+              ? formatPhone(customer.phone)
+              : prev.phone,
+            document: customer.document
+              ? formatCPF(customer.document)
+              : prev.document,
+            cep: defaultAddress?.cep
+              ? formatCEP(defaultAddress.cep)
+              : prev.cep,
+            street: defaultAddress?.street || prev.street,
+            number: defaultAddress?.number || prev.number,
+            complement: defaultAddress?.complement || prev.complement,
+            neighborhood: defaultAddress?.neighborhood || prev.neighborhood,
+            city: defaultAddress?.city || prev.city,
+            state: defaultAddress?.state || prev.state,
+          }));
+        } else {
+          setHasExistingCustomer(false);
+          sessionStorage.removeItem(CUSTOMER_ID_KEY);
+          sessionStorage.removeItem(ADDRESS_ID_KEY);
+        }
+
+        setCustomerLoaded(true);
+
+        const accountEmail = String(user.email || "").trim().toLowerCase();
+
+        setForm((prev) => {
+          const previousEmail = String(prev.email || "").trim().toLowerCase();
+
+          // Dados locais de outra conta nunca são reaproveitados.
+          if (
+            !customer &&
+            previousEmail &&
+            accountEmail &&
+            previousEmail !== accountEmail
+          ) {
+            const cleanForm: Form = {
+              name: "",
+              email: accountEmail,
+              phone: "",
+              document: "",
+              cep: (() => {
+                try {
+                  const rawDraft = sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+                  const draft = rawDraft ? JSON.parse(rawDraft) : null;
+                  return draft?.cep ? formatCEP(draft.cep) : "";
+                } catch {
+                  return "";
+                }
+              })(),
+              street: "",
+              number: "",
+              complement: "",
+              neighborhood: "",
+              city: "",
+              state: "",
+            };
+
+            localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(cleanForm));
+            return cleanForm;
+          }
+
+          if (!prev.email && accountEmail) {
+            return { ...prev, email: accountEmail };
+          }
+
+          return prev;
+        });
+      } finally {
+        if (active) setAuthChecking(false);
+      }
+    }
+
+    validateCheckoutSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+
+      if (!session?.user) {
+        navigate("/checkout", { replace: true });
+        return;
+      }
+
+      setCurrentUser(session.user);
+
+      const accountEmail = String(session.user.email || "").trim().toLowerCase();
+      setForm((prev) => ({
+        ...prev,
+        email: accountEmail || prev.email,
+      }));
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   const [form, setForm] = useState<Form>(() => {
     const saved = localStorage.getItem(FORM_STORAGE_KEY);
@@ -327,6 +445,8 @@ export default function CheckoutIdentificacao() {
       return null;
     }
   }, []);
+
+  const isFirstPurchase = customerLoaded && !hasExistingCustomer;
 
   useEffect(() => {
     if (checkoutDraft?.cep && !form.cep) {
@@ -410,7 +530,6 @@ export default function CheckoutIdentificacao() {
   const getItemImage = (it: any) => it?.image ?? it?.img ?? it?.thumbnail ?? "";
   const getItemQty = (it: any) => Number(it?.qty ?? it?.quantity ?? 1);
   const getItemPrice = (it: any) => Number(it?.price ?? 0);
-  const getItemSkuId = (it: any) => it?.sku_id ?? it?.skuId ?? null;
 
   const itemsSubtotal = useMemo(
     () =>
@@ -424,8 +543,8 @@ export default function CheckoutIdentificacao() {
     typeof checkoutDraft?.subtotal === "number"
       ? checkoutDraft.subtotal
       : itemsSubtotal;
-
   const giftWrap = Boolean(checkoutDraft?.giftWrap);
+
   const giftWrapPrice =
     typeof checkoutDraft?.giftWrapPrice === "number"
       ? checkoutDraft.giftWrapPrice
@@ -443,7 +562,7 @@ export default function CheckoutIdentificacao() {
   const total =
     typeof checkoutDraft?.total === "number"
       ? checkoutDraft.total
-      : subtotal + giftWrapPrice + shippingPrice;
+      : subtotal + (giftWrap ? giftWrapPrice : 0) + shippingPrice;
 
   const requiredOk = useMemo(() => {
     const cepOk = onlyDigits(form.cep).length === 8;
@@ -487,82 +606,91 @@ export default function CheckoutIdentificacao() {
     return e;
   }
 
-async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
-  const checkoutDraftRaw = sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+  async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
+    const checkoutDraftRaw = sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
 
-  if (!checkoutDraftRaw) {
-    throw new Error("Dados do checkout não encontrados. Volte para a sacola e calcule o frete novamente.");
+    if (!checkoutDraftRaw) {
+      throw new Error("Dados do checkout não encontrados. Volte para a sacola e calcule o frete novamente.");
+    }
+
+    const currentCheckoutDraft = JSON.parse(checkoutDraftRaw);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("Sua sessão expirou. Entre novamente para continuar.");
+    }
+
+    const response = await fetch("/.netlify/functions/save-checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        form: currentForm,
+        items: cartItems,
+        checkoutDraft: currentCheckoutDraft,
+        customerId: sessionStorage.getItem(CUSTOMER_ID_KEY),
+        addressId: sessionStorage.getItem(ADDRESS_ID_KEY),
+        orderId: sessionStorage.getItem(ORDER_ID_KEY),
+        orderNumber: sessionStorage.getItem("calea_order_number"),
+      }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.error || "Erro ao salvar checkout.");
+    }
+
+    sessionStorage.setItem(CUSTOMER_ID_KEY, data.customerId);
+    sessionStorage.setItem(ADDRESS_ID_KEY, data.addressId);
+    sessionStorage.setItem(ORDER_ID_KEY, data.orderId);
+
+    if (data.orderNumber) {
+      sessionStorage.setItem("calea_order_number", data.orderNumber);
+    }
+
+    const identificationPayload = {
+      ...currentForm,
+      phone: onlyDigits(currentForm.phone),
+      document: onlyDigits(currentForm.document),
+      cep: onlyDigits(currentForm.cep),
+
+      customer_id: data.customerId,
+      address_id: data.addressId,
+      order_id: data.orderId,
+      order_number: data.orderNumber || null,
+
+      coupon_code: data.couponCode || null,
+      discount_cents: data.discountCents || 0,
+      total_cents: data.totalCents || 0,
+
+      shipping_service_code: data.selectedShipping?.id || null,
+      shipping_service_description: data.selectedShipping?.name || null,
+      shipping_delivery_time: data.selectedShipping?.delivery_time || null,
+      carrier: data.selectedShipping?.carrier || null,
+      shipping: data.selectedShipping || null,
+
+      updatedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(currentForm));
+
+    sessionStorage.setItem(
+      CHECKOUT_IDENTIFICACAO_KEY,
+      JSON.stringify(identificationPayload)
+    );
+
+    return {
+      customerId: data.customerId,
+      addressId: data.addressId,
+      orderId: data.orderId,
+    };
   }
-
-  const currentCheckoutDraft = JSON.parse(checkoutDraftRaw);
-
-  const response = await fetch("/.netlify/functions/save-checkout", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      form: currentForm,
-      items: cartItems,
-      checkoutDraft: currentCheckoutDraft,
-      customerId: sessionStorage.getItem(CUSTOMER_ID_KEY),
-      addressId: sessionStorage.getItem(ADDRESS_ID_KEY),
-      orderId: sessionStorage.getItem(ORDER_ID_KEY),
-      orderNumber: sessionStorage.getItem("calea_order_number"),
-    }),
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok || !data?.ok) {
-    throw new Error(data?.error || "Erro ao salvar checkout.");
-  }
-
-  sessionStorage.setItem(CUSTOMER_ID_KEY, data.customerId);
-  sessionStorage.setItem(ADDRESS_ID_KEY, data.addressId);
-  sessionStorage.setItem(ORDER_ID_KEY, data.orderId);
-
-  if (data.orderNumber) {
-    sessionStorage.setItem("calea_order_number", data.orderNumber);
-  }
-
-  const identificationPayload = {
-    ...currentForm,
-    phone: onlyDigits(currentForm.phone),
-    document: onlyDigits(currentForm.document),
-    cep: onlyDigits(currentForm.cep),
-
-    customer_id: data.customerId,
-    address_id: data.addressId,
-    order_id: data.orderId,
-    order_number: data.orderNumber || null,
-
-    coupon_code: data.couponCode || null,
-    discount_cents: data.discountCents || 0,
-    total_cents: data.totalCents || 0,
-
-    shipping_service_code: data.selectedShipping?.id || null,
-    shipping_service_description: data.selectedShipping?.name || null,
-    shipping_delivery_time: data.selectedShipping?.delivery_time || null,
-    carrier: data.selectedShipping?.carrier || null,
-    shipping: data.selectedShipping || null,
-
-    updatedAt: new Date().toISOString(),
-  };
-
-  localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(currentForm));
-
-  sessionStorage.setItem(
-    CHECKOUT_IDENTIFICACAO_KEY,
-    JSON.stringify(identificationPayload)
-  );
-
-  return {
-    customerId: data.customerId,
-    addressId: data.addressId,
-    orderId: data.orderId,
-  };
-}
 
   async function handleContinue() {
     const e = validate();
@@ -592,67 +720,51 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
     }
   }
 
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#fcfaf6]">
+        <CheckoutHeader onBack={() => navigate("/checkout")} />
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-[#2b554e]" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div ref={topRef} className="min-h-screen" style={{ backgroundColor: CALEA.bg }}>
-      <Header />
+    <div ref={topRef} className="min-h-screen bg-[#fcfaf6]">
+      <CheckoutHeader onBack={() => navigate("/checkout")} />
 
-      <main className="pt-[128px] md:pt-[156px]">
-        <section className="border-b border-[#e9e2d6] bg-[#fcfaf6]">
-          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-            <button
-              type="button"
-              onClick={() => navigate("/checkout")}
-              className="mb-5 inline-flex items-center gap-2 text-sm text-[#756d63] transition hover:text-[#2b554e]"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar para a sacola
-            </button>
+      <main className="pb-28 lg:pb-16">
+        <section className="mx-auto max-w-6xl px-4 pb-5 pt-7 sm:px-6 sm:pb-7 sm:pt-9">
+          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#b08d57]">
+            {isFirstPurchase ? "Primeira compra" : "Finalizar compra"}
+          </p>
 
-            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-[#b08d57]">
-                  Checkout
-                </p>
+          <h1 className="mt-2 font-serif text-[34px] font-normal leading-[1.02] tracking-[-0.03em] text-[#2b554e] sm:text-[42px]">
+            {isFirstPurchase ? "Prazer, vamos completar seu cadastro." : "Seus dados de entrega"}
+          </h1>
 
-                <h1 className="mt-2 text-[30px] font-light leading-tight tracking-[-0.04em] text-[#2b554e] sm:text-[40px]">
-                  Dados de entrega
-                </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#2b554e]/55">
+            {isFirstPurchase
+              ? "Como é sua primeira compra, precisamos de alguns dados para preparar a entrega. Nas próximas compras, tudo fica mais rápido."
+              : "Confira seus dados e o endereço antes de seguir para o pagamento."}
+          </p>
 
-                <p className="mt-2 max-w-xl text-sm leading-6 text-[#7a746c]">
-                  Complete seus dados para criarmos o pedido e seguir para o pagamento com segurança.
-                </p>
-              </div>
+          {currentUser?.email && (
+            <div className="mt-4 inline-flex items-center gap-2 text-xs text-[#2b554e]/50">
+              <CheckCircle className="h-3.5 w-3.5 text-[#2b554e]" />
+              Conectada como <strong className="font-medium text-[#2b554e]">{currentUser.email}</strong>
             </div>
+          )}
 
-            <div className="mt-8 overflow-x-auto pb-2">
-              <div className="flex min-w-max items-center gap-4 sm:min-w-0 sm:justify-between">
-                <Step
-                  label="Sacola"
-                  done
-                  Icon={ShoppingBag}
-                  onClick={() => navigate("/checkout")}
-                />
-
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-
-                <Step label="Identificação" active Icon={User} />
-
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-
-                <Step label="Pagamento" Icon={CreditCard} />
-
-                <div className="h-px w-10 bg-[#ddd5c9] sm:flex-1" />
-
-                <Step label="Confirmação" Icon={CheckCircle} />
-              </div>
-            </div>
-          </div>
+          <CheckoutProgress />
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_390px] lg:gap-7">
             <div className="space-y-6">
-              <div className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+              <div className="border-y border-[#e8dfd3] bg-white p-4 sm:rounded-[24px] sm:border sm:p-6">
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full bg-[#fcfaf6] px-3 py-1 text-xs font-semibold text-[#2b554e] ring-1 ring-[#e9e2d6]">
@@ -664,11 +776,11 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                       className="mt-3 text-xl font-semibold"
                       style={{ color: CALEA.primary }}
                     >
-                      Quem vai receber a compra?
+                      Seus dados
                     </h2>
 
                     <p className="mt-1 text-sm leading-6 text-[#8a8175]">
-                      Os campos com asterisco são obrigatórios.
+                      Preencha uma vez. Nas próximas compras, reaproveitamos seus dados.
                     </p>
                   </div>
                 </div>
@@ -681,12 +793,15 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field
+                    id="checkout-name"
                     label="Nome completo"
                     required
                     error={errors.name}
                     className="sm:col-span-2"
                   >
                     <input
+                      id="checkout-name"
+                      name="name"
                       value={form.name}
                       onChange={(e) => setField("name", e.target.value)}
                       className={inputClass(errors.name)}
@@ -695,19 +810,24 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                     />
                   </Field>
 
-                  <Field label="E-mail" required error={errors.email}>
+                  <Field id="checkout-email" label="E-mail" required error={errors.email}>
                     <input
+                      id="checkout-email"
+                      name="email"
                       value={form.email}
-                      onChange={(e) => setField("email", e.target.value)}
-                      className={inputClass(errors.email)}
+                      readOnly
+                      aria-readonly="true"
+                      className={`${inputClass(errors.email)} cursor-not-allowed bg-[#f7f3ec] text-[#2b554e]/65`}
                       placeholder="voce@exemplo.com"
                       inputMode="email"
                       autoComplete="email"
                     />
                   </Field>
 
-                  <Field label="WhatsApp" required error={errors.phone}>
+                  <Field id="checkout-phone" label="WhatsApp" required error={errors.phone}>
                     <input
+                      id="checkout-phone"
+                      name="phone"
                       value={form.phone}
                       onChange={(e) => setField("phone", formatPhone(e.target.value))}
                       className={inputClass(errors.phone)}
@@ -718,12 +838,15 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                   </Field>
 
                   <Field
+                    id="checkout-document"
                     label="CPF"
                     required
                     error={errors.document}
                     className="sm:col-span-2"
                   >
                     <input
+                      id="checkout-document"
+                      name="document"
                       value={form.document}
                       onChange={(e) => setField("document", formatCPF(e.target.value))}
                       onBlur={() => {
@@ -743,7 +866,7 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                 </div>
               </div>
 
-              <div className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+              <div className="border-y border-[#e8dfd3] bg-white p-4 sm:rounded-[24px] sm:border sm:p-6">
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full bg-[#fcfaf6] px-3 py-1 text-xs font-semibold text-[#2b554e] ring-1 ring-[#e9e2d6]">
@@ -755,7 +878,7 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                       className="mt-3 text-xl font-semibold"
                       style={{ color: CALEA.primary }}
                     >
-                      Endereço de entrega
+                      Onde vamos entregar?
                     </h2>
                   </div>
 
@@ -775,8 +898,10 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-                  <Field label="CEP" required error={errors.cep} className="sm:col-span-2">
+                  <Field id="checkout-cep" label="CEP" required error={errors.cep} className="sm:col-span-2">
                     <input
+                      id="checkout-cep"
+                      name="postalCode"
                       value={form.cep}
                       onChange={(e) => {
                         const nextCep = formatCEP(e.target.value);
@@ -811,12 +936,15 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                   </Field>
 
                   <Field
+                    id="checkout-street"
                     label="Rua / Avenida"
                     required
                     error={errors.street}
                     className="sm:col-span-4"
                   >
                     <input
+                      id="checkout-street"
+                      name="street"
                       value={form.street}
                       onChange={(e) => setField("street", e.target.value)}
                       className={inputClass(errors.street)}
@@ -825,8 +953,10 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                     />
                   </Field>
 
-                  <Field label="Número" required error={errors.number} className="sm:col-span-2">
+                  <Field id="checkout-number" label="Número" required error={errors.number} className="sm:col-span-2">
                     <input
+                      id="checkout-number"
+                      name="number"
                       value={form.number}
                       onChange={(e) => setField("number", e.target.value)}
                       className={inputClass(errors.number)}
@@ -835,8 +965,10 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                     />
                   </Field>
 
-                  <Field label="Complemento" className="sm:col-span-4">
+                  <Field id="checkout-complement" label="Complemento" className="sm:col-span-4">
                     <input
+                      id="checkout-complement"
+                      name="complement"
                       value={form.complement}
                       onChange={(e) => setField("complement", e.target.value)}
                       className={inputClass()}
@@ -845,12 +977,15 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                   </Field>
 
                   <Field
+                    id="checkout-neighborhood"
                     label="Bairro"
                     required
                     error={errors.neighborhood}
                     className="sm:col-span-2"
                   >
                     <input
+                      id="checkout-neighborhood"
+                      name="neighborhood"
                       value={form.neighborhood}
                       onChange={(e) => setField("neighborhood", e.target.value)}
                       className={inputClass(errors.neighborhood)}
@@ -858,8 +993,10 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                     />
                   </Field>
 
-                  <Field label="Cidade" required error={errors.city} className="sm:col-span-3">
+                  <Field id="checkout-city" label="Cidade" required error={errors.city} className="sm:col-span-3">
                     <input
+                      id="checkout-city"
+                      name="city"
                       value={form.city}
                       onChange={(e) => setField("city", e.target.value)}
                       className={inputClass(errors.city)}
@@ -868,8 +1005,10 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                     />
                   </Field>
 
-                  <Field label="UF" required error={errors.state} className="sm:col-span-1">
+                  <Field id="checkout-state" label="UF" required error={errors.state} className="sm:col-span-1">
                     <input
+                      id="checkout-state"
+                      name="state"
                       value={form.state}
                       onChange={(e) =>
                         setField("state", e.target.value.toUpperCase().slice(0, 2))
@@ -881,23 +1020,11 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                     />
                   </Field>
                 </div>
-
-                <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/")}
-                    className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium text-[#766e64] transition hover:bg-[#fcfaf6] hover:text-[#2b554e]"
-                    title="Voltar para a loja"
-                  >
-                    <Home className="h-4 w-4" />
-                    Voltar para a loja
-                  </button>
-                </div>
               </div>
             </div>
 
             <aside className="h-fit space-y-6 lg:sticky lg:top-28">
-              <div className="rounded-[30px] bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-6">
+              <div className="border-y border-[#e8dfd3] bg-white p-4 sm:rounded-[24px] sm:border sm:p-6">
                 <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
                     <p
@@ -1027,7 +1154,7 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                   type="button"
                   onClick={handleContinue}
                   disabled={!requiredOk || saving}
-                  className="mt-5 flex h-[58px] w-full items-center justify-center gap-2 rounded-full bg-[#2b554e] text-sm font-semibold text-white shadow-[0_14px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-5 hidden h-[58px] w-full items-center justify-center gap-2 rounded-full bg-[#2b554e] text-sm font-semibold text-white shadow-[0_14px_28px_rgba(43,85,78,0.24)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 lg:flex"
                 >
                   {saving ? (
                     <>
@@ -1042,12 +1169,12 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
                   )}
                 </button>
 
-                <div className="mt-4 flex items-start gap-3 rounded-2xl bg-[#fcfaf6] p-4 ring-1 ring-[#e9e2d6]">
+                <div className="mt-4 hidden items-center justify-center gap-2 border-t border-[#eee7dc] pt-4 lg:flex">
                   <ShieldCheck
-                    className="mt-0.5 h-5 w-5 shrink-0"
+                    className="h-3.5 w-3.5 shrink-0"
                     style={{ color: CALEA.primary }}
                   />
-                  <p className="text-xs leading-5 text-[#8a8175]">
+                  <p className="text-[10px] leading-4 text-[#2b554e]/45">
                     Ambiente seguro para concluir sua compra.
                   </p>
                 </div>
@@ -1057,7 +1184,97 @@ async function persistCheckoutInDatabase(currentForm: Form, cartItems: any[]) {
         </section>
       </main>
 
-      <Footer />
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e5ddd2] bg-[#fcfaf6]/96 px-4 py-3 shadow-[0_-12px_35px_rgba(43,85,78,0.06)] backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <div className="min-w-[112px]">
+            <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#2b554e]/40">
+              Total
+            </p>
+            <p className="font-serif text-xl text-[#2b554e]">
+              {moneyBRL(total)}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleContinue}
+            disabled={!requiredOk || saving}
+            className="flex h-12 flex-1 items-center justify-center gap-2 bg-[#2b554e] px-5 text-sm font-semibold text-white transition hover:bg-[#23463f] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                Ir para pagamento
+                <ChevronRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CheckoutHeader({ onBack }: { onBack: () => void }) {
+  return (
+    <header className="sticky top-0 z-50 border-b border-[#e8dfd3] bg-[#fcfaf6]/95 backdrop-blur">
+      <div className="mx-auto grid h-[68px] max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 sm:h-[76px] sm:px-6">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 justify-self-start text-xs font-medium text-[#2b554e]/55 transition hover:text-[#2b554e]"
+          aria-label="Voltar para a sacola"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Voltar para a sacola</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => (window.location.href = "/")}
+          className="justify-self-center text-center"
+          aria-label="Ir para a loja Caléa"
+        >
+          <span className="block font-serif text-[20px] tracking-[0.11em] text-[#2b554e] sm:text-[22px]">
+            CALÉA
+          </span>
+          <span className="mt-[-2px] block text-[7px] font-medium uppercase tracking-[0.38em] text-[#b08d57]">
+            Blanc
+          </span>
+        </button>
+
+        <div className="inline-flex items-center gap-2 justify-self-end text-[10px] font-medium uppercase tracking-[0.12em] text-[#2b554e]/45">
+          <LockKeyhole className="h-3.5 w-3.5 text-[#2b554e]" />
+          <span className="hidden sm:inline">Compra segura</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function CheckoutProgress() {
+  return (
+    <div className="mt-7">
+      <div className="flex items-center justify-between text-[11px] font-medium">
+        <span className="text-[#2b554e]">
+          Identificação
+        </span>
+
+        <span className="text-[#2b554e]/35">
+          2 de 4
+        </span>
+      </div>
+
+      <div className="mt-2 grid grid-cols-4 gap-1">
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#2b554e]" />
+        <div className="h-[3px] bg-[#e4dbcf]" />
+        <div className="h-[3px] bg-[#e4dbcf]" />
+      </div>
     </div>
   );
 }

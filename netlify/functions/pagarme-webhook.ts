@@ -111,15 +111,26 @@ export const handler: Handler = async (event) => {
       status: orderStatus,
       payment_status: paymentStatus,
       order_status: orderStatus,
-      payment_method: paymentMethod,
-      pagarme_order_id: providerOrderId,
-      pagarme_charge_id: providerChargeId,
-      pagarme_transaction_id: providerTransactionId,
       pagarme_event_type: eventType,
       pagarme_payload: body,
       updated_at: now,
     };
 
+    if (paymentMethod) {
+      updateData.payment_method = paymentMethod;
+    }
+
+    if (providerOrderId) {
+      updateData.pagarme_order_id = providerOrderId;
+    }
+
+    if (providerChargeId) {
+      updateData.pagarme_charge_id = providerChargeId;
+    }
+
+    if (providerTransactionId) {
+      updateData.pagarme_transaction_id = providerTransactionId;
+    }
     if (orderStatus === "paid") {
       updateData.paid_at = now;
       updateData.stock_reserved = false;
@@ -137,7 +148,7 @@ export const handler: Handler = async (event) => {
       updateData.cancelled_at = now;
       updateData.canceled_reason = eventType;
     }
-
+    
     const updateResult = await updateOrderSafely({
       supabase,
       updateData,
@@ -147,6 +158,34 @@ export const handler: Handler = async (event) => {
       providerOrderId,
       providerChargeId,
     });
+
+    if (updateResult.updated && updateResult.orderId && providerChargeId) {
+      const { error: chargeError } = await supabase
+        .from("pagarme_charges")
+        .upsert(
+          {
+            order_id: updateResult.orderId,
+            pagarme_order_id: providerOrderId,
+            pagarme_charge_id: providerChargeId,
+            pagarme_transaction_id: providerTransactionId,
+            status: charge?.status || newStatus,
+            payment_method: paymentMethod,
+            event_type: eventType,
+            raw_payload: body,
+            updated_at: now,
+          },
+          {
+            onConflict: "pagarme_charge_id",
+          }
+        );
+
+      if (chargeError) {
+        console.error(
+          "Erro ao registrar cobrança Pagar.me:",
+          chargeError
+        );
+      }
+    }
 
     if (!updateResult.updated || !updateResult.orderId) {
       return json(200, {
@@ -306,7 +345,11 @@ function mapStatus(eventType: string, providerStatus?: string): OrderStatus {
     return "refunded";
   }
 
-  if (event.includes("chargedback") || status === "chargedback") {
+  if (
+    event.includes("chargedback") ||
+    event === "chargeback.received" ||
+    status === "chargedback"
+  ) {
     return "chargedback";
   }
 
@@ -372,16 +415,7 @@ async function updateOrderSafely(params: {
         value: orderCode,
         enabled: !!orderCode && !isUuid(orderCode),
       },
-      {
-        column: "order_code",
-        value: orderCode,
-        enabled: !!orderCode,
-      },
-      {
-        column: "code",
-        value: orderCode,
-        enabled: !!orderCode,
-      },
+
       {
         column: "pagarme_order_id",
         value: providerOrderId,

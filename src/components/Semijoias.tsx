@@ -161,13 +161,6 @@ export default function SemijoiasCarousel() {
       setActiveTab(tab);
     }
 
-    if (location.hash === "#semijoias") {
-      window.setTimeout(() => {
-        document
-          .getElementById("semijoias")
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
-    }
   }, [location.search, location.hash]);
 
 
